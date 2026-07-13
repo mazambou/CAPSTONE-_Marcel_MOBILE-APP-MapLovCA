@@ -44,11 +44,22 @@ class SettingsScreen extends StatelessWidget {
         ListTile(
           leading: const Icon(Icons.logout),
           title: const Text('Log Out'),
-          onTap: () => Navigator.pushNamedAndRemoveUntil(
-            context,
-            AppRoutes.login,
-            (_) => false,
-          ),
+          onTap: () async {
+            try {
+              await AuthService.instance.signOut();
+              if (!context.mounted) return;
+              Navigator.pushNamedAndRemoveUntil(
+                context,
+                AppRoutes.login,
+                (_) => false,
+              );
+            } catch (error) {
+              if (!context.mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text(AuthService.instance.messageFor(error))),
+              );
+            }
+          },
         ),
         ListTile(
           leading: const Icon(Icons.delete_outline, color: AppColors.error),

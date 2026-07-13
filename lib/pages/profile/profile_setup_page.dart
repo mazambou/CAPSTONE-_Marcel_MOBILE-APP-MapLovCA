@@ -1,7 +1,78 @@
 part of '../../app.dart';
 
-class ProfileSetupScreen extends StatelessWidget {
+class ProfileSetupScreen extends StatefulWidget {
   const ProfileSetupScreen({super.key});
+  @override
+  State<ProfileSetupScreen> createState() => _ProfileSetupScreenState();
+}
+
+class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
+  final firstName = TextEditingController();
+  final birthDate = TextEditingController();
+  final city = TextEditingController();
+  final country = TextEditingController(text: 'Canada');
+  final bio = TextEditingController();
+  String gender = 'Prefer not to say';
+  bool saving = false;
+
+  @override
+  void dispose() {
+    firstName.dispose();
+    birthDate.dispose();
+    city.dispose();
+    country.dispose();
+    bio.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickBirthDate() async {
+    final now = DateTime.now();
+    final selected = await showDatePicker(
+      context: context,
+      initialDate: DateTime(now.year - 25),
+      firstDate: DateTime(now.year - 100),
+      lastDate: DateTime(now.year - 18, now.month, now.day),
+    );
+    if (selected != null) {
+      birthDate.text = selected.toIso8601String().split('T').first;
+    }
+  }
+
+  Future<void> _continue() async {
+    if (firstName.text.trim().isEmpty ||
+        city.text.trim().isEmpty ||
+        DateTime.tryParse(birthDate.text) == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Add your first name, birth date, and city.'),
+        ),
+      );
+      return;
+    }
+    setState(() => saving = true);
+    try {
+      await MapLovRepository.instance.saveMyProfile({
+        'first_name': firstName.text.trim(),
+        'date_of_birth': birthDate.text,
+        'gender': gender,
+        'city': city.text.trim(),
+        'country_name': country.text.trim(),
+        'country_code': country.text.trim().toLowerCase() == 'canada'
+            ? 'CA'
+            : null,
+        'bio': bio.text.trim(),
+      });
+      if (mounted) Navigator.pushNamed(context, AppRoutes.preferences);
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Unable to save profile: $error')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => saving = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) => _AppPage(
@@ -30,29 +101,61 @@ class ProfileSetupScreen extends StatelessWidget {
         ),
       ),
       const _SectionTitle('About you'),
-      const _Field('First name', Icons.badge_outlined),
+      TextField(
+        controller: firstName,
+        decoration: const InputDecoration(
+          labelText: 'First name',
+          prefixIcon: Icon(Icons.badge_outlined),
+        ),
+      ),
       const SizedBox(height: 12),
-      const _Field('Date of birth', Icons.calendar_month_outlined),
+      TextField(
+        controller: birthDate,
+        readOnly: true,
+        onTap: _pickBirthDate,
+        decoration: const InputDecoration(
+          labelText: 'Date of birth',
+          prefixIcon: Icon(Icons.calendar_month_outlined),
+        ),
+      ),
       const SizedBox(height: 12),
-      const _Dropdown('Gender', [
-        'Woman',
-        'Man',
-        'Non-binary',
-        'Prefer not to say',
-      ]),
+      DropdownButtonFormField<String>(
+        initialValue: gender,
+        isExpanded: true,
+        decoration: const InputDecoration(labelText: 'Gender'),
+        items: const ['Woman', 'Man', 'Non-binary', 'Prefer not to say']
+            .map((value) => DropdownMenuItem(value: value, child: Text(value)))
+            .toList(),
+        onChanged: (value) => setState(() => gender = value ?? gender),
+      ),
       const SizedBox(height: 12),
-      const _Field('City', Icons.location_city_outlined),
+      TextField(
+        controller: city,
+        decoration: const InputDecoration(
+          labelText: 'City',
+          prefixIcon: Icon(Icons.location_city_outlined),
+        ),
+      ),
       const SizedBox(height: 12),
-      const _Field('Country', Icons.public),
+      TextField(
+        controller: country,
+        decoration: const InputDecoration(
+          labelText: 'Country',
+          prefixIcon: Icon(Icons.public),
+        ),
+      ),
       const SizedBox(height: 12),
-      const TextField(
+      TextField(
+        controller: bio,
         maxLines: 4,
-        decoration: InputDecoration(labelText: 'Tell people about yourself'),
+        decoration: const InputDecoration(
+          labelText: 'Tell people about yourself',
+        ),
       ),
       const SizedBox(height: 20),
       _PrimaryButton(
-        'Continue to preferences',
-        onPressed: () => Navigator.pushNamed(context, AppRoutes.preferences),
+        saving ? 'Saving…' : 'Continue to preferences',
+        onPressed: saving ? () {} : _continue,
       ),
     ],
   );

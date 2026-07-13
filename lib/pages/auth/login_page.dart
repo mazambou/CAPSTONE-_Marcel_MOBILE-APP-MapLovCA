@@ -8,8 +8,83 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
+  final _identifierController = TextEditingController();
+  final _passwordController = TextEditingController();
   bool _rememberMe = true;
   bool _obscurePassword = true;
+  bool _isLoading = false;
+  bool _isNavigating = false;
+  String? _errorText;
+  StreamSubscription<MapLovAuthEvent>? _authSubscription;
+
+  @override
+  void initState() {
+    super.initState();
+    _authSubscription = AuthService.instance.events.listen((event) {
+      if (event == MapLovAuthEvent.signedIn) _goHome();
+    });
+  }
+
+  @override
+  void dispose() {
+    _authSubscription?.cancel();
+    _identifierController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _login() async {
+    if (_isLoading) return;
+    final identifier = _identifierController.text.trim();
+    final password = _passwordController.text;
+    if (identifier.isEmpty || password.isEmpty) {
+      setState(() => _errorText = 'Enter your email or phone and password.');
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+      _errorText = null;
+    });
+    try {
+      await AuthService.instance.signIn(
+        identifier: identifier,
+        password: password,
+        rememberSession: _rememberMe,
+      );
+      _goHome();
+    } catch (error) {
+      if (mounted) {
+        setState(() => _errorText = AuthService.instance.messageFor(error));
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _socialLogin(Future<bool> Function() signIn) async {
+    if (_isLoading) return;
+    setState(() {
+      _isLoading = true;
+      _errorText = null;
+    });
+    try {
+      await signIn();
+      if (!AuthService.instance.isConfigured) _goHome();
+    } catch (error) {
+      if (mounted) {
+        setState(() => _errorText = AuthService.instance.messageFor(error));
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  void _goHome() {
+    if (!mounted || _isNavigating) return;
+    _isNavigating = true;
+    Navigator.pushNamedAndRemoveUntil(context, AppRoutes.home, (_) => false);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -60,8 +135,12 @@ class _LoginScreenState extends State<LoginScreen> {
                             left: (pageWidth - contentWidth) / 2,
                             width: contentWidth,
                             child: _LoginCard(
+                              identifierController: _identifierController,
+                              passwordController: _passwordController,
                               rememberMe: _rememberMe,
                               obscurePassword: _obscurePassword,
+                              isLoading: _isLoading,
+                              errorText: _errorText,
                               onRememberChanged: (value) {
                                 setState(() => _rememberMe = value ?? false);
                               },
@@ -70,9 +149,12 @@ class _LoginScreenState extends State<LoginScreen> {
                                   () => _obscurePassword = !_obscurePassword,
                                 );
                               },
-                              onLogin: () => Navigator.pushReplacementNamed(
-                                context,
-                                AppRoutes.home,
+                              onLogin: _login,
+                              onGoogleLogin: () => _socialLogin(
+                                AuthService.instance.signInWithGoogle,
+                              ),
+                              onAppleLogin: () => _socialLogin(
+                                AuthService.instance.signInWithApple,
                               ),
                               onRegister: () => Navigator.pushNamed(
                                 context,
@@ -183,19 +265,31 @@ class _BrandRule extends StatelessWidget {
 
 class _LoginCard extends StatelessWidget {
   const _LoginCard({
+    required this.identifierController,
+    required this.passwordController,
     required this.rememberMe,
     required this.obscurePassword,
+    required this.isLoading,
+    required this.errorText,
     required this.onRememberChanged,
     required this.onPasswordVisibilityChanged,
     required this.onLogin,
+    required this.onGoogleLogin,
+    required this.onAppleLogin,
     required this.onRegister,
   });
 
+  final TextEditingController identifierController;
+  final TextEditingController passwordController;
   final bool rememberMe;
   final bool obscurePassword;
+  final bool isLoading;
+  final String? errorText;
   final ValueChanged<bool?> onRememberChanged;
   final VoidCallback onPasswordVisibilityChanged;
   final VoidCallback onLogin;
+  final VoidCallback onGoogleLogin;
+  final VoidCallback onAppleLogin;
   final VoidCallback onRegister;
 
   @override
@@ -230,14 +324,29 @@ class _LoginCard extends StatelessWidget {
             'Sign in to continue your journey',
             style: TextStyle(color: AppColors.grayText, fontSize: 15),
           ),
+          if (errorText != null) ...[
+            const SizedBox(height: 5),
+            Text(
+              errorText!,
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(color: AppColors.error, fontSize: 12),
+            ),
+          ],
           const SizedBox(height: 14),
-          const _LoginField(
+          _LoginField(
+            controller: identifierController,
             hintText: 'Email or Phone',
             icon: Icons.person,
             keyboardType: TextInputType.emailAddress,
+            textInputAction: TextInputAction.next,
+            autofillHints: const [AutofillHints.username, AutofillHints.email],
+            enabled: !isLoading,
           ),
           const SizedBox(height: 10),
           _LoginField(
+            controller: passwordController,
             hintText: 'Password',
             icon: Icons.lock,
             obscureText: obscurePassword,
@@ -250,6 +359,10 @@ class _LoginCard extends StatelessWidget {
                 color: AppColors.grayText,
               ),
             ),
+            textInputAction: TextInputAction.done,
+            autofillHints: const [AutofillHints.password],
+            enabled: !isLoading,
+            onSubmitted: (_) => onLogin(),
           ),
           const SizedBox(height: 5),
           Row(
@@ -301,7 +414,7 @@ class _LoginCard extends StatelessWidget {
                 borderRadius: BorderRadius.circular(14),
               ),
               child: ElevatedButton(
-                onPressed: onLogin,
+                onPressed: isLoading ? null : onLogin,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.transparent,
                   shadowColor: Colors.transparent,
@@ -310,10 +423,22 @@ class _LoginCard extends StatelessWidget {
                     borderRadius: BorderRadius.circular(14),
                   ),
                 ),
-                child: const Text(
-                  'Log In',
-                  style: TextStyle(fontSize: 19, fontWeight: FontWeight.w600),
-                ),
+                child: isLoading
+                    ? const SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: AppColors.white,
+                        ),
+                      )
+                    : const Text(
+                        'Log In',
+                        style: TextStyle(
+                          fontSize: 19,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
               ),
             ),
           ),
@@ -332,8 +457,9 @@ class _LoginCard extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const _RoundSocialButton(
-                child: Text(
+              _RoundSocialButton(
+                onPressed: isLoading ? null : onGoogleLogin,
+                child: const Text(
                   'G',
                   style: TextStyle(
                     color: Color(0xFF4285F4),
@@ -343,8 +469,9 @@ class _LoginCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 18),
-              const _RoundSocialButton(
-                child: Icon(Icons.apple, color: Colors.black, size: 30),
+              _RoundSocialButton(
+                onPressed: isLoading ? null : onAppleLogin,
+                child: const Icon(Icons.apple, color: Colors.black, size: 30),
               ),
               const SizedBox(width: 18),
               _RoundSocialButton(
@@ -386,24 +513,39 @@ class _LoginCard extends StatelessWidget {
 
 class _LoginField extends StatelessWidget {
   const _LoginField({
+    required this.controller,
     required this.hintText,
     required this.icon,
     this.obscureText = false,
     this.keyboardType,
     this.suffixIcon,
+    this.textInputAction,
+    this.onSubmitted,
+    this.enabled = true,
+    this.autofillHints,
   });
 
+  final TextEditingController controller;
   final String hintText;
   final IconData icon;
   final bool obscureText;
   final TextInputType? keyboardType;
   final Widget? suffixIcon;
+  final TextInputAction? textInputAction;
+  final ValueChanged<String>? onSubmitted;
+  final bool enabled;
+  final Iterable<String>? autofillHints;
 
   @override
   Widget build(BuildContext context) {
     return TextField(
+      controller: controller,
       obscureText: obscureText,
       keyboardType: keyboardType,
+      textInputAction: textInputAction,
+      onSubmitted: onSubmitted,
+      enabled: enabled,
+      autofillHints: autofillHints,
       decoration: InputDecoration(
         hintText: hintText,
         hintStyle: const TextStyle(color: AppColors.grayText),
@@ -449,7 +591,7 @@ class _RoundSocialButton extends StatelessWidget {
       elevation: 4,
       shadowColor: AppColors.deepPink.withValues(alpha: 0.18),
       child: InkWell(
-        onTap: onPressed ?? () {},
+        onTap: onPressed,
         customBorder: const CircleBorder(),
         child: SizedBox(width: 50, height: 50, child: Center(child: child)),
       ),

@@ -1,11 +1,13 @@
 import '../models/user_profile.dart';
 
-// TODO(Supabase): Replace these local profiles with backend data.
+// Offline/demo fallback. MapLovRepository replaces these rows with PostgreSQL
+// data whenever a configured Supabase session is available.
 PhotoDisplayStyle currentUserPhotoDisplayStyle =
     PhotoDisplayStyle.profileDetails;
 
 const mockProfiles = [
   UserProfile(
+    id: '00000000-0000-4000-8000-000000000001',
     name: 'Sophie',
     age: 27,
     city: 'Toronto',
@@ -17,6 +19,7 @@ const mockProfiles = [
     isNew: true,
   ),
   UserProfile(
+    id: '00000000-0000-4000-8000-000000000002',
     name: 'Alex',
     age: 30,
     city: 'Montréal',
@@ -27,6 +30,7 @@ const mockProfiles = [
     distanceKm: 5,
   ),
   UserProfile(
+    id: '00000000-0000-4000-8000-000000000003',
     name: 'Taylor',
     age: 29,
     city: 'Vancouver',
@@ -37,6 +41,7 @@ const mockProfiles = [
     distanceKm: 7,
   ),
   UserProfile(
+    id: '00000000-0000-4000-8000-000000000004',
     name: 'Olivia',
     age: 24,
     city: 'Victoria',
@@ -47,6 +52,7 @@ const mockProfiles = [
     distanceKm: 8,
   ),
   UserProfile(
+    id: '00000000-0000-4000-8000-000000000005',
     name: 'Ava',
     age: 28,
     city: 'Québec City',
@@ -58,6 +64,7 @@ const mockProfiles = [
     isNew: true,
   ),
   UserProfile(
+    id: '00000000-0000-4000-8000-000000000006',
     name: 'Mia',
     age: 24,
     city: 'Whistler',

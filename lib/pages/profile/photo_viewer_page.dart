@@ -54,12 +54,9 @@ class _DetailedPhotoViewerState extends State<_DetailedPhotoViewer> {
   void initState() {
     super.initState();
     _profile = widget.profile;
-    _photos = [
-      _profile.imagePath,
-      ...mockProfiles
-          .where((profile) => profile.imagePath != _profile.imagePath)
-          .map((profile) => profile.imagePath),
-    ];
+    _photos = _profile.photoUrls.isNotEmpty
+        ? List.of(_profile.photoUrls)
+        : [_profile.imagePath];
     _currentIndex = widget.initialIndex.clamp(0, _photos.length - 1);
     _pageController = PageController(initialPage: _currentIndex);
   }
@@ -101,11 +98,10 @@ class _DetailedPhotoViewerState extends State<_DetailedPhotoViewer> {
             controller: _pageController,
             itemCount: _photos.length,
             onPageChanged: (index) => setState(() => _currentIndex = index),
-            itemBuilder: (context, index) => Image.asset(
+            itemBuilder: (context, index) => mediaImage(
               _photos[index],
               fit: BoxFit.cover,
               alignment: Alignment.center,
-              filterQuality: FilterQuality.high,
             ),
           ),
           const _PhotoViewerGradient(),
@@ -193,12 +189,9 @@ class _SocialPhotoViewerState extends State<_SocialPhotoViewer> {
   @override
   void initState() {
     super.initState();
-    _photos = [
-      widget.profile.imagePath,
-      ...mockProfiles
-          .where((profile) => profile.imagePath != widget.profile.imagePath)
-          .map((profile) => profile.imagePath),
-    ];
+    _photos = widget.profile.photoUrls.isNotEmpty
+        ? List.of(widget.profile.photoUrls)
+        : [widget.profile.imagePath];
     _currentIndex = widget.initialIndex.clamp(0, _photos.length - 1);
     _pageController = PageController(initialPage: _currentIndex);
   }
@@ -219,6 +212,17 @@ class _SocialPhotoViewerState extends State<_SocialPhotoViewer> {
   }
 
   void _toggleLike() {
+    final photoId = widget.profile.photoIds.length > _currentIndex
+        ? widget.profile.photoIds[_currentIndex]
+        : null;
+    if (photoId != null) {
+      unawaited(
+        MapLovRepository.instance.togglePhotoLike(
+          photoId,
+          currentlyLiked: _liked,
+        ),
+      );
+    }
     setState(() {
       _liked = !_liked;
       _likeCount += _liked ? 1 : -1;
@@ -235,7 +239,12 @@ class _SocialPhotoViewerState extends State<_SocialPhotoViewer> {
       isScrollControlled: true,
       backgroundColor: const Color(0xFF19171C),
       showDragHandle: true,
-      builder: (context) => _PhotoCommentsSheet(profile: widget.profile),
+      builder: (context) => _PhotoCommentsSheet(
+        profile: widget.profile,
+        photoId: widget.profile.photoIds.length > _currentIndex
+            ? widget.profile.photoIds[_currentIndex]
+            : 'demo-photo',
+      ),
     );
   }
 
@@ -250,11 +259,10 @@ class _SocialPhotoViewerState extends State<_SocialPhotoViewer> {
             controller: _pageController,
             itemCount: _photos.length,
             onPageChanged: (index) => setState(() => _currentIndex = index),
-            itemBuilder: (context, index) => Image.asset(
+            itemBuilder: (context, index) => mediaImage(
               _photos[index],
               fit: BoxFit.cover,
               alignment: Alignment.center,
-              filterQuality: FilterQuality.high,
             ),
           ),
           const _SocialPhotoGradient(),
@@ -529,10 +537,43 @@ class _SocialFactCard extends StatelessWidget {
   }
 }
 
-class _PhotoCommentsSheet extends StatelessWidget {
-  const _PhotoCommentsSheet({required this.profile});
+class _PhotoCommentsSheet extends StatefulWidget {
+  const _PhotoCommentsSheet({required this.profile, required this.photoId});
 
   final UserProfile profile;
+  final String photoId;
+
+  @override
+  State<_PhotoCommentsSheet> createState() => _PhotoCommentsSheetState();
+}
+
+class _PhotoCommentsSheetState extends State<_PhotoCommentsSheet> {
+  final controller = TextEditingController();
+  late Future<List<Map<String, String>>> comments;
+
+  @override
+  void initState() {
+    super.initState();
+    _reload();
+  }
+
+  void _reload() =>
+      comments = MapLovRepository.instance.photoComments(widget.photoId);
+
+  @override
+  void dispose() {
+    controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _send() async {
+    await MapLovRepository.instance.addPhotoComment(
+      widget.photoId,
+      controller.text,
+    );
+    controller.clear();
+    if (mounted) setState(_reload);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -549,7 +590,7 @@ class _PhotoCommentsSheet extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Comments on ${profile.name}’s photo',
+              'Comments on ${widget.profile.name}’s photo',
               style: const TextStyle(
                 color: Colors.white,
                 fontSize: 20,
@@ -557,23 +598,29 @@ class _PhotoCommentsSheet extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 14),
-            const _PhotoComment(
-              author: 'Jamie',
-              text: 'This is such a beautiful photo!',
-            ),
-            const _PhotoComment(
-              author: 'Taylor',
-              text: 'The sunset looks incredible ✨',
+            FutureBuilder<List<Map<String, String>>>(
+              future: comments,
+              builder: (context, snapshot) => Column(
+                children: (snapshot.data ?? const <Map<String, String>>[])
+                    .map(
+                      (item) => _PhotoComment(
+                        author: item['author']!,
+                        text: item['body']!,
+                      ),
+                    )
+                    .toList(),
+              ),
             ),
             const SizedBox(height: 12),
             TextField(
+              controller: controller,
               style: const TextStyle(color: Colors.white),
               decoration: InputDecoration(
                 hintText: 'Add a respectful comment...',
                 hintStyle: const TextStyle(color: Colors.white54),
                 fillColor: Colors.white.withValues(alpha: 0.1),
                 suffixIcon: IconButton(
-                  onPressed: () => Navigator.pop(context),
+                  onPressed: _send,
                   icon: const Icon(Icons.send, color: AppColors.coral),
                 ),
               ),
@@ -917,7 +964,9 @@ class _PhotoActions extends StatelessWidget {
           icon: Icons.star,
           color: const Color(0xFFFFB020),
           size: 58,
-          onPressed: () {},
+          onPressed: () => ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('Super Like sent.'))),
         ),
       ],
     );

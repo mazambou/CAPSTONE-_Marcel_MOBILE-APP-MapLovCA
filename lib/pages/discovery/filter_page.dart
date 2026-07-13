@@ -72,7 +72,46 @@ class _FilterScreenState extends State<FilterScreen> {
     });
   }
 
-  void _showResults() => Navigator.pop(context);
+  Future<void> _showResults() async {
+    final tab = DefaultTabController.of(context).index;
+    final selectedAges = tab == 2
+        ? advancedAges
+        : tab == 1
+        ? standardAges
+        : ages;
+    final selectedDistance = tab == 2
+        ? advancedDistance
+        : tab == 1
+        ? standardDistance
+        : distance;
+    final language = tab == 2
+        ? advancedSelections['Language']
+        : standardSelections['Language'];
+    final goal = tab == 2
+        ? advancedSelections['Relationship goal']
+        : standardSelections['Relationship goal'];
+    final mode = switch (locationMode) {
+      'My country' => 'my_country',
+      'International' => 'specific_country',
+      _ => 'near_me',
+    };
+    final filters = DiscoveryFilters(
+      minimumAge: selectedAges.start.round(),
+      maximumAge: selectedAges.end.round(),
+      distanceKm: selectedDistance.round(),
+      locationMode: mode,
+      countries: locationMode == 'International' ? [selectedCountry] : const [],
+      cities: locationMode == 'My country' && selectedCity != 'Any city'
+          ? [selectedCity]
+          : const [],
+      languages: language == null || language == 'Any' ? const [] : [language],
+      relationshipGoals: goal == null || goal == 'Any' ? const [] : [goal],
+      verifiedOnly: tab == 2 ? advancedVerified : tab == 1 && standardVerified,
+      activeTodayOnly: tab == 2 && activeToday,
+    );
+    await MapLovRepository.instance.savePreferences(filters);
+    if (mounted) Navigator.pop(context, filters);
+  }
 
   void _setStandardSelection(String title, String value) {
     setState(() => standardSelections[title] = value);

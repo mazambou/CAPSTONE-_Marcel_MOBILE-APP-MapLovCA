@@ -35,17 +35,19 @@ class AdminDashboardScreen extends StatelessWidget {
         trailing: const Icon(Icons.chevron_right),
         onTap: () => Navigator.pushNamed(context, AppRoutes.moderationReports),
       ),
-      const ListTile(
-        leading: Icon(Icons.person_search_outlined),
-        title: Text('User management'),
-        subtitle: Text('Search, suspend or ban accounts'),
-        trailing: Icon(Icons.chevron_right),
+      ListTile(
+        leading: const Icon(Icons.person_search_outlined),
+        title: const Text('User management'),
+        subtitle: const Text('Search, suspend or ban accounts'),
+        trailing: const Icon(Icons.chevron_right),
+        onTap: () => Navigator.pushNamed(context, AppRoutes.adminUsers),
       ),
-      const ListTile(
-        leading: Icon(Icons.history),
-        title: Text('Audit log'),
-        subtitle: Text('Review moderator actions'),
-        trailing: Icon(Icons.chevron_right),
+      ListTile(
+        leading: const Icon(Icons.history),
+        title: const Text('Audit log'),
+        subtitle: const Text('Review moderator actions'),
+        trailing: const Icon(Icons.chevron_right),
+        onTap: () => Navigator.pushNamed(context, AppRoutes.adminAudit),
       ),
     ],
   );

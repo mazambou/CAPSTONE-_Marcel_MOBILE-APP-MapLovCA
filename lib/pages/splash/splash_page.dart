@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../routes/app_routes.dart';
+import '../../services/auth_service.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -17,7 +18,7 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   void initState() {
     super.initState();
-    _navigationTimer = Timer(const Duration(seconds: 3), _goToOnboarding);
+    _navigationTimer = Timer(const Duration(seconds: 3), _leaveSplash);
   }
 
   @override
@@ -26,9 +27,13 @@ class _SplashScreenState extends State<SplashScreen> {
     super.dispose();
   }
 
-  void _goToOnboarding() {
+  void _leaveSplash() {
     if (!mounted) return;
-    Navigator.of(context).pushReplacementNamed(AppRoutes.onboarding);
+    Navigator.of(context).pushReplacementNamed(
+      AuthService.instance.hasActiveSession
+          ? AppRoutes.home
+          : AppRoutes.onboarding,
+    );
   }
 
   @override

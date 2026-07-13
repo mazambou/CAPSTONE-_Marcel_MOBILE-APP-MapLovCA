@@ -1,7 +1,63 @@
 part of '../../app.dart';
 
-class GardenManagementScreen extends StatelessWidget {
+class GardenManagementScreen extends StatefulWidget {
   const GardenManagementScreen({super.key});
+  @override
+  State<GardenManagementScreen> createState() => _GardenManagementScreenState();
+}
+
+class _GardenManagementScreenState extends State<GardenManagementScreen> {
+  late Future<List<GardenAlbumItem>> albums;
+  @override
+  void initState() {
+    super.initState();
+    _reload();
+  }
+
+  void _reload() => albums = MapLovRepository.instance.gardenAlbums();
+
+  Future<void> _create() async {
+    final controller = TextEditingController();
+    final title = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Create private album'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(labelText: 'Album name'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, controller.text.trim()),
+            child: const Text('Create'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (title == null || title.isEmpty) return;
+    await MapLovRepository.instance.createGardenAlbum(title);
+    if (mounted) setState(_reload);
+  }
+
+  Future<void> _addPhoto(GardenAlbumItem album) async {
+    final image = await ImagePicker().pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 88,
+    );
+    if (image == null) return;
+    await MapLovRepository.instance.uploadGardenPhoto(
+      albumId: album.id,
+      bytes: await image.readAsBytes(),
+      extension: image.name.split('.').last,
+    );
+    if (mounted) setState(_reload);
+  }
 
   @override
   Widget build(BuildContext context) => _AppPage(
@@ -17,20 +73,44 @@ class GardenManagementScreen extends StatelessWidget {
         ),
       ),
       const _SectionTitle('Private albums'),
-      Card(
-        child: ListTile(
-          leading: const Icon(
-            Icons.photo_library_outlined,
-            color: AppColors.coral,
-          ),
-          title: const Text('My private moments'),
-          subtitle: const Text('6 photos • 2 active viewers'),
-          trailing: const Icon(Icons.chevron_right),
-          onTap: () => Navigator.pushNamed(context, AppRoutes.gardenViewer),
-        ),
+      FutureBuilder<List<GardenAlbumItem>>(
+        future: albums,
+        builder: (context, snapshot) {
+          final items = snapshot.data ?? const <GardenAlbumItem>[];
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          return Column(
+            children: items
+                .map(
+                  (album) => Card(
+                    child: ListTile(
+                      leading: const Icon(
+                        Icons.photo_library_outlined,
+                        color: AppColors.coral,
+                      ),
+                      title: Text(album.title),
+                      subtitle: Text('${album.photoCount} photos'),
+                      trailing: IconButton(
+                        onPressed: () => _addPhoto(album),
+                        tooltip: 'Add private photo',
+                        icon: const Icon(Icons.add_a_photo_outlined),
+                      ),
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => GardenViewerScreen(album: album),
+                        ),
+                      ),
+                    ),
+                  ),
+                )
+                .toList(),
+          );
+        },
       ),
       OutlinedButton.icon(
-        onPressed: () {},
+        onPressed: _create,
         icon: const Icon(Icons.create_new_folder_outlined),
         label: const Text('Create private album'),
       ),
@@ -39,18 +119,10 @@ class GardenManagementScreen extends StatelessWidget {
         child: ListTile(
           leading: const Icon(Icons.pending_actions_outlined),
           title: const Text('Access requests'),
-          subtitle: const Text('2 requests waiting'),
-          trailing: const Badge(label: Text('2')),
+          subtitle: const Text('Review waiting requests'),
+          trailing: const Icon(Icons.chevron_right),
           onTap: () =>
               Navigator.pushNamed(context, AppRoutes.gardenAccessRequests),
-        ),
-      ),
-      const Card(
-        child: ListTile(
-          leading: Icon(Icons.history),
-          title: Text('Access history'),
-          subtitle: Text('Review active, expired and revoked access'),
-          trailing: Icon(Icons.chevron_right),
         ),
       ),
     ],

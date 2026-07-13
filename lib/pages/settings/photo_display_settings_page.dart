@@ -18,9 +18,14 @@ class _PhotoDisplaySettingsScreenState
     selectedStyle = currentUserPhotoDisplayStyle;
   }
 
-  void _savePreference() {
+  Future<void> _savePreference() async {
     currentUserPhotoDisplayStyle = selectedStyle;
-    Navigator.pop(context);
+    await MapLovRepository.instance.saveMyProfile({
+      'photo_display_style': selectedStyle == PhotoDisplayStyle.social
+          ? 'social'
+          : 'profile_details',
+    });
+    if (mounted) Navigator.pop(context);
   }
 
   @override

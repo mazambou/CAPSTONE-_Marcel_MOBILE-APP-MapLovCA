@@ -31,7 +31,20 @@ class SecurityScreen extends StatelessWidget {
       ),
       const _SectionTitle('Account protection'),
       OutlinedButton.icon(
-        onPressed: () {},
+        onPressed: () async {
+          try {
+            await AuthService.instance.signOutOtherDevices();
+            if (!context.mounted) return;
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Other sessions were signed out.')),
+            );
+          } catch (error) {
+            if (!context.mounted) return;
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(AuthService.instance.messageFor(error))),
+            );
+          }
+        },
         icon: const Icon(Icons.logout),
         label: const Text('Sign out of all other devices'),
       ),

@@ -3,68 +3,76 @@ part of '../../app.dart';
 class NotificationsScreen extends StatelessWidget {
   const NotificationsScreen({super.key});
 
+  IconData _icon(String kind) => switch (kind) {
+    'message' => Icons.chat_bubble_outline,
+    'friend_request' || 'friend_accepted' => Icons.person_add_alt,
+    'garden_request' || 'garden_response' => Icons.lock_open_outlined,
+    'post_like' => Icons.favorite_outline,
+    'post_comment' => Icons.comment_outlined,
+    'security' => Icons.shield_outlined,
+    _ => Icons.notifications_none,
+  };
+
   @override
-  Widget build(BuildContext context) {
-    const items = [
-      (
-        Icons.chat_bubble_outline,
-        'New message',
-        'Sophie sent you a message.',
-        'Now',
-      ),
-      (
-        Icons.person_add_alt,
-        'Friend request',
-        'Alex wants to connect with you.',
-        '10m',
-      ),
-      (
-        Icons.lock_open_outlined,
-        'Secret Garden request',
-        'Taylor requested temporary access.',
-        '1h',
-      ),
-      (
-        Icons.favorite_outline,
-        'New like',
-        'Your post received 5 new likes.',
-        '3h',
-      ),
-      (
-        Icons.comment_outlined,
-        'New comment',
-        'Sophie commented on your post.',
-        'Yesterday',
-      ),
-    ];
-    return _AppPage(
-      title: 'Notifications',
-      children: [
-        Align(
-          alignment: Alignment.centerRight,
-          child: TextButton(
-            onPressed: () {},
-            child: const Text('Mark all as read'),
-          ),
+  Widget build(BuildContext context) => _AppPage(
+    title: 'Notifications',
+    children: [
+      Align(
+        alignment: Alignment.centerRight,
+        child: TextButton(
+          onPressed: () async {
+            await MapLovRepository.instance.markNotificationsRead();
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Notifications marked as read.')),
+              );
+            }
+          },
+          child: const Text('Mark all as read'),
         ),
-        ...items.indexed.map(
-          (entry) => Card(
-            color: entry.$1 < 2 ? AppColors.palePink : null,
-            child: ListTile(
-              leading: CircleAvatar(
-                backgroundColor: AppColors.blush,
-                child: Icon(entry.$2.$1, color: AppColors.coral),
-              ),
-              title: Text(
-                entry.$2.$2,
-                style: const TextStyle(fontWeight: FontWeight.w700),
-              ),
-              subtitle: Text(entry.$2.$3),
-              trailing: Text(entry.$2.$4, style: const TextStyle(fontSize: 12)),
-            ),
-          ),
-        ),
-      ],
-    );
+      ),
+      StreamBuilder<List<MapLovNotification>>(
+        stream: MapLovRepository.instance.watchNotifications(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          final items = snapshot.data ?? const <MapLovNotification>[];
+          if (items.isEmpty) return const Text('No notifications yet.');
+          return Column(
+            children: items
+                .map(
+                  (item) => Card(
+                    color: item.isRead ? null : AppColors.palePink,
+                    child: ListTile(
+                      leading: CircleAvatar(
+                        backgroundColor: AppColors.blush,
+                        child: Icon(_icon(item.kind), color: AppColors.coral),
+                      ),
+                      title: Text(
+                        item.title,
+                        style: const TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                      subtitle: Text(item.body),
+                      trailing: Text(
+                        _relativeTime(item.createdAt),
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                    ),
+                  ),
+                )
+                .toList(),
+          );
+        },
+      ),
+    ],
+  );
+
+  String _relativeTime(DateTime date) {
+    final difference = DateTime.now().difference(date.toLocal());
+    if (difference.inMinutes < 1) return 'Now';
+    if (difference.inHours < 1) return '${difference.inMinutes}m';
+    if (difference.inDays < 1) return '${difference.inHours}h';
+    return '${difference.inDays}d';
   }
 }

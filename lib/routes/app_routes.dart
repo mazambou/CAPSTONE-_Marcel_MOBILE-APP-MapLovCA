@@ -51,4 +51,6 @@ class AppRoutes {
   static const legal = '/settings/legal';
   static const adminDashboard = '/admin';
   static const moderationReports = '/admin/reports';
+  static const adminUsers = '/admin/users';
+  static const adminAudit = '/admin/audit';
 }

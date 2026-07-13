@@ -15,7 +15,7 @@ class MatchScreen extends StatelessWidget {
       ...mockProfiles.map(
         (p) => Card(
           child: ListTile(
-            leading: CircleAvatar(backgroundImage: AssetImage(p.imagePath)),
+            leading: CircleAvatar(backgroundImage: profileImageProvider(p)),
             title: Text('${p.name}, ${p.age}'),
             subtitle: Text(
               '${p.compatibilityScore}% compatible • Travel, music',

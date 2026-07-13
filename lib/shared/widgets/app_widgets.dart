@@ -45,31 +45,43 @@ class _MapLovNavigationBar extends StatelessWidget {
           Navigator.pushReplacementNamed(context, routes[index]);
         }
       },
-      destinations: const [
+      destinations: [
         NavigationDestination(
-          icon: Icon(Icons.favorite_outline),
-          selectedIcon: Icon(Icons.favorite),
-          label: 'Discover',
+          icon: const Icon(Icons.favorite_outline),
+          selectedIcon: const Icon(Icons.favorite),
+          label: MapLovLocalizations.of(context).text('discover'),
         ),
         NavigationDestination(
-          icon: Badge(label: Text('2'), child: Icon(Icons.chat_bubble_outline)),
-          selectedIcon: Badge(label: Text('2'), child: Icon(Icons.chat_bubble)),
-          label: 'Messages',
+          icon: const Badge(
+            label: Text('2'),
+            child: Icon(Icons.chat_bubble_outline),
+          ),
+          selectedIcon: const Badge(
+            label: Text('2'),
+            child: Icon(Icons.chat_bubble),
+          ),
+          label: MapLovLocalizations.of(context).text('messages'),
         ),
         NavigationDestination(
-          icon: Icon(Icons.location_on_outlined),
-          selectedIcon: Icon(Icons.location_on),
-          label: 'Map',
+          icon: const Icon(Icons.location_on_outlined),
+          selectedIcon: const Icon(Icons.location_on),
+          label: MapLovLocalizations.of(context).text('map'),
         ),
         NavigationDestination(
-          icon: Badge(label: Text('7'), child: Icon(Icons.favorite_border)),
-          selectedIcon: Badge(label: Text('7'), child: Icon(Icons.favorite)),
-          label: 'Likes',
+          icon: const Badge(
+            label: Text('7'),
+            child: Icon(Icons.favorite_border),
+          ),
+          selectedIcon: const Badge(
+            label: Text('7'),
+            child: Icon(Icons.favorite),
+          ),
+          label: MapLovLocalizations.of(context).text('likes'),
         ),
         NavigationDestination(
-          icon: Icon(Icons.person_outline),
-          selectedIcon: Icon(Icons.person),
-          label: 'Profile',
+          icon: const Icon(Icons.person_outline),
+          selectedIcon: const Icon(Icons.person),
+          label: MapLovLocalizations.of(context).text('profile'),
         ),
       ],
     );
@@ -157,8 +169,8 @@ class _ProfileCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Image.asset(
-              profile.imagePath,
+            profileImage(
+              profile,
               height: 155,
               width: double.infinity,
               fit: BoxFit.cover,
@@ -201,8 +213,8 @@ class _DiscoverCard extends StatelessWidget {
                   builder: (_) => PhotoViewerScreen(profile: profile),
                 ),
               ),
-              child: Image.asset(
-                profile.imagePath,
+              child: profileImage(
+                profile,
                 height: 310,
                 width: double.infinity,
                 fit: BoxFit.cover,
@@ -228,11 +240,14 @@ class _DiscoverCard extends StatelessWidget {
                 icon: const Icon(Icons.message_outlined),
               ),
               IconButton(
-                onPressed: () {},
+                onPressed: () =>
+                    MapLovRepository.instance.sendFriendRequest(profile.id),
                 icon: const Icon(Icons.person_add_alt),
               ),
               IconButton(
-                onPressed: () {},
+                onPressed: () => ScaffoldMessenger.of(
+                  context,
+                ).showSnackBar(const SnackBar(content: Text('Profile liked.'))),
                 icon: const Icon(Icons.favorite_border, color: AppColors.coral),
               ),
               IconButton(

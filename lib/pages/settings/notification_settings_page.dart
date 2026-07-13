@@ -2,7 +2,6 @@ part of '../../app.dart';
 
 class NotificationSettingsScreen extends StatefulWidget {
   const NotificationSettingsScreen({super.key});
-
   @override
   State<NotificationSettingsScreen> createState() =>
       _NotificationSettingsScreenState();
@@ -10,14 +9,31 @@ class NotificationSettingsScreen extends StatefulWidget {
 
 class _NotificationSettingsScreenState
     extends State<NotificationSettingsScreen> {
-  final values = <String, bool>{
-    'Messages': true,
-    'Friend requests': true,
-    'Post likes and comments': true,
-    'Secret Garden requests': true,
-    'Compatibility suggestions': false,
-    'Marketing updates': false,
+  Map<String, bool>? values;
+  static const labels = {
+    'messages': 'Messages',
+    'friend_requests': 'Friend requests',
+    'post_activity': 'Post likes and comments',
+    'garden_requests': 'Secret Garden requests',
+    'compatibility_suggestions': 'Compatibility suggestions',
+    'marketing': 'Marketing updates',
   };
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_load());
+  }
+
+  Future<void> _load() async {
+    final loaded = await MapLovRepository.instance.notificationPreferences();
+    if (mounted) setState(() => values = loaded);
+  }
+
+  Future<void> _change(String key, bool value) async {
+    setState(() => values![key] = value);
+    await MapLovRepository.instance.saveNotificationPreferences(values!);
+  }
 
   @override
   Widget build(BuildContext context) => _AppPage(
@@ -28,13 +44,16 @@ class _NotificationSettingsScreenState
         style: TextStyle(color: AppColors.grayText),
       ),
       const SizedBox(height: 12),
-      ...values.entries.map(
-        (entry) => SwitchListTile(
-          value: entry.value,
-          onChanged: (value) => setState(() => values[entry.key] = value),
-          title: Text(entry.key),
+      if (values == null)
+        const Center(child: CircularProgressIndicator())
+      else
+        ...values!.entries.map(
+          (entry) => SwitchListTile(
+            value: entry.value,
+            onChanged: (value) => _change(entry.key, value),
+            title: Text(labels[entry.key] ?? entry.key),
+          ),
         ),
-      ),
     ],
   );
 }

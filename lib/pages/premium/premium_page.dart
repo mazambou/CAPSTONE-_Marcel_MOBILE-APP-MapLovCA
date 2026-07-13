@@ -39,6 +39,7 @@ class PremiumScreen extends StatelessWidget {
         'More Secret Garden requests',
       ],
       buttonLabel: 'Choose Plus',
+      productId: PremiumProductIds.plusMonthly,
     ),
     _PremiumPlan(
       name: 'PREMIUM\nELITE',
@@ -59,6 +60,7 @@ class PremiumScreen extends StatelessWidget {
       buttonLabel: 'Choose Elite',
       badge: 'MOST POPULAR',
       highlighted: true,
+      productId: PremiumProductIds.eliteMonthly,
     ),
     _PremiumPlan(
       name: 'PREMIUM\nVIP',
@@ -89,6 +91,7 @@ class PremiumScreen extends StatelessWidget {
       buttonLabel: 'Choose VIP',
       badge: 'NEW',
       badgeIcon: Icons.diamond_outlined,
+      productId: PremiumProductIds.vipMonthly,
     ),
   ];
 
@@ -489,8 +492,20 @@ class _PremiumPlanCard extends StatelessWidget {
     );
   }
 
-  void _openPurchaseStatus(BuildContext context) {
+  Future<void> _openPurchaseStatus(BuildContext context) async {
     final selectedPlan = plan.name.replaceAll('\n', ' ');
+    final launched = await PurchaseService.instance.buy(plan.productId!);
+    if (!context.mounted) return;
+    if (!launched) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            PurchaseService.instance.error ?? 'The store is unavailable.',
+          ),
+        ),
+      );
+      return;
+    }
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -567,6 +582,7 @@ class _PremiumPlan {
     this.iconColor = AppColors.softCoral,
     this.highlighted = false,
     this.isCurrent = false,
+    this.productId,
   });
 
   final String name;
@@ -583,4 +599,5 @@ class _PremiumPlan {
   final IconData? badgeIcon;
   final bool highlighted;
   final bool isCurrent;
+  final String? productId;
 }

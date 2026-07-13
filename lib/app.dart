@@ -1,8 +1,20 @@
+import 'dart:async';
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:record/record.dart';
 
 import 'data/mock_data.dart';
 import 'models/user_profile.dart';
 import 'routes/app_routes.dart';
+import 'services/auth_service.dart';
+import 'services/locale_service.dart';
+import 'services/location_service.dart';
+import 'services/maplov_repository.dart';
+import 'services/purchase_service.dart';
 import 'shared/theme/app_colors.dart';
 
 export 'models/user_profile.dart';
@@ -59,35 +71,122 @@ part 'pages/settings/security_page.dart';
 part 'pages/notifications/notifications_page.dart';
 part 'pages/admin/admin_dashboard_page.dart';
 part 'pages/admin/moderation_reports_page.dart';
+part 'pages/admin/admin_users_page.dart';
+part 'pages/admin/admin_audit_page.dart';
 part 'shared/widgets/app_widgets.dart';
 
-class MapLoveApp extends StatelessWidget {
+class MapLoveApp extends StatefulWidget {
   const MapLoveApp({super.key});
 
   @override
+  State<MapLoveApp> createState() => _MapLoveAppState();
+}
+
+class _MapLoveAppState extends State<MapLoveApp> {
+  final _navigatorKey = GlobalKey<NavigatorState>();
+  StreamSubscription<MapLovAuthEvent>? _authSubscription;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(LocaleService.instance.load());
+    unawaited(PurchaseService.instance.initialize());
+    _authSubscription = AuthService.instance.events.listen((event) {
+      if (event == MapLovAuthEvent.passwordRecovery) {
+        _navigatorKey.currentState?.pushNamed(AppRoutes.resetPassword);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _authSubscription?.cancel();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      title: 'MapLov',
-      theme: ThemeData(
-        useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: AppColors.coral,
-          primary: AppColors.coral,
-          surface: AppColors.white,
-        ),
-        scaffoldBackgroundColor: AppColors.white,
-        inputDecorationTheme: InputDecorationTheme(
-          filled: true,
-          fillColor: AppColors.lightGray,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16),
-            borderSide: BorderSide.none,
+    return AnimatedBuilder(
+      animation: LocaleService.instance,
+      builder: (context, _) => MaterialApp(
+        navigatorKey: _navigatorKey,
+        debugShowCheckedModeBanner: false,
+        title: 'MapLov',
+        locale: LocaleService.instance.locale,
+        supportedLocales: const [Locale('en'), Locale('fr')],
+        localizationsDelegates: const [
+          MapLovLocalizations.delegate,
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        theme: ThemeData(
+          useMaterial3: true,
+          colorScheme: ColorScheme.fromSeed(
+            seedColor: AppColors.coral,
+            primary: AppColors.coral,
+            surface: AppColors.white,
+          ),
+          scaffoldBackgroundColor: AppColors.white,
+          inputDecorationTheme: InputDecorationTheme(
+            filled: true,
+            fillColor: AppColors.lightGray,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: BorderSide.none,
+            ),
           ),
         ),
+        initialRoute: AppRoutes.splash,
+        routes: AppRouter.routes,
       ),
-      initialRoute: AppRoutes.splash,
-      routes: AppRouter.routes,
     );
   }
 }
+
+ImageProvider<Object> profileImageProvider(UserProfile profile) =>
+    profile.hasNetworkImage
+    ? NetworkImage(profile.imagePath)
+    : AssetImage(profile.imagePath);
+
+Widget profileImage(
+  UserProfile profile, {
+  BoxFit fit = BoxFit.cover,
+  double? width,
+  double? height,
+}) => profile.hasNetworkImage
+    ? Image.network(
+        profile.imagePath,
+        fit: fit,
+        width: width,
+        height: height,
+        errorBuilder: (_, _, _) => Image.asset(
+          'assets/profile/profile_user_placeholder.png',
+          fit: fit,
+          width: width,
+          height: height,
+        ),
+      )
+    : Image.asset(profile.imagePath, fit: fit, width: width, height: height);
+
+Widget mediaImage(
+  String path, {
+  BoxFit fit = BoxFit.cover,
+  Alignment alignment = Alignment.center,
+  double? width,
+  double? height,
+}) => path.startsWith('http')
+    ? Image.network(
+        path,
+        fit: fit,
+        alignment: alignment,
+        width: width,
+        height: height,
+      )
+    : Image.asset(
+        path,
+        fit: fit,
+        alignment: alignment,
+        width: width,
+        height: height,
+      );

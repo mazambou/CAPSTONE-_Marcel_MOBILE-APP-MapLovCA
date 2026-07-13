@@ -1,7 +1,51 @@
 part of '../../app.dart';
 
-class EditProfileScreen extends StatelessWidget {
+class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({super.key});
+
+  @override
+  State<EditProfileScreen> createState() => _EditProfileScreenState();
+}
+
+class _EditProfileScreenState extends State<EditProfileScreen> {
+  final name = TextEditingController(text: 'Jamie');
+  final city = TextEditingController(text: 'Toronto');
+  final profession = TextEditingController(text: 'Product designer');
+  final bio = TextEditingController();
+  String goal = 'Long-term relationship';
+  bool saving = false;
+
+  @override
+  void dispose() {
+    name.dispose();
+    city.dispose();
+    profession.dispose();
+    bio.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    setState(() => saving = true);
+    try {
+      await MapLovRepository.instance.saveMyProfile({
+        'first_name': name.text.trim(),
+        'city': city.text.trim(),
+        'profession': profession.text.trim(),
+        'bio': bio.text.trim(),
+        'relationship_goal': goal,
+        'profile_completed_at': DateTime.now().toUtc().toIso8601String(),
+      });
+      if (mounted) Navigator.pop(context, true);
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Unable to save profile: $error')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => saving = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) => _AppPage(
@@ -24,28 +68,61 @@ class EditProfileScreen extends StatelessWidget {
         ),
       ),
       const _SectionTitle('Profile information'),
-      const _Field('Jamie', Icons.person_outline),
+      TextField(
+        controller: name,
+        decoration: const InputDecoration(
+          labelText: 'First name',
+          prefixIcon: Icon(Icons.person_outline),
+        ),
+      ),
       const SizedBox(height: 12),
-      const _Field('Toronto', Icons.location_city_outlined),
+      TextField(
+        controller: city,
+        decoration: const InputDecoration(
+          labelText: 'City',
+          prefixIcon: Icon(Icons.location_city_outlined),
+        ),
+      ),
       const SizedBox(height: 12),
-      const _Field('Product designer', Icons.work_outline),
+      TextField(
+        controller: profession,
+        decoration: const InputDecoration(
+          labelText: 'Profession',
+          prefixIcon: Icon(Icons.work_outline),
+        ),
+      ),
       const SizedBox(height: 12),
-      const TextField(
+      TextField(
+        controller: bio,
         maxLines: 4,
-        decoration: InputDecoration(
+        decoration: const InputDecoration(
           labelText: 'Bio',
           hintText: 'Curious traveler, coffee enthusiast...',
         ),
       ),
       const _SectionTitle('Relationship goal'),
-      const _Dropdown('Goal', [
-        'Long-term relationship',
-        'Dating',
-        'Friendship',
-        'Networking',
-      ]),
+      DropdownButtonFormField<String>(
+        initialValue: goal,
+        isExpanded: true,
+        decoration: const InputDecoration(labelText: 'Goal'),
+        items:
+            const [
+                  'Long-term relationship',
+                  'Dating',
+                  'Friendship',
+                  'Networking',
+                ]
+                .map(
+                  (value) => DropdownMenuItem(value: value, child: Text(value)),
+                )
+                .toList(),
+        onChanged: (value) => setState(() => goal = value ?? goal),
+      ),
       const SizedBox(height: 20),
-      _PrimaryButton('Save changes', onPressed: () => Navigator.pop(context)),
+      _PrimaryButton(
+        saving ? 'Saving…' : 'Save changes',
+        onPressed: saving ? () {} : _save,
+      ),
     ],
   );
 }

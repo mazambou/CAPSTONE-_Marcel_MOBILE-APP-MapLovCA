@@ -32,12 +32,22 @@ class SubscriptionManagementScreen extends StatelessWidget {
         trailing: const Icon(Icons.chevron_right),
         onTap: () => Navigator.pushNamed(context, AppRoutes.premium),
       ),
-      const ListTile(
-        leading: Icon(Icons.restore),
-        title: Text('Restore purchases'),
-        subtitle: Text(
+      ListTile(
+        leading: const Icon(Icons.restore),
+        title: const Text('Restore purchases'),
+        subtitle: const Text(
           'Restore a subscription purchased on this store account.',
         ),
+        onTap: () async {
+          await PurchaseService.instance.restore();
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Restore request sent to the store.'),
+              ),
+            );
+          }
+        },
       ),
       const ListTile(
         leading: Icon(Icons.receipt_long_outlined),

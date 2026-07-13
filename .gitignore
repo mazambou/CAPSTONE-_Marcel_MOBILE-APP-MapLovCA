@@ -33,6 +33,13 @@ migrate_working_dir/
 /build/
 /coverage/
 
+# Local backend configuration and credentials
+.env
+.env.*
+!.env.example
+*.dart-define.json
+supabase/.temp/
+
 # Symbolication related
 app.*.symbols
 

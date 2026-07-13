@@ -35,7 +35,19 @@ class HelpCenterScreen extends StatelessWidget {
       ),
       const SizedBox(height: 20),
       OutlinedButton.icon(
-        onPressed: () {},
+        onPressed: () => showDialog<void>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Contact support'),
+            content: const SelectableText('support@maplov.ca'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Close'),
+              ),
+            ],
+          ),
+        ),
         icon: const Icon(Icons.support_agent),
         label: const Text('Contact MapLov Support'),
       ),

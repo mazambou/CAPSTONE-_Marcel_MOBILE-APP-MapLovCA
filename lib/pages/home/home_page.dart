@@ -10,14 +10,53 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   String selectedTab = 'Discover';
   final Set<String> likedProfiles = {};
+  List<UserProfile> _profiles = List.of(mockProfiles);
+  DiscoveryFilters _filters = const DiscoveryFilters();
+  bool _loading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_loadProfiles());
+  }
+
+  Future<void> _loadProfiles() async {
+    if (mounted) setState(() => _loading = true);
+    try {
+      if (selectedTab == 'Nearby') {
+        await LocationService.instance.updateMyLocation();
+      }
+      final profiles = await MapLovRepository.instance.discoverProfiles(
+        tab: selectedTab,
+        filters: _filters,
+      );
+      if (mounted) setState(() => _profiles = profiles);
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Unable to refresh profiles: $error')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _openFilters() async {
+    final result = await Navigator.pushNamed(context, AppRoutes.filters);
+    if (result is DiscoveryFilters) {
+      _filters = result;
+      await _loadProfiles();
+    }
+  }
 
   List<UserProfile> get visibleProfiles {
     return switch (selectedTab) {
       'Nearby' =>
-        mockProfiles.where((profile) => profile.distanceKm <= 10).toList(),
-      'Online' => mockProfiles.where((profile) => profile.isOnline).toList(),
-      'New' => mockProfiles.where((profile) => profile.isNew).toList(),
-      _ => mockProfiles,
+        _profiles.where((profile) => profile.distanceKm <= 10).toList(),
+      'Online' => _profiles.where((profile) => profile.isOnline).toList(),
+      'New' => _profiles.where((profile) => profile.isNew).toList(),
+      _ => _profiles,
     };
   }
 
@@ -53,15 +92,19 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Column(
           children: [
             _DiscoverHeader(
-              onFilters: () => Navigator.pushNamed(context, AppRoutes.filters),
+              onFilters: _openFilters,
               onNotifications: () =>
                   Navigator.pushNamed(context, AppRoutes.notifications),
             ),
             _DiscoverTabs(
               selectedTab: selectedTab,
-              onSelected: (tab) => setState(() => selectedTab = tab),
+              onSelected: (tab) {
+                setState(() => selectedTab = tab);
+                unawaited(_loadProfiles());
+              },
             ),
             const Divider(height: 1),
+            if (_loading) const LinearProgressIndicator(minHeight: 2),
             Expanded(
               child: profiles.isEmpty
                   ? const _EmptyDiscoverState()
@@ -239,11 +282,7 @@ class _DiscoverGridCard extends StatelessWidget {
               child: Transform.scale(
                 scale: 1.48,
                 alignment: const Alignment(0, -0.12),
-                child: Image.asset(
-                  profile.imagePath,
-                  fit: BoxFit.cover,
-                  filterQuality: FilterQuality.high,
-                ),
+                child: profileImage(profile),
               ),
             ),
           ),

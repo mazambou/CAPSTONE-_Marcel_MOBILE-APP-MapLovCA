@@ -1,69 +1,84 @@
 part of '../../app.dart';
 
-class PostDetailsScreen extends StatelessWidget {
-  const PostDetailsScreen({super.key});
+class PostDetailsScreen extends StatefulWidget {
+  const PostDetailsScreen({super.key, this.post});
+  final MapLovPost? post;
+
+  @override
+  State<PostDetailsScreen> createState() => _PostDetailsScreenState();
+}
+
+class _PostDetailsScreenState extends State<PostDetailsScreen> {
+  final comment = TextEditingController();
+
+  @override
+  void dispose() {
+    comment.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    final profile = mockProfiles.first;
+    final post =
+        widget.post ??
+        MapLovPost(
+          id: 'demo-post',
+          author: mockProfiles.first,
+          body: 'A perfect day exploring the city ✨',
+          mediaUrl: mockProfiles.first.imagePath,
+          createdAt: DateTime.now(),
+        );
     return _AppPage(
       title: 'Post',
       children: [
         ListTile(
           contentPadding: EdgeInsets.zero,
-          leading: CircleAvatar(backgroundImage: AssetImage(profile.imagePath)),
+          leading: CircleAvatar(
+            backgroundImage: profileImageProvider(post.author),
+          ),
           title: Text(
-            profile.name,
+            post.author.name,
             style: const TextStyle(fontWeight: FontWeight.w700),
           ),
-          subtitle: const Text('2 hours ago • Friends only'),
-          trailing: const Icon(Icons.more_horiz),
+          subtitle: const Text('Friends only'),
         ),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(18),
-          child: Image.asset(
-            profile.imagePath,
-            height: 320,
-            width: double.infinity,
-            fit: BoxFit.cover,
+        if (post.mediaUrl != null)
+          ClipRRect(
+            borderRadius: BorderRadius.circular(18),
+            child: post.mediaUrl!.startsWith('http')
+                ? Image.network(post.mediaUrl!, height: 360, fit: BoxFit.cover)
+                : Image.asset(post.mediaUrl!, height: 360, fit: BoxFit.cover),
           ),
-        ),
-        const Padding(
-          padding: EdgeInsets.symmetric(vertical: 14),
-          child: Text('A perfect day exploring the city ✨'),
-        ),
-        const Row(
-          children: [
-            Icon(Icons.favorite, color: AppColors.coral),
-            SizedBox(width: 6),
-            Text('24 likes'),
-            Spacer(),
-            Text('5 comments'),
-          ],
-        ),
-        const Divider(height: 30),
-        const _SectionTitle('Comments'),
-        ...[
-          'This looks amazing!',
-          'Such a beautiful place.',
-          'We should go together!',
-        ].map(
-          (comment) => ListTile(
-            leading: const CircleAvatar(child: Icon(Icons.person_outline)),
-            title: const Text(
-              'MapLov friend',
-              style: TextStyle(fontWeight: FontWeight.w700),
+        if (post.body.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            child: Text(post.body),
+          ),
+        if (post.commentsEnabled) ...[
+          const _SectionTitle('Add a comment'),
+          TextField(
+            controller: comment,
+            decoration: const InputDecoration(
+              hintText: 'Write a respectful comment…',
             ),
-            subtitle: Text(comment),
           ),
-        ),
-        const SizedBox(height: 12),
-        const TextField(
-          decoration: InputDecoration(
-            hintText: 'Write a comment...',
-            suffixIcon: Icon(Icons.send, color: AppColors.coral),
+          const SizedBox(height: 10),
+          FilledButton(
+            onPressed: () async {
+              await MapLovRepository.instance.addPostComment(
+                post.id,
+                comment.text,
+              );
+              comment.clear();
+              if (context.mounted) {
+                ScaffoldMessenger.of(
+                  context,
+                ).showSnackBar(const SnackBar(content: Text('Comment added.')));
+              }
+            },
+            child: const Text('Comment'),
           ),
-        ),
+        ],
       ],
     );
   }

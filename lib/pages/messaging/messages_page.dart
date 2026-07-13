@@ -1,7 +1,21 @@
 part of '../../app.dart';
 
-class MessagesScreen extends StatelessWidget {
+class MessagesScreen extends StatefulWidget {
   const MessagesScreen({super.key});
+
+  @override
+  State<MessagesScreen> createState() => _MessagesScreenState();
+}
+
+class _MessagesScreenState extends State<MessagesScreen> {
+  late Future<List<ConversationItem>> _conversations;
+
+  @override
+  void initState() {
+    super.initState();
+    _conversations = MapLovRepository.instance.conversations();
+  }
+
   @override
   Widget build(BuildContext context) => _MainPage(
     index: 1,
@@ -11,30 +25,53 @@ class MessagesScreen extends StatelessWidget {
         height: 150,
         child: Image.asset('assets/chat/chat_conversation_placeholder.png'),
       ),
-      ...mockProfiles.asMap().entries.map(
-        (entry) => ListTile(
-          onTap: () => Navigator.pushNamed(context, AppRoutes.chat),
-          leading: CircleAvatar(
-            backgroundImage: AssetImage(entry.value.imagePath),
-          ),
-          title: Text(
-            entry.value.name,
-            style: const TextStyle(fontWeight: FontWeight.w700),
-          ),
-          subtitle: Text(
-            entry.key == 0 ? 'That sounds perfect! 😊' : 'See you soon',
-          ),
-          trailing: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(
-                entry.key == 0 ? '18:42' : 'Yesterday',
-                style: const TextStyle(fontSize: 12),
-              ),
-              if (entry.key == 0) const Badge(label: Text('2')),
-            ],
-          ),
-        ),
+      FutureBuilder<List<ConversationItem>>(
+        future: _conversations,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          final items = snapshot.data ?? const <ConversationItem>[];
+          if (items.isEmpty) {
+            return const ListTile(
+              leading: Icon(Icons.forum_outlined),
+              title: Text('No conversations yet'),
+              subtitle: Text('Open a profile and tap Message to start.'),
+            );
+          }
+          return Column(
+            children: items
+                .map(
+                  (item) => ListTile(
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => ChatScreen(
+                          conversationId: item.id,
+                          profile: item.profile,
+                        ),
+                      ),
+                    ),
+                    leading: CircleAvatar(
+                      backgroundImage: profileImageProvider(item.profile),
+                    ),
+                    title: Text(
+                      item.profile.name,
+                      style: const TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                    subtitle: Text(
+                      item.preview,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    trailing: item.unread > 0
+                        ? Badge(label: Text('${item.unread}'))
+                        : null,
+                  ),
+                )
+                .toList(),
+          );
+        },
       ),
     ],
   );

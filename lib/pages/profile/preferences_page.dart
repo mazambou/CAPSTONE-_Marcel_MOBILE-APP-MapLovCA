@@ -66,11 +66,26 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
       const SizedBox(height: 20),
       _PrimaryButton(
         'Save preferences',
-        onPressed: () => Navigator.pushNamedAndRemoveUntil(
-          context,
-          AppRoutes.home,
-          (_) => false,
-        ),
+        onPressed: () async {
+          await MapLovRepository.instance.savePreferences(
+            DiscoveryFilters(
+              minimumAge: ages.start.round(),
+              maximumAge: ages.end.round(),
+              locationMode: switch (searchMode) {
+                'Country' => 'my_country',
+                'Worldwide' => 'worldwide',
+                _ => 'near_me',
+              },
+            ),
+          );
+          if (context.mounted) {
+            Navigator.pushNamedAndRemoveUntil(
+              context,
+              AppRoutes.home,
+              (_) => false,
+            );
+          }
+        },
       ),
     ],
   );

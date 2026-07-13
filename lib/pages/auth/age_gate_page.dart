@@ -9,6 +9,28 @@ class AgeGateScreen extends StatefulWidget {
 
 class _AgeGateScreenState extends State<AgeGateScreen> {
   bool confirmed = false;
+  DateTime? dateOfBirth;
+
+  Future<void> _selectDateOfBirth() async {
+    final now = DateTime.now();
+    final latestAllowed = DateTime(now.year - 18, now.month, now.day);
+    final selected = await showDatePicker(
+      context: context,
+      initialDate: dateOfBirth ?? DateTime(now.year - 25),
+      firstDate: DateTime(1900),
+      lastDate: latestAllowed,
+      helpText: 'Select your date of birth',
+    );
+    if (selected != null && mounted) setState(() => dateOfBirth = selected);
+  }
+
+  String get _formattedDate {
+    final value = dateOfBirth;
+    if (value == null) return 'Select your date of birth';
+    return '${value.year.toString().padLeft(4, '0')}-'
+        '${value.month.toString().padLeft(2, '0')}-'
+        '${value.day.toString().padLeft(2, '0')}';
+  }
 
   @override
   Widget build(BuildContext context) => _AppPage(
@@ -30,7 +52,18 @@ class _AgeGateScreenState extends State<AgeGateScreen> {
         style: TextStyle(color: AppColors.grayText),
       ),
       const SizedBox(height: 26),
-      const _Field('Date of birth', Icons.calendar_month_outlined),
+      Card(
+        child: ListTile(
+          onTap: _selectDateOfBirth,
+          leading: const Icon(
+            Icons.calendar_month_outlined,
+            color: AppColors.coral,
+          ),
+          title: const Text('Date of birth'),
+          subtitle: Text(_formattedDate),
+          trailing: const Icon(Icons.chevron_right),
+        ),
+      ),
       CheckboxListTile(
         value: confirmed,
         onChanged: (value) => setState(() => confirmed = value ?? false),
@@ -42,9 +75,12 @@ class _AgeGateScreenState extends State<AgeGateScreen> {
       SizedBox(
         width: double.infinity,
         child: FilledButton(
-          onPressed: confirmed
-              ? () =>
-                    Navigator.pushReplacementNamed(context, AppRoutes.register)
+          onPressed: confirmed && dateOfBirth != null
+              ? () => Navigator.pushReplacementNamed(
+                  context,
+                  AppRoutes.register,
+                  arguments: dateOfBirth,
+                )
               : null,
           child: const Text('Continue'),
         ),

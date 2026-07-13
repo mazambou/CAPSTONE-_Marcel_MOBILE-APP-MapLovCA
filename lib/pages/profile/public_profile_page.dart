@@ -21,11 +21,10 @@ class PublicProfileScreen extends StatelessWidget {
           ),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(24),
-            child: Image.asset(
-              selectedProfile.imagePath,
+            child: SizedBox(
               height: 360,
               width: double.infinity,
-              fit: BoxFit.cover,
+              child: profileImage(selectedProfile),
             ),
           ),
         ),
@@ -58,8 +57,10 @@ class PublicProfileScreen extends StatelessWidget {
           style: const TextStyle(color: AppColors.grayText),
         ),
         const _SectionTitle('About'),
-        const Text(
-          'Warm, curious and always ready to discover a new neighbourhood or live concert.',
+        Text(
+          selectedProfile.bio.isEmpty
+              ? 'Warm, curious and always ready to discover a new neighbourhood or live concert.'
+              : selectedProfile.bio,
         ),
         const _SectionTitle('Interests'),
         const Wrap(
@@ -99,8 +100,12 @@ class PublicProfileScreen extends StatelessWidget {
                     'assets/secret_garden/secret_garden_locked_placeholder.png',
                 icon: Icons.lock_outline,
                 locked: true,
-                onTap: () =>
-                    Navigator.pushNamed(context, AppRoutes.secretGarden),
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => SecretGardenScreen(owner: selectedProfile),
+                  ),
+                ),
               ),
             ),
           ],
@@ -110,7 +115,26 @@ class PublicProfileScreen extends StatelessWidget {
           children: [
             Expanded(
               child: OutlinedButton.icon(
-                onPressed: () {},
+                onPressed: () async {
+                  try {
+                    await MapLovRepository.instance.sendFriendRequest(
+                      selectedProfile.id,
+                    );
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Friend request sent.')),
+                      );
+                    }
+                  } catch (error) {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Unable to send request: $error'),
+                        ),
+                      );
+                    }
+                  }
+                },
                 icon: const Icon(Icons.person_add_alt),
                 label: const Text('Add friend'),
               ),
@@ -118,7 +142,22 @@ class PublicProfileScreen extends StatelessWidget {
             const SizedBox(width: 12),
             Expanded(
               child: FilledButton.icon(
-                onPressed: () => Navigator.pushNamed(context, AppRoutes.chat),
+                onPressed: () async {
+                  final id = await MapLovRepository.instance.startConversation(
+                    selectedProfile.id,
+                  );
+                  if (context.mounted) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => ChatScreen(
+                          conversationId: id,
+                          profile: selectedProfile,
+                        ),
+                      ),
+                    );
+                  }
+                },
                 icon: const Icon(Icons.chat_bubble_outline),
                 label: const Text('Message'),
               ),
@@ -160,12 +199,19 @@ class _ProfileAlbumCard extends StatelessWidget {
             Stack(
               alignment: Alignment.center,
               children: [
-                Image.asset(
-                  imagePath,
-                  height: 128,
-                  width: double.infinity,
-                  fit: BoxFit.cover,
-                ),
+                imagePath.startsWith('http')
+                    ? Image.network(
+                        imagePath,
+                        height: 128,
+                        width: double.infinity,
+                        fit: BoxFit.cover,
+                      )
+                    : Image.asset(
+                        imagePath,
+                        height: 128,
+                        width: double.infinity,
+                        fit: BoxFit.cover,
+                      ),
                 if (locked)
                   Container(
                     width: 48,

@@ -18,6 +18,52 @@ void main() {
     expect(find.text('Find Love Near You'), findsOneWidget);
   });
 
+  testWidgets('login validates credentials and signs in in local UI mode', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        routes: {'/home': (_) => const HomeScreen()},
+        home: const LoginScreen(),
+      ),
+    );
+
+    await tester.tap(find.text('Log In'));
+    await tester.pump();
+    expect(
+      find.text('Enter your email or phone and password.'),
+      findsOneWidget,
+    );
+
+    await tester.enterText(find.byType(TextField).at(0), 'jamie@example.com');
+    await tester.enterText(find.byType(TextField).at(1), 'Password!1');
+    await tester.tap(find.text('Log In'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.pump();
+
+    expect(find.byType(HomeScreen), findsOneWidget);
+  });
+
+  testWidgets('password reset rejects a weak password', (tester) async {
+    await tester.pumpWidget(const MaterialApp(home: ResetPasswordScreen()));
+
+    await tester.enterText(find.byType(TextField).first, 'weak');
+    await tester.enterText(find.byType(TextField).last, 'weak');
+    await tester.tap(find.text('Update password'));
+    await tester.pump();
+
+    expect(
+      find.text('Use at least 8 characters, including a number and a symbol.'),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('opens the full-screen gallery when a profile photo is tapped', (
     tester,
   ) async {
@@ -255,6 +301,8 @@ void main() {
     'legal': const LegalScreen(),
     'admin dashboard': const AdminDashboardScreen(),
     'moderation reports': const ModerationReportsScreen(),
+    'admin users': const AdminUsersScreen(),
+    'admin audit': const AdminAuditScreen(),
   };
 
   for (final entry in screens.entries) {

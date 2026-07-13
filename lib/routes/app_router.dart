@@ -7,7 +7,12 @@ class AppRouter {
     AppRoutes.splash: (_) => const SplashScreen(),
     AppRoutes.onboarding: (_) => const OnboardingScreen(),
     AppRoutes.login: (_) => const LoginScreen(),
-    AppRoutes.register: (_) => const RegisterScreen(),
+    AppRoutes.register: (context) {
+      final argument = ModalRoute.of(context)?.settings.arguments;
+      return RegisterScreen(
+        dateOfBirth: argument is DateTime ? argument : null,
+      );
+    },
     AppRoutes.ageGate: (_) => const AgeGateScreen(),
     AppRoutes.forgotPassword: (_) => const ForgotPasswordScreen(),
     AppRoutes.resetPassword: (_) => const ResetPasswordScreen(),
@@ -55,5 +60,7 @@ class AppRouter {
     AppRoutes.legal: (_) => const LegalScreen(),
     AppRoutes.adminDashboard: (_) => const AdminDashboardScreen(),
     AppRoutes.moderationReports: (_) => const ModerationReportsScreen(),
+    AppRoutes.adminUsers: (_) => const AdminUsersScreen(),
+    AppRoutes.adminAudit: (_) => const AdminAuditScreen(),
   };
 }

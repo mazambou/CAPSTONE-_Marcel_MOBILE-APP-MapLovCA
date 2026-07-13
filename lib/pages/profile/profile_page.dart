@@ -1,7 +1,38 @@
 part of '../../app.dart';
 
-class ProfileScreen extends StatelessWidget {
+class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
+  @override
+  State<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends State<ProfileScreen> {
+  UserProfile profile = const UserProfile(
+    id: 'me',
+    name: 'Jamie',
+    age: 29,
+    city: 'Toronto',
+    compatibilityScore: 100,
+    imagePath: 'assets/profile/profile_user_placeholder.png',
+    photoDisplayStyle: PhotoDisplayStyle.profileDetails,
+    profession: 'Product designer',
+    bio:
+        'Curious traveler, coffee enthusiast, and always ready for a live concert.',
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_load());
+  }
+
+  Future<void> _load() async {
+    final id = MapLovRepository.instance.currentUserId;
+    if (id == null) return;
+    final loaded = await MapLovRepository.instance.getProfile(id);
+    if (loaded != null && mounted) setState(() => profile = loaded);
+  }
+
   @override
   Widget build(BuildContext context) => _MainPage(
     index: 4,
@@ -19,28 +50,21 @@ class ProfileScreen extends StatelessWidget {
     children: [
       ClipRRect(
         borderRadius: BorderRadius.circular(24),
-        child: Image.asset(
-          'assets/profile/profile_user_placeholder.png',
-          height: 280,
-          width: double.infinity,
-          fit: BoxFit.cover,
-        ),
+        child: profileImage(profile, height: 280, width: double.infinity),
       ),
       const SizedBox(height: 16),
       Text(
-        'Jamie, 29',
+        '${profile.name}, ${profile.age}',
         style: Theme.of(
           context,
         ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
       ),
-      const Text(
-        'Toronto, Canada',
-        style: TextStyle(color: AppColors.grayText),
+      Text(
+        '${profile.city}, ${profile.country}',
+        style: const TextStyle(color: AppColors.grayText),
       ),
       const SizedBox(height: 14),
-      const Text(
-        'Curious traveler, coffee enthusiast, and always ready for a live concert.',
-      ),
+      Text(profile.bio),
       const _SectionTitle('Interests'),
       const Wrap(
         spacing: 8,
@@ -56,17 +80,17 @@ class ProfileScreen extends StatelessWidget {
         height: 100,
         child: ListView.separated(
           scrollDirection: Axis.horizontal,
-          itemCount: mockProfiles.length,
+          itemCount: profile.photoUrls.isEmpty
+              ? mockProfiles.length
+              : profile.photoUrls.length,
           separatorBuilder: (_, _) => const SizedBox(width: 8),
           itemBuilder: (_, i) => GestureDetector(
             onTap: () => Navigator.pushNamed(context, AppRoutes.photoViewer),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(14),
-              child: Image.asset(
-                mockProfiles[i].imagePath,
-                width: 100,
-                fit: BoxFit.cover,
-              ),
+              child: profile.photoUrls.isEmpty
+                  ? profileImage(mockProfiles[i], width: 100)
+                  : mediaImage(profile.photoUrls[i], width: 100),
             ),
           ),
         ),

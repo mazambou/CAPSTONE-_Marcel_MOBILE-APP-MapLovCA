@@ -1,0 +1,1478 @@
+-- MapLov Canada - initial Supabase/PostgreSQL schema.
+-- Supabase uses PostgreSQL; this migration is the source of truth for data,
+-- constraints, indexes, helper functions, RLS, and Storage access control.
+
+begin;
+
+create extension if not exists pgcrypto with schema extensions;
+
+create schema if not exists private;
+revoke all on schema private from public, anon;
+grant usage on schema private to authenticated;
+
+create type public.app_role as enum ('user', 'moderator', 'admin');
+create type public.account_status as enum (
+  'active',
+  'suspended',
+  'banned',
+  'deleted'
+);
+create type public.subscription_tier as enum ('free', 'plus', 'elite', 'vip');
+create type public.photo_display_style as enum ('profile_details', 'social');
+create type public.friendship_status as enum (
+  'pending',
+  'accepted',
+  'declined',
+  'cancelled'
+);
+create type public.message_kind as enum ('text', 'image', 'voice', 'system');
+create type public.post_visibility as enum ('friends');
+create type public.garden_request_status as enum (
+  'pending',
+  'approved',
+  'declined',
+  'revoked',
+  'expired'
+);
+create type public.report_target_type as enum ('user', 'post', 'comment', 'photo');
+create type public.report_status as enum (
+  'open',
+  'under_review',
+  'resolved',
+  'dismissed'
+);
+create type public.notification_kind as enum (
+  'message',
+  'friend_request',
+  'friend_accepted',
+  'post_like',
+  'post_comment',
+  'garden_request',
+  'garden_response',
+  'compatibility',
+  'security',
+  'system'
+);
+
+create table public.profiles (
+  id uuid primary key references auth.users(id) on delete cascade,
+  role public.app_role not null default 'user',
+  status public.account_status not null default 'active',
+  first_name text,
+  date_of_birth date,
+  gender text,
+  bio text not null default '',
+  country_code varchar(2),
+  country_name text,
+  city text,
+  profession text,
+  education_level text,
+  height_cm smallint check (height_cm between 100 and 250),
+  relationship_goal text,
+  spoken_languages text[] not null default '{}',
+  is_discoverable boolean not null default true,
+  show_online_status boolean not null default false,
+  show_approximate_distance boolean not null default true,
+  is_verified boolean not null default false,
+  is_photo_verified boolean not null default false,
+  photo_display_style public.photo_display_style not null default 'profile_details',
+  last_active_at timestamptz not null default now(),
+  profile_completed_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint profiles_first_name_length check (char_length(first_name) <= 80),
+  constraint profiles_bio_length check (char_length(bio) <= 2000),
+  constraint profiles_country_code_uppercase check (
+    country_code is null or country_code = upper(country_code)
+  )
+);
+
+comment on column public.profiles.role is
+  'Never writable from user metadata. Only a service role/admin workflow may change roles.';
+
+create table private.user_locations (
+  user_id uuid primary key references public.profiles(id) on delete cascade,
+  latitude double precision not null check (latitude between -90 and 90),
+  longitude double precision not null check (longitude between -180 and 180),
+  accuracy_meters double precision check (accuracy_meters >= 0),
+  updated_at timestamptz not null default now()
+);
+
+comment on table private.user_locations is
+  'Exact coordinates are isolated from the API. Clients use controlled RPC functions.';
+
+create table public.dating_preferences (
+  user_id uuid primary key references public.profiles(id) on delete cascade,
+  genders text[] not null default '{}',
+  minimum_age smallint not null default 18 check (minimum_age between 18 and 100),
+  maximum_age smallint not null default 100 check (maximum_age between 18 and 100),
+  location_mode text not null default 'near_me' check (
+    location_mode in ('near_me', 'my_country', 'specific_country', 'worldwide')
+  ),
+  distance_km integer not null default 50 check (distance_km between 1 and 20000),
+  country_codes text[] not null default '{}',
+  cities text[] not null default '{}',
+  languages text[] not null default '{}',
+  relationship_goals text[] not null default '{}',
+  personalities text[] not null default '{}',
+  religions text[] not null default '{}',
+  body_types text[] not null default '{}',
+  minimum_height_cm smallint check (minimum_height_cm between 100 and 250),
+  maximum_height_cm smallint check (maximum_height_cm between 100 and 250),
+  verified_only boolean not null default false,
+  active_today_only boolean not null default false,
+  updated_at timestamptz not null default now(),
+  constraint dating_preferences_age_order check (minimum_age <= maximum_age),
+  constraint dating_preferences_height_order check (
+    minimum_height_cm is null
+    or maximum_height_cm is null
+    or minimum_height_cm <= maximum_height_cm
+  )
+);
+
+create table public.interests (
+  id bigint generated by default as identity primary key,
+  slug text not null unique,
+  label_en text not null,
+  label_fr text not null,
+  icon_name text,
+  is_active boolean not null default true
+);
+
+create table public.profile_interests (
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  interest_id bigint not null references public.interests(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (user_id, interest_id)
+);
+
+create table public.preference_interests (
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  interest_id bigint not null references public.interests(id) on delete cascade,
+  importance smallint not null default 1 check (importance between 1 and 5),
+  primary key (user_id, interest_id)
+);
+
+create table public.profile_photos (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  storage_path text not null unique,
+  display_order smallint not null default 0 check (display_order >= 0),
+  caption text,
+  is_primary boolean not null default false,
+  is_verified boolean not null default false,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint profile_photos_caption_length check (char_length(caption) <= 500)
+);
+
+create unique index profile_photos_one_primary_per_user
+  on public.profile_photos(user_id)
+  where is_primary;
+create unique index profile_photos_display_order_per_user
+  on public.profile_photos(user_id, display_order);
+
+create table public.photo_likes (
+  photo_id uuid not null references public.profile_photos(id) on delete cascade,
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (photo_id, user_id)
+);
+
+create table public.photo_comments (
+  id uuid primary key default gen_random_uuid(),
+  photo_id uuid not null references public.profile_photos(id) on delete cascade,
+  author_id uuid not null references public.profiles(id) on delete cascade,
+  body text not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  deleted_at timestamptz,
+  constraint photo_comments_body_length check (
+    char_length(body) between 1 and 2000
+  )
+);
+
+create table public.friendships (
+  id uuid primary key default gen_random_uuid(),
+  requester_id uuid not null references public.profiles(id) on delete cascade,
+  addressee_id uuid not null references public.profiles(id) on delete cascade,
+  status public.friendship_status not null default 'pending',
+  created_at timestamptz not null default now(),
+  responded_at timestamptz,
+  updated_at timestamptz not null default now(),
+  constraint friendships_distinct_users check (requester_id <> addressee_id)
+);
+
+create unique index friendships_unique_pair
+  on public.friendships(
+    least(requester_id, addressee_id),
+    greatest(requester_id, addressee_id)
+  )
+  where status in ('pending', 'accepted');
+create index friendships_requester_status_idx
+  on public.friendships(requester_id, status);
+create index friendships_addressee_status_idx
+  on public.friendships(addressee_id, status);
+
+create table public.blocks (
+  blocker_id uuid not null references public.profiles(id) on delete cascade,
+  blocked_id uuid not null references public.profiles(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (blocker_id, blocked_id),
+  constraint blocks_distinct_users check (blocker_id <> blocked_id)
+);
+create index blocks_blocked_id_idx on public.blocks(blocked_id);
+
+create table public.conversations (
+  id uuid primary key default gen_random_uuid(),
+  created_by uuid not null references public.profiles(id) on delete cascade,
+  is_group boolean not null default false,
+  title text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table public.conversation_members (
+  conversation_id uuid not null references public.conversations(id) on delete cascade,
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  joined_at timestamptz not null default now(),
+  left_at timestamptz,
+  is_muted boolean not null default false,
+  primary key (conversation_id, user_id)
+);
+create index conversation_members_user_idx
+  on public.conversation_members(user_id, conversation_id)
+  where left_at is null;
+
+create table public.messages (
+  id uuid primary key default gen_random_uuid(),
+  conversation_id uuid not null references public.conversations(id) on delete cascade,
+  sender_id uuid not null references public.profiles(id) on delete cascade,
+  kind public.message_kind not null default 'text',
+  body text,
+  media_path text,
+  reply_to_id uuid references public.messages(id) on delete set null,
+  created_at timestamptz not null default now(),
+  deleted_at timestamptz,
+  constraint messages_have_content check (
+    deleted_at is not null
+    or kind = 'system'
+    or nullif(btrim(body), '') is not null
+    or media_path is not null
+  ),
+  constraint messages_body_length check (char_length(body) <= 10000)
+);
+create index messages_conversation_created_idx
+  on public.messages(conversation_id, created_at desc);
+
+create table public.conversation_reads (
+  conversation_id uuid not null references public.conversations(id) on delete cascade,
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  last_read_at timestamptz not null default now(),
+  primary key (conversation_id, user_id)
+);
+
+create table public.posts (
+  id uuid primary key default gen_random_uuid(),
+  author_id uuid not null references public.profiles(id) on delete cascade,
+  body text,
+  visibility public.post_visibility not null default 'friends',
+  comments_enabled boolean not null default true,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  deleted_at timestamptz,
+  constraint posts_body_length check (char_length(body) <= 10000)
+);
+create index posts_author_created_idx on public.posts(author_id, created_at desc);
+
+create table public.post_media (
+  id uuid primary key default gen_random_uuid(),
+  post_id uuid not null references public.posts(id) on delete cascade,
+  storage_path text not null unique,
+  media_type text not null default 'image' check (media_type in ('image', 'video')),
+  display_order smallint not null default 0 check (display_order >= 0),
+  created_at timestamptz not null default now(),
+  unique (post_id, display_order)
+);
+
+create table public.post_likes (
+  post_id uuid not null references public.posts(id) on delete cascade,
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (post_id, user_id)
+);
+
+create table public.post_comments (
+  id uuid primary key default gen_random_uuid(),
+  post_id uuid not null references public.posts(id) on delete cascade,
+  author_id uuid not null references public.profiles(id) on delete cascade,
+  body text not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  deleted_at timestamptz,
+  constraint post_comments_body_length check (
+    char_length(body) between 1 and 4000
+  )
+);
+create index post_comments_post_created_idx
+  on public.post_comments(post_id, created_at);
+
+create table public.garden_albums (
+  id uuid primary key default gen_random_uuid(),
+  owner_id uuid not null references public.profiles(id) on delete cascade,
+  title text not null,
+  description text,
+  cover_path text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint garden_albums_title_length check (char_length(title) between 1 and 120),
+  constraint garden_albums_description_length check (char_length(description) <= 1000)
+);
+
+create table public.garden_photos (
+  id uuid primary key default gen_random_uuid(),
+  album_id uuid not null references public.garden_albums(id) on delete cascade,
+  owner_id uuid not null references public.profiles(id) on delete cascade,
+  storage_path text not null unique,
+  caption text,
+  display_order smallint not null default 0 check (display_order >= 0),
+  created_at timestamptz not null default now(),
+  unique (album_id, display_order),
+  constraint garden_photos_caption_length check (char_length(caption) <= 500)
+);
+
+create table public.garden_access_requests (
+  id uuid primary key default gen_random_uuid(),
+  album_id uuid not null references public.garden_albums(id) on delete cascade,
+  requester_id uuid not null references public.profiles(id) on delete cascade,
+  status public.garden_request_status not null default 'pending',
+  requested_duration_seconds integer check (
+    requested_duration_seconds is null or requested_duration_seconds between 60 and 31536000
+  ),
+  granted_duration_seconds integer check (
+    granted_duration_seconds is null or granted_duration_seconds between 60 and 31536000
+  ),
+  requested_at timestamptz not null default now(),
+  responded_at timestamptz,
+  expires_at timestamptz,
+  revoked_at timestamptz,
+  constraint garden_access_expiry_order check (
+    expires_at is null or responded_at is null or expires_at > responded_at
+  )
+);
+create unique index garden_access_one_active_request
+  on public.garden_access_requests(album_id, requester_id)
+  where status in ('pending', 'approved');
+create index garden_access_requester_idx
+  on public.garden_access_requests(requester_id, status);
+create index garden_access_expiry_idx
+  on public.garden_access_requests(expires_at)
+  where status = 'approved';
+
+create table public.profile_views (
+  viewer_id uuid not null references public.profiles(id) on delete cascade,
+  viewed_id uuid not null references public.profiles(id) on delete cascade,
+  viewed_at timestamptz not null default now(),
+  primary key (viewer_id, viewed_id, viewed_at),
+  constraint profile_views_distinct_users check (viewer_id <> viewed_id)
+);
+create index profile_views_viewed_at_idx
+  on public.profile_views(viewed_id, viewed_at desc);
+
+create table public.compatibility_scores (
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  candidate_id uuid not null references public.profiles(id) on delete cascade,
+  score smallint not null check (score between 0 and 100),
+  breakdown jsonb not null default '{}'::jsonb,
+  calculated_at timestamptz not null default now(),
+  primary key (user_id, candidate_id),
+  constraint compatibility_distinct_users check (user_id <> candidate_id)
+);
+create index compatibility_scores_rank_idx
+  on public.compatibility_scores(user_id, score desc);
+
+create table public.reports (
+  id uuid primary key default gen_random_uuid(),
+  reporter_id uuid not null references public.profiles(id) on delete cascade,
+  target_type public.report_target_type not null,
+  target_id uuid not null,
+  reason text not null,
+  comment text,
+  status public.report_status not null default 'open',
+  assigned_to uuid references public.profiles(id) on delete set null,
+  resolution_notes text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  resolved_at timestamptz,
+  constraint reports_reason_length check (char_length(reason) between 2 and 120),
+  constraint reports_comment_length check (char_length(comment) <= 4000)
+);
+create index reports_status_created_idx on public.reports(status, created_at);
+create index reports_reporter_idx on public.reports(reporter_id, created_at desc);
+
+create table public.notifications (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  actor_id uuid references public.profiles(id) on delete set null,
+  kind public.notification_kind not null,
+  title text not null,
+  body text not null,
+  entity_type text,
+  entity_id uuid,
+  data jsonb not null default '{}'::jsonb,
+  read_at timestamptz,
+  created_at timestamptz not null default now()
+);
+create index notifications_user_unread_idx
+  on public.notifications(user_id, created_at desc)
+  where read_at is null;
+
+create table public.notification_preferences (
+  user_id uuid primary key references public.profiles(id) on delete cascade,
+  messages boolean not null default true,
+  friend_requests boolean not null default true,
+  post_activity boolean not null default true,
+  garden_requests boolean not null default true,
+  compatibility_suggestions boolean not null default false,
+  marketing boolean not null default false,
+  updated_at timestamptz not null default now()
+);
+
+create table public.subscriptions (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  tier public.subscription_tier not null,
+  provider text not null check (provider in ('apple', 'google', 'manual')),
+  external_subscription_id text,
+  status text not null check (
+    status in ('pending', 'active', 'past_due', 'cancelled', 'expired', 'refunded')
+  ),
+  current_period_start timestamptz,
+  current_period_end timestamptz,
+  cancel_at_period_end boolean not null default false,
+  is_current boolean not null default true,
+  receipt_metadata jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create unique index subscriptions_one_current_per_user
+  on public.subscriptions(user_id)
+  where is_current;
+create unique index subscriptions_external_id_unique
+  on public.subscriptions(provider, external_subscription_id)
+  where external_subscription_id is not null;
+
+create table public.admin_actions (
+  id uuid primary key default gen_random_uuid(),
+  admin_id uuid not null references public.profiles(id) on delete restrict,
+  action text not null,
+  target_type text not null,
+  target_id uuid,
+  reason text,
+  metadata jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now()
+);
+create index admin_actions_created_idx on public.admin_actions(created_at desc);
+
+-- Seed values are intentionally bilingual; UI localization chooses the label.
+insert into public.interests (slug, label_en, label_fr, icon_name) values
+  ('travel', 'Travel', 'Voyage', 'flight'),
+  ('music', 'Music', 'Musique', 'music_note'),
+  ('hiking', 'Hiking', 'Randonnée', 'hiking'),
+  ('fitness', 'Fitness', 'Fitness', 'fitness_center'),
+  ('food', 'Food', 'Cuisine', 'restaurant'),
+  ('movies', 'Movies', 'Films', 'movie'),
+  ('reading', 'Reading', 'Lecture', 'menu_book'),
+  ('photography', 'Photography', 'Photographie', 'photo_camera'),
+  ('cooking', 'Cooking', 'Cuisine maison', 'skillet'),
+  ('art', 'Art', 'Art', 'palette')
+on conflict (slug) do nothing;
+
+-- Generic timestamp maintenance.
+create or replace function private.set_updated_at()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+begin
+  new.updated_at := now();
+  return new;
+end;
+$$;
+
+create trigger profiles_set_updated_at before update on public.profiles
+for each row execute function private.set_updated_at();
+create trigger preferences_set_updated_at before update on public.dating_preferences
+for each row execute function private.set_updated_at();
+create trigger photos_set_updated_at before update on public.profile_photos
+for each row execute function private.set_updated_at();
+create trigger photo_comments_set_updated_at before update on public.photo_comments
+for each row execute function private.set_updated_at();
+create trigger friendships_set_updated_at before update on public.friendships
+for each row execute function private.set_updated_at();
+create trigger conversations_set_updated_at before update on public.conversations
+for each row execute function private.set_updated_at();
+create trigger posts_set_updated_at before update on public.posts
+for each row execute function private.set_updated_at();
+create trigger post_comments_set_updated_at before update on public.post_comments
+for each row execute function private.set_updated_at();
+create trigger garden_albums_set_updated_at before update on public.garden_albums
+for each row execute function private.set_updated_at();
+create trigger reports_set_updated_at before update on public.reports
+for each row execute function private.set_updated_at();
+create trigger notification_preferences_set_updated_at before update on public.notification_preferences
+for each row execute function private.set_updated_at();
+create trigger subscriptions_set_updated_at before update on public.subscriptions
+for each row execute function private.set_updated_at();
+
+create or replace function private.enforce_adult_profile()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+begin
+  if new.date_of_birth is not null
+     and new.date_of_birth > (current_date - interval '18 years')::date then
+    raise exception 'MapLov accounts require users to be at least 18 years old';
+  end if;
+  return new;
+end;
+$$;
+
+create trigger profiles_enforce_adult
+before insert or update of date_of_birth on public.profiles
+for each row execute function private.enforce_adult_profile();
+
+-- RLS controls rows, not individual columns. These triggers protect fields that
+-- must never be self-awarded by a client using the authenticated key.
+create or replace function private.protect_profile_security_fields()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if auth.role() = 'service_role'
+     or current_setting('maplov.system_operation', true) = 'account_deletion' then
+    return new;
+  end if;
+  if new.role is distinct from old.role
+     and not private.is_full_admin(auth.uid()) then
+    raise exception 'Only administrators can change application roles';
+  end if;
+  if (new.status is distinct from old.status
+     or new.is_verified is distinct from old.is_verified
+     or new.is_photo_verified is distinct from old.is_photo_verified)
+     and not private.is_admin(auth.uid()) then
+    raise exception 'Protected profile fields cannot be changed by the user';
+  end if;
+  return new;
+end;
+$$;
+
+create trigger profiles_protect_security_fields
+before update on public.profiles
+for each row execute function private.protect_profile_security_fields();
+
+create or replace function private.protect_photo_verification()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if auth.role() = 'service_role'
+     or current_setting('maplov.system_operation', true) = 'account_deletion'
+     or private.is_admin(auth.uid()) then
+    return new;
+  end if;
+  if tg_op = 'INSERT' then
+    new.is_verified := false;
+  elsif new.is_verified is distinct from old.is_verified then
+    raise exception 'Photo verification is moderator-controlled';
+  end if;
+  return new;
+end;
+$$;
+
+create trigger profile_photos_protect_verification
+before insert or update on public.profile_photos
+for each row execute function private.protect_photo_verification();
+
+-- A profile is created automatically after a successful Supabase Auth signup.
+-- User-controlled metadata never sets role, status, verification, or subscription.
+create or replace function private.handle_new_auth_user()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  insert into public.profiles (
+    id,
+    first_name,
+    country_code,
+    country_name,
+    city
+  ) values (
+    new.id,
+    nullif(btrim(new.raw_user_meta_data ->> 'first_name'), ''),
+    nullif(upper(btrim(new.raw_user_meta_data ->> 'country_code')), ''),
+    nullif(btrim(new.raw_user_meta_data ->> 'country_name'), ''),
+    nullif(btrim(new.raw_user_meta_data ->> 'city'), '')
+  );
+
+  insert into public.dating_preferences (user_id) values (new.id);
+  insert into public.notification_preferences (user_id) values (new.id);
+  return new;
+end;
+$$;
+
+drop trigger if exists on_auth_user_created on auth.users;
+create trigger on_auth_user_created
+after insert on auth.users
+for each row execute function private.handle_new_auth_user();
+
+-- Security-definer policy helpers live outside the exposed public schema.
+create or replace function private.is_admin(check_user uuid default auth.uid())
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select exists (
+    select 1
+    from public.profiles p
+    where p.id = check_user
+      and p.role in ('moderator', 'admin')
+      and p.status = 'active'
+  );
+$$;
+
+create or replace function private.is_full_admin(check_user uuid default auth.uid())
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select exists (
+    select 1
+    from public.profiles p
+    where p.id = check_user
+      and p.role = 'admin'
+      and p.status = 'active'
+  );
+$$;
+
+create or replace function private.is_blocked_between(user_a uuid, user_b uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select exists (
+    select 1 from public.blocks b
+    where (b.blocker_id = user_a and b.blocked_id = user_b)
+       or (b.blocker_id = user_b and b.blocked_id = user_a)
+  );
+$$;
+
+create or replace function private.can_view_profile(target_user uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select auth.uid() is not null
+    and (
+      auth.uid() = target_user
+      or private.is_admin(auth.uid())
+      or (
+        exists (
+          select 1 from public.profiles p
+          where p.id = target_user
+            and p.status = 'active'
+            and p.is_discoverable
+        )
+        and not private.is_blocked_between(auth.uid(), target_user)
+      )
+    );
+$$;
+
+create or replace function private.are_friends(user_a uuid, user_b uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select exists (
+    select 1 from public.friendships f
+    where f.status = 'accepted'
+      and (
+        (f.requester_id = user_a and f.addressee_id = user_b)
+        or (f.requester_id = user_b and f.addressee_id = user_a)
+      )
+  ) and not private.is_blocked_between(user_a, user_b);
+$$;
+
+create or replace function private.is_conversation_member(target_conversation uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select exists (
+    select 1 from public.conversation_members cm
+    where cm.conversation_id = target_conversation
+      and cm.user_id = auth.uid()
+      and cm.left_at is null
+  );
+$$;
+
+create or replace function private.can_view_post(target_post uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select exists (
+    select 1 from public.posts p
+    where p.id = target_post
+      and p.deleted_at is null
+      and (
+        p.author_id = auth.uid()
+        or private.is_admin(auth.uid())
+        or private.are_friends(auth.uid(), p.author_id)
+      )
+  );
+$$;
+
+create or replace function private.can_view_garden_album(target_album uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select exists (
+    select 1
+    from public.garden_albums a
+    where a.id = target_album
+      and (
+        a.owner_id = auth.uid()
+        or private.is_admin(auth.uid())
+        or exists (
+          select 1
+          from public.garden_access_requests r
+          where r.album_id = a.id
+            and r.requester_id = auth.uid()
+            and r.status = 'approved'
+            and r.revoked_at is null
+            and (r.expires_at is null or r.expires_at > now())
+            and not private.is_blocked_between(auth.uid(), a.owner_id)
+        )
+      )
+  );
+$$;
+
+create or replace function private.safe_uuid(value text)
+returns uuid
+language plpgsql
+immutable
+set search_path = ''
+as $$
+begin
+  return value::uuid;
+exception when invalid_text_representation then
+  return null;
+end;
+$$;
+
+-- Only this RPC can write exact coordinates from a client.
+create or replace function public.update_my_location(
+  latitude double precision,
+  longitude double precision,
+  accuracy_meters double precision default null
+)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if auth.uid() is null then
+    raise exception 'Authentication required';
+  end if;
+  if latitude not between -90 and 90
+     or longitude not between -180 and 180
+     or (accuracy_meters is not null and accuracy_meters < 0) then
+    raise exception 'Invalid location';
+  end if;
+
+  insert into private.user_locations (
+    user_id, latitude, longitude, accuracy_meters, updated_at
+  ) values (
+    auth.uid(), latitude, longitude, accuracy_meters, now()
+  )
+  on conflict (user_id) do update set
+    latitude = excluded.latitude,
+    longitude = excluded.longitude,
+    accuracy_meters = excluded.accuracy_meters,
+    updated_at = now();
+end;
+$$;
+
+-- Returns approximate distance only; exact candidate coordinates never leave PostgreSQL.
+create or replace function public.find_nearby_profiles(
+  radius_km integer default 50,
+  result_limit integer default 50,
+  result_offset integer default 0
+)
+returns table (
+  id uuid,
+  first_name text,
+  age integer,
+  city text,
+  country_name text,
+  is_verified boolean,
+  is_online boolean,
+  distance_km numeric
+)
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  with me as (
+    select latitude, longitude
+    from private.user_locations
+    where user_id = auth.uid()
+  ), candidates as (
+    select
+      p.id,
+      p.first_name,
+      extract(year from age(current_date, p.date_of_birth))::integer as age,
+      p.city,
+      p.country_name,
+      p.is_verified,
+      p.show_online_status and p.last_active_at > now() - interval '5 minutes' as is_online,
+      6371.0 * 2 * asin(
+        sqrt(
+          power(sin(radians(l.latitude - me.latitude) / 2), 2)
+          + cos(radians(me.latitude)) * cos(radians(l.latitude))
+          * power(sin(radians(l.longitude - me.longitude) / 2), 2)
+        )
+      ) as raw_distance_km
+    from me
+    join private.user_locations l on l.user_id <> auth.uid()
+    join public.profiles p on p.id = l.user_id
+    where p.status = 'active'
+      and p.is_discoverable
+      and not private.is_blocked_between(auth.uid(), p.id)
+  )
+  select
+    c.id,
+    c.first_name,
+    c.age,
+    c.city,
+    c.country_name,
+    c.is_verified,
+    c.is_online,
+    round(c.raw_distance_km::numeric, 1)
+  from candidates c
+  where c.raw_distance_km <= greatest(1, least(radius_km, 20000))
+  order by c.raw_distance_km
+  limit greatest(1, least(result_limit, 100))
+  offset greatest(0, result_offset);
+$$;
+
+-- Direct conversations are created atomically so a user cannot forge members.
+create or replace function public.start_direct_conversation(other_user uuid)
+returns uuid
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  conversation_uuid uuid;
+begin
+  if auth.uid() is null or other_user is null or other_user = auth.uid() then
+    raise exception 'Invalid conversation participant';
+  end if;
+  if private.is_blocked_between(auth.uid(), other_user) then
+    raise exception 'Conversation unavailable';
+  end if;
+  if not exists (
+    select 1 from public.profiles p
+    where p.id = other_user and p.status = 'active'
+  ) then
+    raise exception 'Profile unavailable';
+  end if;
+
+  select c.id into conversation_uuid
+  from public.conversations c
+  join public.conversation_members mine
+    on mine.conversation_id = c.id and mine.user_id = auth.uid() and mine.left_at is null
+  join public.conversation_members theirs
+    on theirs.conversation_id = c.id and theirs.user_id = other_user and theirs.left_at is null
+  where not c.is_group
+    and (select count(*) from public.conversation_members cm
+         where cm.conversation_id = c.id and cm.left_at is null) = 2
+  limit 1;
+
+  if conversation_uuid is null then
+    insert into public.conversations (created_by)
+    values (auth.uid()) returning id into conversation_uuid;
+    insert into public.conversation_members (conversation_id, user_id)
+    values (conversation_uuid, auth.uid()), (conversation_uuid, other_user);
+  end if;
+
+  return conversation_uuid;
+end;
+$$;
+
+create or replace function public.delete_my_message(message_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  update public.messages
+  set body = null, media_path = null, deleted_at = now()
+  where id = message_id and sender_id = auth.uid() and deleted_at is null;
+  if not found then
+    raise exception 'Message not found or not owned by current user';
+  end if;
+end;
+$$;
+
+-- Friendship transitions are constrained beyond what row-level policies can express.
+create or replace function private.validate_friendship_transition()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if new.requester_id is distinct from old.requester_id
+     or new.addressee_id is distinct from old.addressee_id then
+    raise exception 'Friendship participants cannot be changed';
+  end if;
+  if auth.role() = 'service_role'
+     or current_setting('maplov.system_operation', true) = 'account_deletion'
+     or private.is_admin(auth.uid()) then
+    return new;
+  end if;
+  if old.status <> 'pending' then
+    raise exception 'This friendship request can no longer be changed';
+  end if;
+  if auth.uid() = old.requester_id and new.status <> 'cancelled' then
+    raise exception 'Requester may only cancel a pending request';
+  elsif auth.uid() = old.addressee_id and new.status not in ('accepted', 'declined') then
+    raise exception 'Recipient may only accept or decline a pending request';
+  elsif auth.uid() not in (old.requester_id, old.addressee_id) then
+    raise exception 'Not allowed';
+  end if;
+  new.responded_at := now();
+  return new;
+end;
+$$;
+
+create trigger friendships_validate_transition
+before update on public.friendships
+for each row execute function private.validate_friendship_transition();
+
+-- Prevent a client from granting or extending its own Secret Garden access.
+create or replace function private.validate_garden_request_transition()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  album_owner uuid;
+begin
+  if new.album_id is distinct from old.album_id
+     or new.requester_id is distinct from old.requester_id then
+    raise exception 'Access request participants cannot be changed';
+  end if;
+  select owner_id into album_owner
+  from public.garden_albums where id = old.album_id;
+
+  if auth.role() = 'service_role'
+     or current_setting('maplov.system_operation', true) = 'account_deletion'
+     or private.is_admin(auth.uid()) then
+    return new;
+  end if;
+  if auth.uid() <> album_owner then
+    raise exception 'Only the album owner can answer access requests';
+  end if;
+  if old.status = 'pending' and new.status in ('approved', 'declined') then
+    new.responded_at := now();
+  elsif old.status = 'approved' and new.status = 'revoked' then
+    new.revoked_at := now();
+    return new;
+  else
+    raise exception 'Invalid access request transition';
+  end if;
+
+  if new.status = 'approved' then
+    new.granted_duration_seconds := coalesce(
+      new.granted_duration_seconds,
+      old.requested_duration_seconds
+    );
+    new.expires_at := case
+      when new.granted_duration_seconds is null then null
+      else now() + make_interval(secs => new.granted_duration_seconds)
+    end;
+  end if;
+  return new;
+end;
+$$;
+
+create trigger garden_requests_validate_transition
+before update on public.garden_access_requests
+for each row execute function private.validate_garden_request_transition();
+
+create or replace function private.protect_notification_update()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if auth.role() = 'service_role' or private.is_admin(auth.uid()) then
+    return new;
+  end if;
+  if new.user_id is distinct from old.user_id
+     or new.actor_id is distinct from old.actor_id
+     or new.kind is distinct from old.kind
+     or new.title is distinct from old.title
+     or new.body is distinct from old.body
+     or new.entity_type is distinct from old.entity_type
+     or new.entity_id is distinct from old.entity_id
+     or new.data is distinct from old.data
+     or new.created_at is distinct from old.created_at then
+    raise exception 'Only notification read state can be changed';
+  end if;
+  return new;
+end;
+$$;
+
+create trigger notifications_protect_update
+before update on public.notifications
+for each row execute function private.protect_notification_update();
+
+-- Row Level Security is enabled on every user-data table, including private location.
+alter table public.profiles enable row level security;
+alter table private.user_locations enable row level security;
+alter table public.dating_preferences enable row level security;
+alter table public.interests enable row level security;
+alter table public.profile_interests enable row level security;
+alter table public.preference_interests enable row level security;
+alter table public.profile_photos enable row level security;
+alter table public.photo_likes enable row level security;
+alter table public.photo_comments enable row level security;
+alter table public.friendships enable row level security;
+alter table public.blocks enable row level security;
+alter table public.conversations enable row level security;
+alter table public.conversation_members enable row level security;
+alter table public.messages enable row level security;
+alter table public.conversation_reads enable row level security;
+alter table public.posts enable row level security;
+alter table public.post_media enable row level security;
+alter table public.post_likes enable row level security;
+alter table public.post_comments enable row level security;
+alter table public.garden_albums enable row level security;
+alter table public.garden_photos enable row level security;
+alter table public.garden_access_requests enable row level security;
+alter table public.profile_views enable row level security;
+alter table public.compatibility_scores enable row level security;
+alter table public.reports enable row level security;
+alter table public.notifications enable row level security;
+alter table public.notification_preferences enable row level security;
+alter table public.subscriptions enable row level security;
+alter table public.admin_actions enable row level security;
+
+create policy profiles_select on public.profiles for select to authenticated
+using (private.can_view_profile(id));
+create policy profiles_update on public.profiles for update to authenticated
+using (id = auth.uid() or private.is_admin())
+with check (id = auth.uid() or private.is_admin());
+
+create policy preferences_owner_all on public.dating_preferences
+for all to authenticated using (user_id = auth.uid()) with check (user_id = auth.uid());
+
+create policy interests_read on public.interests for select to authenticated
+using (is_active or private.is_admin());
+
+create policy profile_interests_read on public.profile_interests for select to authenticated
+using (private.can_view_profile(user_id));
+create policy profile_interests_owner_insert on public.profile_interests for insert to authenticated
+with check (user_id = auth.uid());
+create policy profile_interests_owner_delete on public.profile_interests for delete to authenticated
+using (user_id = auth.uid());
+
+create policy preference_interests_owner_all on public.preference_interests
+for all to authenticated using (user_id = auth.uid()) with check (user_id = auth.uid());
+
+create policy profile_photos_read on public.profile_photos for select to authenticated
+using (private.can_view_profile(user_id));
+create policy profile_photos_owner_insert on public.profile_photos for insert to authenticated
+with check (user_id = auth.uid());
+create policy profile_photos_owner_update on public.profile_photos for update to authenticated
+using (user_id = auth.uid()) with check (user_id = auth.uid());
+create policy profile_photos_owner_delete on public.profile_photos for delete to authenticated
+using (user_id = auth.uid() or private.is_admin());
+
+create policy photo_likes_read on public.photo_likes for select to authenticated
+using (exists (
+  select 1 from public.profile_photos p
+  where p.id = photo_id and private.can_view_profile(p.user_id)
+));
+create policy photo_likes_insert on public.photo_likes for insert to authenticated
+with check (user_id = auth.uid() and exists (
+  select 1 from public.profile_photos p
+  where p.id = photo_id and private.can_view_profile(p.user_id)
+));
+create policy photo_likes_delete on public.photo_likes for delete to authenticated
+using (user_id = auth.uid());
+
+create policy photo_comments_read on public.photo_comments for select to authenticated
+using (exists (
+  select 1 from public.profile_photos p
+  where p.id = photo_id and private.can_view_profile(p.user_id)
+));
+create policy photo_comments_insert on public.photo_comments for insert to authenticated
+with check (author_id = auth.uid() and exists (
+  select 1 from public.profile_photos p
+  where p.id = photo_id and private.can_view_profile(p.user_id)
+));
+create policy photo_comments_update on public.photo_comments for update to authenticated
+using (author_id = auth.uid()) with check (author_id = auth.uid());
+create policy photo_comments_delete on public.photo_comments for delete to authenticated
+using (author_id = auth.uid() or private.is_admin());
+
+create policy friendships_read on public.friendships for select to authenticated
+using (auth.uid() in (requester_id, addressee_id) or private.is_admin());
+create policy friendships_insert on public.friendships for insert to authenticated
+with check (
+  requester_id = auth.uid()
+  and requester_id <> addressee_id
+  and status = 'pending'
+  and responded_at is null
+  and not private.is_blocked_between(requester_id, addressee_id)
+);
+create policy friendships_update on public.friendships for update to authenticated
+using (auth.uid() in (requester_id, addressee_id) or private.is_admin())
+with check (auth.uid() in (requester_id, addressee_id) or private.is_admin());
+create policy friendships_delete on public.friendships for delete to authenticated
+using (auth.uid() in (requester_id, addressee_id) or private.is_admin());
+
+create policy blocks_owner_read on public.blocks for select to authenticated
+using (blocker_id = auth.uid());
+create policy blocks_owner_insert on public.blocks for insert to authenticated
+with check (blocker_id = auth.uid() and blocker_id <> blocked_id);
+create policy blocks_owner_delete on public.blocks for delete to authenticated
+using (blocker_id = auth.uid());
+
+create policy conversations_members_read on public.conversations for select to authenticated
+using (private.is_conversation_member(id));
+create policy conversation_members_read on public.conversation_members for select to authenticated
+using (private.is_conversation_member(conversation_id));
+
+create policy messages_members_read on public.messages for select to authenticated
+using (private.is_conversation_member(conversation_id));
+create policy messages_members_insert on public.messages for insert to authenticated
+with check (
+  sender_id = auth.uid()
+  and kind <> 'system'
+  and private.is_conversation_member(conversation_id)
+  and not exists (
+    select 1
+    from public.conversation_members cm
+    where cm.conversation_id = messages.conversation_id
+      and cm.user_id <> auth.uid()
+      and private.is_blocked_between(auth.uid(), cm.user_id)
+  )
+);
+
+create policy conversation_reads_owner_read on public.conversation_reads for select to authenticated
+using (user_id = auth.uid() and private.is_conversation_member(conversation_id));
+create policy conversation_reads_owner_insert on public.conversation_reads for insert to authenticated
+with check (user_id = auth.uid() and private.is_conversation_member(conversation_id));
+create policy conversation_reads_owner_update on public.conversation_reads for update to authenticated
+using (user_id = auth.uid()) with check (user_id = auth.uid());
+
+create policy posts_friends_read on public.posts for select to authenticated
+using (private.can_view_post(id));
+create policy posts_owner_insert on public.posts for insert to authenticated
+with check (author_id = auth.uid());
+create policy posts_owner_update on public.posts for update to authenticated
+using (author_id = auth.uid()) with check (author_id = auth.uid());
+create policy posts_owner_delete on public.posts for delete to authenticated
+using (author_id = auth.uid() or private.is_admin());
+
+create policy post_media_friends_read on public.post_media for select to authenticated
+using (private.can_view_post(post_id));
+create policy post_media_owner_insert on public.post_media for insert to authenticated
+with check (exists (
+  select 1 from public.posts p where p.id = post_id and p.author_id = auth.uid()
+));
+create policy post_media_owner_delete on public.post_media for delete to authenticated
+using (exists (
+  select 1 from public.posts p where p.id = post_id and p.author_id = auth.uid()
+));
+
+create policy post_likes_friends_read on public.post_likes for select to authenticated
+using (private.can_view_post(post_id));
+create policy post_likes_owner_insert on public.post_likes for insert to authenticated
+with check (user_id = auth.uid() and private.can_view_post(post_id));
+create policy post_likes_owner_delete on public.post_likes for delete to authenticated
+using (user_id = auth.uid());
+
+create policy post_comments_friends_read on public.post_comments for select to authenticated
+using (private.can_view_post(post_id));
+create policy post_comments_owner_insert on public.post_comments for insert to authenticated
+with check (
+  author_id = auth.uid()
+  and private.can_view_post(post_id)
+  and exists (select 1 from public.posts p where p.id = post_id and p.comments_enabled)
+);
+create policy post_comments_owner_update on public.post_comments for update to authenticated
+using (author_id = auth.uid()) with check (author_id = auth.uid());
+create policy post_comments_owner_delete on public.post_comments for delete to authenticated
+using (author_id = auth.uid() or private.is_admin());
+
+create policy garden_albums_visible on public.garden_albums for select to authenticated
+using (owner_id = auth.uid() or private.can_view_garden_album(id));
+create policy garden_albums_owner_insert on public.garden_albums for insert to authenticated
+with check (owner_id = auth.uid());
+create policy garden_albums_owner_update on public.garden_albums for update to authenticated
+using (owner_id = auth.uid()) with check (owner_id = auth.uid());
+create policy garden_albums_owner_delete on public.garden_albums for delete to authenticated
+using (owner_id = auth.uid() or private.is_admin());
+
+create policy garden_photos_visible on public.garden_photos for select to authenticated
+using (private.can_view_garden_album(album_id));
+create policy garden_photos_owner_insert on public.garden_photos for insert to authenticated
+with check (owner_id = auth.uid() and exists (
+  select 1 from public.garden_albums a where a.id = album_id and a.owner_id = auth.uid()
+));
+create policy garden_photos_owner_update on public.garden_photos for update to authenticated
+using (owner_id = auth.uid()) with check (owner_id = auth.uid());
+create policy garden_photos_owner_delete on public.garden_photos for delete to authenticated
+using (owner_id = auth.uid() or private.is_admin());
+
+create policy garden_requests_participants_read on public.garden_access_requests
+for select to authenticated using (
+  requester_id = auth.uid()
+  or exists (
+    select 1 from public.garden_albums a
+    where a.id = album_id and a.owner_id = auth.uid()
+  )
+  or private.is_admin()
+);
+create policy garden_requests_requester_insert on public.garden_access_requests
+for insert to authenticated with check (
+  requester_id = auth.uid()
+  and status = 'pending'
+  and responded_at is null
+  and granted_duration_seconds is null
+  and expires_at is null
+  and revoked_at is null
+  and exists (
+    select 1 from public.garden_albums a
+    where a.id = album_id
+      and a.owner_id <> auth.uid()
+      and not private.is_blocked_between(auth.uid(), a.owner_id)
+  )
+);
+create policy garden_requests_owner_update on public.garden_access_requests
+for update to authenticated using (
+  exists (
+    select 1 from public.garden_albums a
+    where a.id = album_id and a.owner_id = auth.uid()
+  ) or private.is_admin()
+) with check (
+  exists (
+    select 1 from public.garden_albums a
+    where a.id = album_id and a.owner_id = auth.uid()
+  ) or private.is_admin()
+);
+
+create policy profile_views_owner_insert on public.profile_views for insert to authenticated
+with check (
+  viewer_id = auth.uid()
+  and viewer_id <> viewed_id
+  and private.can_view_profile(viewed_id)
+);
+create policy profile_views_viewer_read on public.profile_views for select to authenticated
+using (viewer_id = auth.uid());
+create policy profile_views_premium_viewed_read on public.profile_views for select to authenticated
+using (
+  viewed_id = auth.uid()
+  and exists (
+    select 1 from public.subscriptions s
+    where s.user_id = auth.uid()
+      and s.is_current and s.status = 'active'
+      and s.tier in ('plus', 'elite', 'vip')
+      and (s.current_period_end is null or s.current_period_end > now())
+  )
+);
+
+create policy compatibility_owner_read on public.compatibility_scores for select to authenticated
+using (user_id = auth.uid() and private.can_view_profile(candidate_id));
+
+create policy reports_reporter_insert on public.reports for insert to authenticated
+with check (
+  reporter_id = auth.uid()
+  and status = 'open'
+  and assigned_to is null
+  and resolution_notes is null
+  and resolved_at is null
+);
+create policy reports_reporter_or_admin_read on public.reports for select to authenticated
+using (reporter_id = auth.uid() or private.is_admin());
+create policy reports_admin_update on public.reports for update to authenticated
+using (private.is_admin()) with check (private.is_admin());
+
+create policy notifications_owner_read on public.notifications for select to authenticated
+using (user_id = auth.uid());
+create policy notifications_owner_update on public.notifications for update to authenticated
+using (user_id = auth.uid()) with check (user_id = auth.uid());
+create policy notifications_owner_delete on public.notifications for delete to authenticated
+using (user_id = auth.uid());
+
+create policy notification_preferences_owner_all on public.notification_preferences
+for all to authenticated using (user_id = auth.uid()) with check (user_id = auth.uid());
+
+create policy subscriptions_owner_or_admin_read on public.subscriptions for select to authenticated
+using (user_id = auth.uid() or private.is_admin());
+
+create policy admin_actions_admin_read on public.admin_actions for select to authenticated
+using (private.is_admin());
+create policy admin_actions_admin_insert on public.admin_actions for insert to authenticated
+with check (private.is_admin() and admin_id = auth.uid());
+
+-- Table privileges are necessary in addition to RLS. Missing policies still deny access.
+revoke all on all tables in schema public from anon;
+grant select, insert, update, delete on all tables in schema public to authenticated;
+grant usage, select on all sequences in schema public to authenticated;
+
+revoke all on private.user_locations from anon, authenticated;
+revoke execute on all functions in schema private from public, anon;
+grant execute on all functions in schema private to authenticated;
+revoke execute on function public.update_my_location(double precision, double precision, double precision) from public, anon;
+revoke execute on function public.find_nearby_profiles(integer, integer, integer) from public, anon;
+revoke execute on function public.start_direct_conversation(uuid) from public, anon;
+revoke execute on function public.delete_my_message(uuid) from public, anon;
+grant execute on function public.update_my_location(double precision, double precision, double precision) to authenticated;
+grant execute on function public.find_nearby_profiles(integer, integer, integer) to authenticated;
+grant execute on function public.start_direct_conversation(uuid) to authenticated;
+grant execute on function public.delete_my_message(uuid) to authenticated;
+
+-- Private Storage buckets. Object names must start with the owner's UUID.
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values
+  ('profile-media', 'profile-media', false, 10485760, array['image/jpeg', 'image/png', 'image/webp']),
+  ('post-media', 'post-media', false, 15728640, array['image/jpeg', 'image/png', 'image/webp']),
+  ('chat-media', 'chat-media', false, 26214400, array['image/jpeg', 'image/png', 'image/webp', 'audio/mpeg', 'audio/mp4', 'audio/aac', 'audio/ogg']),
+  ('secret-garden', 'secret-garden', false, 10485760, array['image/jpeg', 'image/png', 'image/webp'])
+on conflict (id) do update set
+  public = excluded.public,
+  file_size_limit = excluded.file_size_limit,
+  allowed_mime_types = excluded.allowed_mime_types;
+
+create policy profile_media_read on storage.objects for select to authenticated
+using (
+  bucket_id = 'profile-media'
+  and private.can_view_profile(private.safe_uuid((storage.foldername(name))[1]))
+);
+create policy profile_media_insert on storage.objects for insert to authenticated
+with check (
+  bucket_id = 'profile-media'
+  and private.safe_uuid((storage.foldername(name))[1]) = auth.uid()
+);
+create policy profile_media_update on storage.objects for update to authenticated
+using (
+  bucket_id = 'profile-media'
+  and private.safe_uuid((storage.foldername(name))[1]) = auth.uid()
+) with check (
+  bucket_id = 'profile-media'
+  and private.safe_uuid((storage.foldername(name))[1]) = auth.uid()
+);
+create policy profile_media_delete on storage.objects for delete to authenticated
+using (
+  bucket_id = 'profile-media'
+  and private.safe_uuid((storage.foldername(name))[1]) = auth.uid()
+);
+
+create policy post_media_storage_read on storage.objects for select to authenticated
+using (
+  bucket_id = 'post-media'
+  and private.can_view_post(private.safe_uuid((storage.foldername(name))[2]))
+);
+create policy post_media_storage_insert on storage.objects for insert to authenticated
+with check (
+  bucket_id = 'post-media'
+  and private.safe_uuid((storage.foldername(name))[1]) = auth.uid()
+  and exists (
+    select 1 from public.posts p
+    where p.id = private.safe_uuid((storage.foldername(name))[2])
+      and p.author_id = auth.uid()
+  )
+);
+create policy post_media_storage_delete on storage.objects for delete to authenticated
+using (
+  bucket_id = 'post-media'
+  and private.safe_uuid((storage.foldername(name))[1]) = auth.uid()
+);
+
+create policy chat_media_storage_read on storage.objects for select to authenticated
+using (
+  bucket_id = 'chat-media'
+  and private.is_conversation_member(private.safe_uuid((storage.foldername(name))[2]))
+);
+create policy chat_media_storage_insert on storage.objects for insert to authenticated
+with check (
+  bucket_id = 'chat-media'
+  and private.safe_uuid((storage.foldername(name))[1]) = auth.uid()
+  and private.is_conversation_member(private.safe_uuid((storage.foldername(name))[2]))
+);
+create policy chat_media_storage_delete on storage.objects for delete to authenticated
+using (
+  bucket_id = 'chat-media'
+  and private.safe_uuid((storage.foldername(name))[1]) = auth.uid()
+);
+
+create policy secret_garden_storage_read on storage.objects for select to authenticated
+using (
+  bucket_id = 'secret-garden'
+  and private.can_view_garden_album(private.safe_uuid((storage.foldername(name))[2]))
+);
+create policy secret_garden_storage_insert on storage.objects for insert to authenticated
+with check (
+  bucket_id = 'secret-garden'
+  and private.safe_uuid((storage.foldername(name))[1]) = auth.uid()
+  and exists (
+    select 1 from public.garden_albums a
+    where a.id = private.safe_uuid((storage.foldername(name))[2])
+      and a.owner_id = auth.uid()
+  )
+);
+create policy secret_garden_storage_delete on storage.objects for delete to authenticated
+using (
+  bucket_id = 'secret-garden'
+  and private.safe_uuid((storage.foldername(name))[1]) = auth.uid()
+);
+
+commit;

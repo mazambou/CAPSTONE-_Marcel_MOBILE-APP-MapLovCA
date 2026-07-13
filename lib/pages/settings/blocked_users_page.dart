@@ -1,7 +1,20 @@
 part of '../../app.dart';
 
-class BlockedUsersScreen extends StatelessWidget {
+class BlockedUsersScreen extends StatefulWidget {
   const BlockedUsersScreen({super.key});
+  @override
+  State<BlockedUsersScreen> createState() => _BlockedUsersScreenState();
+}
+
+class _BlockedUsersScreenState extends State<BlockedUsersScreen> {
+  late Future<List<UserProfile>> users;
+  @override
+  void initState() {
+    super.initState();
+    _reload();
+  }
+
+  void _reload() => users = MapLovRepository.instance.blockedUsers();
 
   @override
   Widget build(BuildContext context) => _AppPage(
@@ -12,13 +25,38 @@ class BlockedUsersScreen extends StatelessWidget {
         style: TextStyle(color: AppColors.grayText),
       ),
       const SizedBox(height: 16),
-      Card(
-        child: ListTile(
-          leading: const CircleAvatar(child: Icon(Icons.person_off_outlined)),
-          title: const Text('Blocked profile'),
-          subtitle: const Text('Blocked 3 days ago'),
-          trailing: TextButton(onPressed: () {}, child: const Text('Unblock')),
-        ),
+      FutureBuilder<List<UserProfile>>(
+        future: users,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          final items = snapshot.data ?? const <UserProfile>[];
+          if (items.isEmpty) return const Text('You have not blocked anyone.');
+          return Column(
+            children: items
+                .map(
+                  (profile) => Card(
+                    child: ListTile(
+                      leading: CircleAvatar(
+                        backgroundImage: profileImageProvider(profile),
+                      ),
+                      title: Text(profile.name),
+                      trailing: TextButton(
+                        onPressed: () async {
+                          await MapLovRepository.instance.unblockUser(
+                            profile.id,
+                          );
+                          if (mounted) setState(_reload);
+                        },
+                        child: const Text('Unblock'),
+                      ),
+                    ),
+                  ),
+                )
+                .toList(),
+          );
+        },
       ),
     ],
   );

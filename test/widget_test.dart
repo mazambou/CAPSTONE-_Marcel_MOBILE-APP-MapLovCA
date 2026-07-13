@@ -182,6 +182,27 @@ void main() {
     },
   );
 
+  testWidgets('premium comparison renders all plans on a wide viewport', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1024, 1536);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(const MaterialApp(home: PremiumScreen()));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Upgrade to Premium'), findsOneWidget);
+    expect(find.text('FREE'), findsOneWidget);
+    expect(find.text('PREMIUM\nPLUS'), findsOneWidget);
+    expect(find.text('PREMIUM\nELITE'), findsOneWidget);
+    expect(find.text('PREMIUM\nVIP'), findsOneWidget);
+    expect(find.text('MOST POPULAR'), findsOneWidget);
+    expect(find.text('NEW'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   final screens = <String, Widget>{
     'login': const LoginScreen(),
     'register': const RegisterScreen(),

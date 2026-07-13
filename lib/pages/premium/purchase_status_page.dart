@@ -1,7 +1,9 @@
 part of '../../app.dart';
 
 class PurchaseStatusScreen extends StatelessWidget {
-  const PurchaseStatusScreen({super.key});
+  const PurchaseStatusScreen({super.key, this.planName = 'Premium Plus'});
+
+  final String planName;
 
   @override
   Widget build(BuildContext context) => _AppPage(
@@ -9,8 +11,8 @@ class PurchaseStatusScreen extends StatelessWidget {
     children: [
       const Icon(Icons.workspace_premium, size: 96, color: AppColors.coral),
       const SizedBox(height: 18),
-      const Text(
-        'Welcome to Premium Plus!',
+      Text(
+        'Welcome to $planName!',
         textAlign: TextAlign.center,
         style: TextStyle(fontSize: 25, fontWeight: FontWeight.w800),
       ),

@@ -9,7 +9,8 @@ class NearMeScreen extends StatefulWidget {
 class _NearMeScreenState extends State<NearMeScreen> {
   double distance = 10;
   @override
-  Widget build(BuildContext context) => _AppPage(
+  Widget build(BuildContext context) => _MainPage(
+    index: 2,
     title: 'Near me',
     children: [
       const Text(

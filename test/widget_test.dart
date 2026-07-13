@@ -32,7 +32,7 @@ void main() {
 
     expect(find.byType(PhotoViewerScreen), findsOneWidget);
     expect(find.text('Sophie, 27'), findsOneWidget);
-    expect(find.text('1/5'), findsOneWidget);
+    expect(find.byIcon(Icons.info_outline), findsOneWidget);
   });
 
   testWidgets('opens a public profile from the person name', (tester) async {
@@ -116,6 +116,39 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('International search'), findsOneWidget);
+  });
+
+  testWidgets('opens Standard and Advanced filters with Show Results', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(const MaterialApp(home: FilterScreen()));
+
+    await tester.tap(find.text('Standard Filter'));
+    await tester.pumpAndSettle();
+    expect(find.text('Religion'), findsOneWidget);
+    final standardList = find.descendant(
+      of: find.byKey(const Key('standard_filter_tab')),
+      matching: find.byType(ListView),
+    );
+    await tester.drag(standardList, const Offset(0, -4000));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('standard_show_results')), findsOneWidget);
+
+    await tester.tap(find.text('Advanced Filter'));
+    await tester.pumpAndSettle();
+    expect(find.text('Basic'), findsOneWidget);
+    final advancedList = find.descendant(
+      of: find.byKey(const Key('advanced_filter_tab')),
+      matching: find.byType(ListView),
+    );
+    await tester.drag(advancedList, const Offset(0, -8000));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('advanced_show_results')), findsOneWidget);
   });
 
   testWidgets(

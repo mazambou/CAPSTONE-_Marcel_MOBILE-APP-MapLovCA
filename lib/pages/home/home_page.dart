@@ -73,7 +73,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             crossAxisCount: 2,
                             crossAxisSpacing: 10,
                             mainAxisSpacing: 10,
-                            childAspectRatio: 0.70,
+                            childAspectRatio: 0.66,
                           ),
                       itemCount: profiles.length,
                       itemBuilder: (context, index) {
@@ -235,10 +235,16 @@ class _DiscoverGridCard extends StatelessWidget {
           GestureDetector(
             key: Key('profile_photo_${profile.name}'),
             onTap: onPhotoTap,
-            child: Image.asset(
-              profile.imagePath,
-              fit: BoxFit.cover,
-              filterQuality: FilterQuality.high,
+            child: ClipRect(
+              child: Transform.scale(
+                scale: 1.48,
+                alignment: const Alignment(0, -0.12),
+                child: Image.asset(
+                  profile.imagePath,
+                  fit: BoxFit.cover,
+                  filterQuality: FilterQuality.high,
+                ),
+              ),
             ),
           ),
           const IgnorePointer(
@@ -253,26 +259,33 @@ class _DiscoverGridCard extends StatelessWidget {
               ),
             ),
           ),
-          if (profile.isNew)
-            const Positioned(
-              left: 9,
-              top: 9,
-              child: _GridStatusBadge(
-                label: 'New here ✨',
-                foregroundColor: AppColors.deepPink,
-                backgroundColor: Colors.white,
-              ),
+          Positioned(
+            left: 8,
+            right: 8,
+            top: 8,
+            child: Row(
+              children: [
+                if (profile.isNew)
+                  const Flexible(
+                    child: _GridStatusBadge(
+                      label: 'New ✨',
+                      foregroundColor: AppColors.deepPink,
+                      backgroundColor: Colors.white,
+                    ),
+                  ),
+                if (profile.isNew && profile.isOnline) const SizedBox(width: 5),
+                if (!profile.isNew) const Spacer(),
+                if (profile.isOnline)
+                  const Flexible(
+                    child: _GridStatusBadge(
+                      label: '● Online',
+                      foregroundColor: Color(0xFF37E19A),
+                      backgroundColor: Color(0xA6000000),
+                    ),
+                  ),
+              ],
             ),
-          if (profile.isOnline)
-            const Positioned(
-              right: 9,
-              top: 9,
-              child: _GridStatusBadge(
-                label: '● Online',
-                foregroundColor: Color(0xFF37E19A),
-                backgroundColor: Color(0xA6000000),
-              ),
-            ),
+          ),
           Positioned(
             left: 12,
             right: 8,
@@ -297,7 +310,7 @@ class _DiscoverGridCard extends StatelessWidget {
                                 overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(
                                   color: Colors.white,
-                                  fontSize: 19,
+                                  fontSize: 18,
                                   fontWeight: FontWeight.w900,
                                 ),
                               ),
@@ -316,28 +329,42 @@ class _DiscoverGridCard extends StatelessWidget {
                         '● ${profile.distanceKm} km away',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(color: Colors.white),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 13,
+                        ),
                       ),
                       const SizedBox(height: 3),
                       Text(
                         '▣ ${profile.profession}',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(color: Colors.white),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 13,
+                        ),
                       ),
                     ],
                   ),
                 ),
-                IconButton.filled(
-                  key: Key('grid_like_${profile.name}'),
-                  onPressed: onLike,
-                  style: IconButton.styleFrom(
-                    backgroundColor: Colors.white,
-                    foregroundColor: liked
-                        ? AppColors.deepPink
-                        : AppColors.softCoral,
+                SizedBox(
+                  width: 42,
+                  height: 42,
+                  child: IconButton.filled(
+                    key: Key('grid_like_${profile.name}'),
+                    onPressed: onLike,
+                    padding: EdgeInsets.zero,
+                    style: IconButton.styleFrom(
+                      backgroundColor: Colors.white,
+                      foregroundColor: liked
+                          ? AppColors.deepPink
+                          : AppColors.softCoral,
+                    ),
+                    icon: Icon(
+                      liked ? Icons.favorite : Icons.favorite_border,
+                      size: 22,
+                    ),
                   ),
-                  icon: Icon(liked ? Icons.favorite : Icons.favorite_border),
                 ),
               ],
             ),
@@ -362,7 +389,7 @@ class _GridStatusBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
       decoration: BoxDecoration(
         color: backgroundColor,
         borderRadius: BorderRadius.circular(999),
@@ -371,7 +398,7 @@ class _GridStatusBadge extends StatelessWidget {
         label,
         style: TextStyle(
           color: foregroundColor,
-          fontSize: 11,
+          fontSize: 10,
           fontWeight: FontWeight.w800,
         ),
       ),

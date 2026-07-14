@@ -1,64 +1,80 @@
 part of '../../app.dart';
 
 class CompatibilityDetailsScreen extends StatelessWidget {
-  const CompatibilityDetailsScreen({super.key});
+  const CompatibilityDetailsScreen({super.key, this.profile});
+
+  final UserProfile? profile;
 
   @override
-  Widget build(BuildContext context) => _AppPage(
-    title: 'Compatibility details',
-    children: [
-      const Center(
-        child: SizedBox(
-          width: 150,
-          height: 150,
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              CircularProgressIndicator(value: 0.94, strokeWidth: 13),
-              Text(
-                '94%',
-                style: TextStyle(fontSize: 34, fontWeight: FontWeight.w900),
-              ),
-            ],
+  Widget build(BuildContext context) {
+    final selected = profile ?? mockProfiles.first;
+    final details = selected.compatibilityBreakdown;
+    final score = selected.compatibilityScore;
+    double value(String key, double fallback) =>
+        ((details[key] as num?)?.toDouble() ?? fallback) / 100;
+    return _AppPage(
+      title: 'Compatibility details',
+      children: [
+        Center(
+          child: SizedBox(
+            width: 150,
+            height: 150,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                CircularProgressIndicator(value: score / 100, strokeWidth: 13),
+                Text(
+                  '$score%',
+                  style: const TextStyle(
+                    fontSize: 34,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
-      ),
-      const SizedBox(height: 14),
-      const Text(
-        'Highly compatible',
-        textAlign: TextAlign.center,
-        style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
-      ),
-      const _SectionTitle('Why you may connect'),
-      const _CompatibilityReason(
-        Icons.favorite_outline,
-        'You are both looking for a long-term relationship.',
-      ),
-      const _CompatibilityReason(
-        Icons.translate,
-        'You both speak English and French.',
-      ),
-      const _CompatibilityReason(
-        Icons.location_on_outlined,
-        'You live in the same city.',
-      ),
-      const _CompatibilityReason(
-        Icons.interests_outlined,
-        'You share travel, music and hiking interests.',
-      ),
-      const _SectionTitle('Score breakdown'),
-      const _ScoreRow('Preferences', 0.96),
-      const _ScoreRow('Interests', 0.90),
-      const _ScoreRow('Relationship goal', 1),
-      const _ScoreRow('Languages', 1),
-      const _ScoreRow('Location', 0.86),
-      const SizedBox(height: 22),
-      _PrimaryButton(
-        'Send a message',
-        onPressed: () => Navigator.pushNamed(context, AppRoutes.chat),
-      ),
-    ],
-  );
+        const SizedBox(height: 14),
+        const Text(
+          'Highly compatible',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
+        ),
+        const _SectionTitle('Why you may connect'),
+        _CompatibilityReason(
+          Icons.favorite_outline,
+          selected.relationshipGoal.isEmpty
+              ? 'Your relationship preferences are compatible.'
+              : 'Relationship goal: ${selected.relationshipGoal}.',
+        ),
+        _CompatibilityReason(
+          Icons.translate,
+          (details['shared_languages'] as int? ?? 0) > 0
+              ? 'You share at least one language.'
+              : 'You can discover a new language together.',
+        ),
+        _CompatibilityReason(
+          Icons.location_on_outlined,
+          'Location compatibility is based on ${selected.city}.',
+        ),
+        _CompatibilityReason(
+          Icons.interests_outlined,
+          '${details['shared_interests'] ?? 0} shared interests.',
+        ),
+        const _SectionTitle('Score breakdown'),
+        _ScoreRow('Preferences', value('preferences', 80)),
+        _ScoreRow('Interests', value('interests', 70)),
+        _ScoreRow('Relationship goal', value('relationship', 75)),
+        _ScoreRow('Languages', value('languages', 75)),
+        _ScoreRow('Location', value('geography', 70)),
+        const SizedBox(height: 22),
+        _PrimaryButton(
+          'Send a message',
+          onPressed: () => Navigator.pushNamed(context, AppRoutes.chat),
+        ),
+      ],
+    );
+  }
 }
 
 class _CompatibilityReason extends StatelessWidget {

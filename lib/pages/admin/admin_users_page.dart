@@ -8,6 +8,7 @@ class AdminUsersScreen extends StatefulWidget {
 
 class _AdminUsersScreenState extends State<AdminUsersScreen> {
   late Future<List<Map<String, dynamic>>> users;
+  String query = '';
   @override
   void initState() {
     super.initState();
@@ -29,6 +30,14 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
         'Only administrators can change account status. Every action is written to the audit log.',
         style: TextStyle(color: AppColors.grayText),
       ),
+      TextField(
+        decoration: const InputDecoration(
+          hintText: 'Search users',
+          prefixIcon: Icon(Icons.search),
+        ),
+        onChanged: (value) =>
+            setState(() => query = value.trim().toLowerCase()),
+      ),
       FutureBuilder<List<Map<String, dynamic>>>(
         future: users,
         builder: (context, snapshot) {
@@ -44,6 +53,11 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
           }
           return Column(
             children: items
+                .where(
+                  (user) => '${user['first_name'] ?? ''} ${user['city'] ?? ''}'
+                      .toLowerCase()
+                      .contains(query),
+                )
                 .map(
                   (user) => Card(
                     child: ListTile(
@@ -67,9 +81,26 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                             child: Text('Suspend'),
                           ),
                           PopupMenuItem(value: 'banned', child: Text('Ban')),
+                          PopupMenuItem(
+                            value: 'verify',
+                            child: Text('Verify profile'),
+                          ),
+                          PopupMenuItem(
+                            value: 'verify_photo',
+                            child: Text('Verify photo'),
+                          ),
                         ],
-                        onSelected: (status) =>
-                            _setStatus(user['id'] as String, status),
+                        onSelected: (status) async {
+                          if (status == 'verify' || status == 'verify_photo') {
+                            await MapLovRepository.instance.verifyProfile(
+                              user['id'] as String,
+                              photo: status == 'verify_photo',
+                            );
+                            if (mounted) setState(_reload);
+                          } else {
+                            await _setStatus(user['id'] as String, status);
+                          }
+                        },
                       ),
                     ),
                   ),

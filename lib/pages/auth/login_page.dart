@@ -21,8 +21,19 @@ class _LoginScreenState extends State<LoginScreen> {
   void initState() {
     super.initState();
     _authSubscription = AuthService.instance.events.listen((event) {
-      if (event == MapLovAuthEvent.signedIn) _goHome();
+      if (event == MapLovAuthEvent.signedIn) unawaited(_handleSignedIn());
     });
+  }
+
+  Future<void> _handleSignedIn() async {
+    try {
+      await AuthService.instance.validateCurrentAccount();
+      _goHome();
+    } catch (error) {
+      if (mounted) {
+        setState(() => _errorText = AuthService.instance.messageFor(error));
+      }
+    }
   }
 
   @override

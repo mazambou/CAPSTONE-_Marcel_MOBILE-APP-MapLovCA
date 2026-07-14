@@ -27,7 +27,17 @@ class _SplashScreenState extends State<SplashScreen> {
     super.dispose();
   }
 
-  void _leaveSplash() {
+  Future<void> _leaveSplash() async {
+    if (!mounted) return;
+    if (AuthService.instance.hasActiveSession) {
+      try {
+        await AuthService.instance.validateCurrentAccount();
+      } catch (_) {
+        if (!mounted) return;
+        Navigator.of(context).pushReplacementNamed(AppRoutes.login);
+        return;
+      }
+    }
     if (!mounted) return;
     Navigator.of(context).pushReplacementNamed(
       AuthService.instance.hasActiveSession
@@ -43,7 +53,11 @@ class _SplashScreenState extends State<SplashScreen> {
       body: Stack(
         fit: StackFit.expand,
         children: [
-          Image.asset('assets/splash/splash01.png', fit: BoxFit.cover),
+          Image.asset(
+            'assets/splash/splash01.png',
+            fit: BoxFit.cover,
+            excludeFromSemantics: true,
+          ),
           SafeArea(
             child: Align(
               alignment: const Alignment(0, -0.56),
@@ -52,6 +66,7 @@ class _SplashScreenState extends State<SplashScreen> {
                 child: Image.asset(
                   'assets/logos/maplov_logo_full .png',
                   fit: BoxFit.contain,
+                  semanticLabel: 'MapLov',
                 ),
               ),
             ),

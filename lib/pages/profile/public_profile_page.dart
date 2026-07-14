@@ -1,13 +1,27 @@
 part of '../../app.dart';
 
-class PublicProfileScreen extends StatelessWidget {
+class PublicProfileScreen extends StatefulWidget {
   const PublicProfileScreen({super.key, this.profile});
 
   final UserProfile? profile;
 
   @override
+  State<PublicProfileScreen> createState() => _PublicProfileScreenState();
+}
+
+class _PublicProfileScreenState extends State<PublicProfileScreen> {
+  @override
+  void initState() {
+    super.initState();
+    final id = widget.profile?.id;
+    if (id != null && id.isNotEmpty) {
+      unawaited(MapLovRepository.instance.recordProfileView(id));
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final selectedProfile = profile ?? mockProfiles.first;
+    final selectedProfile = widget.profile ?? mockProfiles.first;
     return _AppPage(
       title: '${selectedProfile.name}, ${selectedProfile.age}',
       children: [
@@ -47,8 +61,13 @@ class PublicProfileScreen extends StatelessWidget {
                 size: 18,
               ),
               label: Text('${selectedProfile.compatibilityScore}%'),
-              onPressed: () =>
-                  Navigator.pushNamed(context, AppRoutes.compatibilityDetails),
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) =>
+                      CompatibilityDetailsScreen(profile: selectedProfile),
+                ),
+              ),
             ),
           ],
         ),

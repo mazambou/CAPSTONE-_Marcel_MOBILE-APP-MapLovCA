@@ -17,9 +17,37 @@ class _ModerationReportsScreenState extends State<ModerationReportsScreen> {
 
   void _reload() => reports = MapLovRepository.instance.moderationReports();
 
-  Future<void> _moderate(String id, String status) async {
-    await MapLovRepository.instance.moderateReport(id, status);
+  Future<void> _moderate(String id, String status, {String? notes}) async {
+    await MapLovRepository.instance.moderateReport(id, status, notes: notes);
     if (mounted) setState(_reload);
+  }
+
+  Future<void> _resolve(String id) async {
+    final controller = TextEditingController();
+    final notes = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Resolve report'),
+        content: TextField(
+          controller: controller,
+          maxLines: 4,
+          decoration: const InputDecoration(labelText: 'Resolution notes'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, controller.text),
+            child: const Text('Resolve'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (notes == null) return;
+    await _moderate(id, 'resolved', notes: notes);
   }
 
   @override
@@ -66,6 +94,34 @@ class _ModerationReportsScreenState extends State<ModerationReportsScreen> {
                               Chip(label: Text(report['status'] as String)),
                             ],
                           ),
+                          SizedBox(
+                            width: double.infinity,
+                            child: TextButton.icon(
+                              onPressed: () => _resolve(report['id'] as String),
+                              icon: const Icon(Icons.task_alt),
+                              label: const Text('Resolve with notes'),
+                            ),
+                          ),
+                          if (report['target_type'] != 'user')
+                            SizedBox(
+                              width: double.infinity,
+                              child: TextButton.icon(
+                                onPressed: () async {
+                                  await MapLovRepository.instance
+                                      .adminRemoveContent(
+                                        report['target_type'] as String,
+                                        report['target_id'] as String,
+                                      );
+                                  await _moderate(
+                                    report['id'] as String,
+                                    'resolved',
+                                    notes: 'Reported content removed.',
+                                  );
+                                },
+                                icon: const Icon(Icons.delete_outline),
+                                label: const Text('Remove reported content'),
+                              ),
+                            ),
                           Text(
                             'Target: ${report['target_type']} • ${report['target_id']}',
                           ),

@@ -18,6 +18,16 @@ class UserProfile {
     this.photoUrls = const [],
     this.photoIds = const [],
     this.isVerified = false,
+    this.gender = '',
+    this.languages = const [],
+    this.relationshipGoal = '',
+    this.interests = const [],
+    this.religion = '',
+    this.bodyType = '',
+    this.heightCm,
+    this.compatibilityBreakdown = const {},
+    this.likedByMe = false,
+    this.lastActiveAt,
   });
 
   final String id;
@@ -36,6 +46,16 @@ class UserProfile {
   final List<String> photoUrls;
   final List<String> photoIds;
   final bool isVerified;
+  final String gender;
+  final List<String> languages;
+  final String relationshipGoal;
+  final List<String> interests;
+  final String religion;
+  final String bodyType;
+  final int? heightCm;
+  final Map<String, dynamic> compatibilityBreakdown;
+  final bool likedByMe;
+  final DateTime? lastActiveAt;
 
   bool get hasNetworkImage =>
       imagePath.startsWith('http://') || imagePath.startsWith('https://');

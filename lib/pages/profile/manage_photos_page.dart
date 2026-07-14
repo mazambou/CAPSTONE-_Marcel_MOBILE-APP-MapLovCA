@@ -45,7 +45,34 @@ class _ManagePhotosScreenState extends State<ManagePhotosScreen> {
   }
 
   Future<void> _deletePhoto(Map<String, dynamic> photo) async {
-    await MapLovRepository.instance.deleteProfilePhoto(photo);
+    final deleted = await MapLovRepository.instance.deleteProfilePhoto(photo);
+    if (!deleted && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Your profile must keep at least one photo.'),
+        ),
+      );
+      return;
+    }
+    if (mounted) setState(_reload);
+  }
+
+  Future<void> _setPrimary(Map<String, dynamic> photo) async {
+    await MapLovRepository.instance.setPrimaryPhoto(photo['id'] as String);
+    if (mounted) setState(_reload);
+  }
+
+  Future<void> _move(
+    List<Map<String, dynamic>> photos,
+    int index,
+    int offset,
+  ) async {
+    final target = index + offset;
+    if (target < 0 || target >= photos.length) return;
+    final reordered = List<Map<String, dynamic>>.from(photos);
+    final item = reordered.removeAt(index);
+    reordered.insert(target, item);
+    await MapLovRepository.instance.reorderProfilePhotos(reordered);
     if (mounted) setState(_reload);
   }
 
@@ -73,19 +100,19 @@ class _ManagePhotosScreenState extends State<ManagePhotosScreen> {
             crossAxisSpacing: 12,
             mainAxisSpacing: 12,
             children: [
-              ...photos.map(
-                (photo) => ClipRRect(
+              ...photos.asMap().entries.map(
+                (entry) => ClipRRect(
                   borderRadius: BorderRadius.circular(18),
                   child: Stack(
                     fit: StackFit.expand,
                     children: [
-                      (photo['url'] as String).startsWith('http')
+                      (entry.value['url'] as String).startsWith('http')
                           ? Image.network(
-                              photo['url'] as String,
+                              entry.value['url'] as String,
                               fit: BoxFit.cover,
                             )
                           : Image.asset(
-                              photo['url'] as String,
+                              entry.value['url'] as String,
                               fit: BoxFit.cover,
                             ),
                       Positioned(
@@ -93,8 +120,50 @@ class _ManagePhotosScreenState extends State<ManagePhotosScreen> {
                         right: 8,
                         child: IconButton.filled(
                           tooltip: 'Delete photo',
-                          onPressed: () => _deletePhoto(photo),
+                          onPressed: () => _deletePhoto(entry.value),
                           icon: const Icon(Icons.close, size: 17),
+                        ),
+                      ),
+                      Positioned(
+                        left: 7,
+                        top: 7,
+                        child: ActionChip(
+                          avatar: Icon(
+                            entry.value['is_primary'] == true
+                                ? Icons.star
+                                : Icons.star_border,
+                            size: 16,
+                          ),
+                          label: Text(
+                            entry.value['is_primary'] == true
+                                ? 'Main'
+                                : 'Set main',
+                          ),
+                          onPressed: () => _setPrimary(entry.value),
+                        ),
+                      ),
+                      Positioned(
+                        left: 6,
+                        right: 6,
+                        bottom: 6,
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            IconButton.filledTonal(
+                              tooltip: 'Move earlier',
+                              onPressed: entry.key == 0
+                                  ? null
+                                  : () => _move(photos, entry.key, -1),
+                              icon: const Icon(Icons.arrow_back, size: 18),
+                            ),
+                            IconButton.filledTonal(
+                              tooltip: 'Move later',
+                              onPressed: entry.key == photos.length - 1
+                                  ? null
+                                  : () => _move(photos, entry.key, 1),
+                              icon: const Icon(Icons.arrow_forward, size: 18),
+                            ),
+                          ],
                         ),
                       ),
                     ],

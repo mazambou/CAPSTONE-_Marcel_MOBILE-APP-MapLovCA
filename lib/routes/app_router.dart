@@ -59,9 +59,41 @@ class AppRouter {
     AppRoutes.blockedUsers: (_) => const BlockedUsersScreen(),
     AppRoutes.helpCenter: (_) => const HelpCenterScreen(),
     AppRoutes.legal: (_) => const LegalScreen(),
-    AppRoutes.adminDashboard: (_) => const AdminDashboardScreen(),
-    AppRoutes.moderationReports: (_) => const ModerationReportsScreen(),
-    AppRoutes.adminUsers: (_) => const AdminUsersScreen(),
-    AppRoutes.adminAudit: (_) => const AdminAuditScreen(),
+    AppRoutes.adminDashboard: (_) =>
+        const _AdminRouteGuard(child: AdminDashboardScreen()),
+    AppRoutes.moderationReports: (_) =>
+        const _AdminRouteGuard(child: ModerationReportsScreen()),
+    AppRoutes.adminUsers: (_) =>
+        const _AdminRouteGuard(child: AdminUsersScreen()),
+    AppRoutes.adminAudit: (_) =>
+        const _AdminRouteGuard(child: AdminAuditScreen()),
   };
+}
+
+class _AdminRouteGuard extends StatelessWidget {
+  const _AdminRouteGuard({required this.child});
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => FutureBuilder<Map<String, dynamic>?>(
+    future: MapLovRepository.instance.currentAccount(),
+    builder: (context, snapshot) {
+      if (snapshot.connectionState == ConnectionState.waiting) {
+        return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      }
+      final role = snapshot.data?['role'] as String?;
+      if (role != 'admin' && role != 'moderator') {
+        return Scaffold(
+          appBar: AppBar(title: const Text('Access denied')),
+          body: const Center(
+            child: Padding(
+              padding: EdgeInsets.all(24),
+              child: Text('This page is restricted to the moderation team.'),
+            ),
+          ),
+        );
+      }
+      return child;
+    },
+  );
 }

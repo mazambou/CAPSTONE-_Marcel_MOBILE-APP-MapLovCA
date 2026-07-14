@@ -41,6 +41,28 @@ class SettingsScreen extends StatelessWidget {
             ),
           ),
         ),
+        FutureBuilder<Map<String, dynamic>?>(
+          future: MapLovRepository.instance.currentAccount(),
+          builder: (context, snapshot) {
+            final role = snapshot.data?['role'] as String?;
+            if (role != 'admin' && role != 'moderator') {
+              return const SizedBox.shrink();
+            }
+            return Card(
+              color: AppColors.palePink,
+              child: ListTile(
+                leading: const Icon(
+                  Icons.admin_panel_settings_outlined,
+                  color: AppColors.coral,
+                ),
+                title: const Text('Moderation dashboard'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () =>
+                    Navigator.pushNamed(context, AppRoutes.adminDashboard),
+              ),
+            );
+          },
+        ),
         ListTile(
           leading: const Icon(Icons.logout),
           title: const Text('Log Out'),

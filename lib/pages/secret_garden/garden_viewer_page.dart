@@ -1,18 +1,47 @@
 part of '../../app.dart';
 
-class GardenViewerScreen extends StatelessWidget {
+class GardenViewerScreen extends StatefulWidget {
   const GardenViewerScreen({super.key, this.album});
   final GardenAlbumItem? album;
 
   @override
+  State<GardenViewerScreen> createState() => _GardenViewerScreenState();
+}
+
+class _GardenViewerScreenState extends State<GardenViewerScreen> {
+  late Future<List<Map<String, dynamic>>> managedPhotos;
+
+  GardenAlbumItem get selected =>
+      widget.album ??
+      const GardenAlbumItem(
+        id: 'demo-garden',
+        ownerId: 'me',
+        title: 'My private moments',
+      );
+
+  bool get canManage =>
+      MapLovRepository.instance.currentUserId == selected.ownerId;
+
+  @override
+  void initState() {
+    super.initState();
+    managedPhotos = MapLovRepository.instance.gardenPhotos(selected.id);
+  }
+
+  Future<void> _delete(Map<String, dynamic> photo) async {
+    await MapLovRepository.instance.deleteGardenPhoto(
+      photo['id'] as String,
+      photo['storage_path'] as String,
+    );
+    if (mounted) {
+      setState(() {
+        managedPhotos = MapLovRepository.instance.gardenPhotos(selected.id);
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final selected =
-        album ??
-        const GardenAlbumItem(
-          id: 'demo-garden',
-          ownerId: 'me',
-          title: 'My private moments',
-        );
     return Scaffold(
       backgroundColor: const Color(0xFF17131B),
       appBar: AppBar(
@@ -27,11 +56,28 @@ class GardenViewerScreen extends StatelessWidget {
       ),
       body: SafeArea(
         child: FutureBuilder<List<String>>(
-          future: MapLovRepository.instance.gardenPhotoUrls(selected.id),
+          future: canManage
+              ? managedPhotos.then(
+                  (items) =>
+                      items.map((item) => item['url'] as String).toList(),
+                )
+              : MapLovRepository.instance.gardenPhotoUrls(selected.id),
           builder: (context, snapshot) {
             final photos = snapshot.data ?? const <String>[];
             if (snapshot.connectionState == ConnectionState.waiting) {
               return const Center(child: CircularProgressIndicator());
+            }
+            if (snapshot.hasError) {
+              return const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(24),
+                  child: Text(
+                    'This access has expired or is no longer available.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.white),
+                  ),
+                ),
+              );
             }
             return Column(
               children: [
@@ -58,12 +104,39 @@ class GardenViewerScreen extends StatelessWidget {
                           ),
                         )
                       : PageView(
-                          children: photos
+                          children: photos.indexed
                               .map(
-                                (path) => InteractiveViewer(
-                                  child: path.startsWith('http')
-                                      ? Image.network(path, fit: BoxFit.contain)
-                                      : Image.asset(path, fit: BoxFit.contain),
+                                (entry) => Stack(
+                                  children: [
+                                    Positioned.fill(
+                                      child: InteractiveViewer(
+                                        child: entry.$2.startsWith('http')
+                                            ? Image.network(
+                                                entry.$2,
+                                                fit: BoxFit.contain,
+                                              )
+                                            : Image.asset(
+                                                entry.$2,
+                                                fit: BoxFit.contain,
+                                              ),
+                                      ),
+                                    ),
+                                    if (canManage)
+                                      Positioned(
+                                        top: 12,
+                                        right: 12,
+                                        child: IconButton.filled(
+                                          tooltip: 'Delete private photo',
+                                          onPressed: () async {
+                                            final items = await managedPhotos;
+                                            await _delete(items[entry.$1]);
+                                          },
+                                          icon: const Icon(
+                                            Icons.delete_outline,
+                                          ),
+                                        ),
+                                      ),
+                                  ],
                                 ),
                               )
                               .toList(),

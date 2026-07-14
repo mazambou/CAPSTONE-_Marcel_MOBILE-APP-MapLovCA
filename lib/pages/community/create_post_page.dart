@@ -11,8 +11,8 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   final _body = TextEditingController();
   bool commentsEnabled = true;
   bool publishing = false;
-  Uint8List? image;
-  String imageExtension = 'jpg';
+  final List<Uint8List> images = [];
+  final List<String> imageExtensions = [];
 
   @override
   void dispose() {
@@ -21,18 +21,21 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   }
 
   Future<void> _pickImage() async {
-    final selected = await ImagePicker().pickImage(
-      source: ImageSource.gallery,
-      imageQuality: 85,
-    );
-    if (selected == null) return;
-    image = await selected.readAsBytes();
-    imageExtension = selected.name.split('.').last;
+    final selected = await ImagePicker().pickMultiImage(imageQuality: 85);
+    if (selected.isEmpty) return;
+    images
+      ..clear()
+      ..addAll(
+        await Future.wait(selected.take(6).map((file) => file.readAsBytes())),
+      );
+    imageExtensions
+      ..clear()
+      ..addAll(selected.take(6).map((file) => file.name.split('.').last));
     if (mounted) setState(() {});
   }
 
   Future<void> _publish() async {
-    if (_body.text.trim().isEmpty && image == null) {
+    if (_body.text.trim().isEmpty && images.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Add text or a photo first.')),
       );
@@ -43,8 +46,8 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
       await MapLovRepository.instance.createPost(
         body: _body.text,
         commentsEnabled: commentsEnabled,
-        image: image,
-        extension: imageExtension,
+        images: images,
+        extensions: imageExtensions,
       );
       if (mounted) Navigator.pop(context, true);
     } catch (error) {
@@ -90,18 +93,27 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
           alignLabelWithHint: true,
         ),
       ),
-      if (image != null) ...[
+      if (images.isNotEmpty) ...[
         const SizedBox(height: 12),
         ClipRRect(
           borderRadius: BorderRadius.circular(16),
-          child: Image.memory(image!, height: 220, fit: BoxFit.cover),
+          child: SizedBox(
+            height: 220,
+            child: PageView(
+              children: images
+                  .map((bytes) => Image.memory(bytes, fit: BoxFit.cover))
+                  .toList(),
+            ),
+          ),
         ),
       ],
       const SizedBox(height: 16),
       OutlinedButton.icon(
         onPressed: _pickImage,
         icon: const Icon(Icons.add_photo_alternate_outlined),
-        label: Text(image == null ? 'Add photo' : 'Replace photo'),
+        label: Text(
+          images.isEmpty ? 'Add photos' : 'Replace photos (${images.length}/6)',
+        ),
       ),
       SwitchListTile(
         contentPadding: EdgeInsets.zero,

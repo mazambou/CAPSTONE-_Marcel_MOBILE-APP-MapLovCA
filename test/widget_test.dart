@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:maplove/app.dart';
@@ -320,6 +321,167 @@ void main() {
 
       expect(find.byKey(const Key('manage_album_button')), findsOneWidget);
       expect(find.text('Photos'), findsOneWidget);
+    },
+  );
+
+  test('discovery preferences keep all V1 criteria', () {
+    final filters = DiscoveryFilters.fromDatabase({
+      'minimum_age': 25,
+      'maximum_age': 40,
+      'location_mode': 'specific_country',
+      'country_codes': ['Canada'],
+      'languages': ['French'],
+      'relationship_goals': ['Marriage'],
+      'genders': ['Women'],
+      'personalities': ['Creative'],
+      'interest_slugs': ['travel'],
+      'required_languages': true,
+    });
+
+    expect(filters.minimumAge, 25);
+    expect(filters.countries, ['Canada']);
+    expect(filters.languages, ['French']);
+    expect(filters.personalities, ['Creative']);
+    expect(filters.interestSlugs, ['travel']);
+    expect(filters.requiredLanguages, isTrue);
+    expect(filters.toDatabase()['location_mode'], 'specific_country');
+  });
+
+  test('demo likes are persistent and create a mutual match', () async {
+    const profileId = '00000000-0000-4000-8000-000000000001';
+    final first = await MapLovRepository.instance.toggleProfileLike(profileId);
+    expect(first.liked, isTrue);
+    expect(first.matched, isTrue);
+
+    final matches = await MapLovRepository.instance.myMatches();
+    expect(matches.any((item) => item.profile.id == profileId), isTrue);
+
+    final removed = await MapLovRepository.instance.toggleProfileLike(
+      profileId,
+    );
+    expect(removed.liked, isFalse);
+  });
+
+  testWidgets('compatibility details use the selected profile score', (
+    tester,
+  ) async {
+    const profile = UserProfile(
+      id: 'dynamic-score',
+      name: 'Morgan',
+      age: 31,
+      city: 'Ottawa',
+      compatibilityScore: 73,
+      compatibilityBreakdown: {
+        'preferences': 75,
+        'interests': 60,
+        'relationship': 90,
+        'languages': 80,
+        'geography': 70,
+        'shared_interests': 2,
+        'shared_languages': 1,
+      },
+      imagePath: 'assets/profile/profile_user_placeholder.png',
+      photoDisplayStyle: PhotoDisplayStyle.profileDetails,
+    );
+    await tester.pumpWidget(
+      const MaterialApp(home: CompatibilityDetailsScreen(profile: profile)),
+    );
+
+    expect(find.text('73%'), findsOneWidget);
+    expect(find.text('2 shared interests.'), findsOneWidget);
+  });
+
+  testWidgets('photo manager exposes main-photo and ordering controls', (
+    tester,
+  ) async {
+    await tester.pumpWidget(const MaterialApp(home: ManagePhotosScreen()));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Main'), findsOneWidget);
+    expect(find.text('Set main'), findsWidgets);
+    expect(find.byTooltip('Move later'), findsWidgets);
+  });
+
+  test('French translations are centralized', () {
+    const translations = MapLovLocalizations(Locale('fr'));
+    expect(translations.translate('Settings'), 'Paramètres');
+    expect(translations.translate('Manage photos'), 'Gérer les photos');
+    expect(
+      translations.translate('Unknown dynamic content'),
+      'Unknown dynamic content',
+    );
+  });
+
+  testWidgets('screen labels render in French and English', (tester) async {
+    Future<void> render(Locale locale) => tester.pumpWidget(
+      MaterialApp(
+        locale: locale,
+        supportedLocales: const [Locale('en'), Locale('fr')],
+        localizationsDelegates: const [
+          MapLovLocalizations.delegate,
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        home: const SettingsScreen(),
+      ),
+    );
+
+    await render(const Locale('fr'));
+    expect(find.text('Paramètres'), findsOneWidget);
+    expect(find.text('Confidentialité'), findsOneWidget);
+
+    await render(const Locale('en'));
+    await tester.pump();
+    expect(find.text('Settings'), findsOneWidget);
+    expect(find.text('Privacy'), findsOneWidget);
+  });
+
+  test(
+    'demo user flows cover blocking, friendship, posts and Garden',
+    () async {
+      final repository = MapLovRepository.instance;
+      final target = (await repository.discoverProfiles()).last;
+
+      await repository.unblockUser(target.id);
+      await repository.blockUser(target.id);
+      expect(
+        (await repository.blockedUsers()).any(
+          (profile) => profile.id == target.id,
+        ),
+        isTrue,
+      );
+      expect(
+        (await repository.discoverProfiles()).any(
+          (profile) => profile.id == target.id,
+        ),
+        isFalse,
+      );
+      await repository.unblockUser(target.id);
+
+      await repository.sendFriendRequest(target.id);
+      expect(
+        (await repository.friendships(
+          status: 'pending',
+        )).any((friendship) => friendship.profile.id == target.id),
+        isTrue,
+      );
+      await repository.removeFriendship(target.id, cancel: true);
+
+      const body = 'Automated private post flow';
+      await repository.createPost(body: body, commentsEnabled: true);
+      final post = (await repository.posts()).firstWhere(
+        (item) => item.body == body,
+      );
+      await repository.deletePost(post.id);
+      expect(
+        (await repository.posts()).any((item) => item.id == post.id),
+        isFalse,
+      );
+
+      final albums = await repository.gardenAlbums(ownerId: target.id);
+      expect(albums.single.ownerId, target.id);
+      await repository.requestGardenAccess(albums.single.id, 600);
     },
   );
 

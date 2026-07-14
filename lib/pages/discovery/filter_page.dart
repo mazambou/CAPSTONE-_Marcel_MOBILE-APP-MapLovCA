@@ -21,6 +21,7 @@ class _FilterScreenState extends State<FilterScreen> {
   bool advancedVerified = true;
   bool photoVerified = true;
   bool activeToday = true;
+  String selectedGender = 'Everyone';
   final Map<String, String> standardSelections = {
     'Language': 'Any',
     'Religion': 'Any',
@@ -60,6 +61,7 @@ class _FilterScreenState extends State<FilterScreen> {
       advancedVerified = true;
       photoVerified = true;
       activeToday = true;
+      selectedGender = 'Everyone';
       standardSelections.updateAll((key, value) => 'Any');
       standardSelections['Language'] = 'Any';
       standardSelections['Education level'] = 'Any';
@@ -74,6 +76,18 @@ class _FilterScreenState extends State<FilterScreen> {
 
   Future<void> _showResults() async {
     final tab = DefaultTabController.of(context).index;
+    if (tab == 2) {
+      final subscription = await MapLovRepository.instance.subscriptionInfo();
+      if (!subscription.isPremium && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Advanced filters require Premium Plus.'),
+          ),
+        );
+        await Navigator.pushNamed(context, AppRoutes.premium);
+        return;
+      }
+    }
     final selectedAges = tab == 2
         ? advancedAges
         : tab == 1
@@ -90,6 +104,12 @@ class _FilterScreenState extends State<FilterScreen> {
     final goal = tab == 2
         ? advancedSelections['Relationship goal']
         : standardSelections['Relationship goal'];
+    final religion = tab == 2
+        ? advancedSelections['Religion']
+        : standardSelections['Religion'];
+    final bodyType = tab == 2
+        ? advancedSelections['Body type']
+        : standardSelections['Body type'];
     final mode = switch (locationMode) {
       'My country' => 'my_country',
       'International' => 'specific_country',
@@ -108,6 +128,16 @@ class _FilterScreenState extends State<FilterScreen> {
       relationshipGoals: goal == null || goal == 'Any' ? const [] : [goal],
       verifiedOnly: tab == 2 ? advancedVerified : tab == 1 && standardVerified,
       activeTodayOnly: tab == 2 && activeToday,
+      genders: selectedGender == 'Everyone' ? const [] : [selectedGender],
+      religions: religion == null || religion == 'Any' ? const [] : [religion],
+      bodyTypes: bodyType == null || bodyType == 'Any' ? const [] : [bodyType],
+      interestSlugs: tab == 1
+          ? standardInterests.map((value) => value.toLowerCase()).toList()
+          : const [],
+      requiredGenders: selectedGender != 'Everyone',
+      requiredLocation: mode != 'worldwide',
+      requiredLanguages: language != null && language != 'Any',
+      requiredRelationshipGoal: goal != null && goal != 'Any',
     );
     await MapLovRepository.instance.savePreferences(filters);
     if (mounted) Navigator.pop(context, filters);
@@ -174,7 +204,17 @@ class _FilterScreenState extends State<FilterScreen> {
       buttonKey: const Key('quick_show_results'),
       onShowResults: _showResults,
       children: [
-        const _Dropdown('Gender', ['Everyone', 'Women', 'Men', 'Non-binary']),
+        DropdownButtonFormField<String>(
+          initialValue: selectedGender,
+          decoration: const InputDecoration(labelText: 'Gender'),
+          items: ['Everyone', 'Women', 'Men', 'Non-binary']
+              .map(
+                (value) => DropdownMenuItem(value: value, child: Text(value)),
+              )
+              .toList(),
+          onChanged: (value) =>
+              setState(() => selectedGender = value ?? selectedGender),
+        ),
         const SizedBox(height: 12),
         Text('Age ${ages.start.round()}–${ages.end.round()}'),
         RangeSlider(

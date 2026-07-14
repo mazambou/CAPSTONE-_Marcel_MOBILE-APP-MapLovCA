@@ -33,6 +33,79 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (loaded != null && mounted) setState(() => profile = loaded);
   }
 
+  Future<bool> _requirePremium({bool elite = false}) async {
+    final info = await MapLovRepository.instance.subscriptionInfo();
+    final allowed = elite ? info.isElite : info.isPremium;
+    if (!allowed && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            elite
+                ? 'Profile statistics require Premium Elite.'
+                : 'Profile visitors require Premium Plus.',
+          ),
+        ),
+      );
+      await Navigator.pushNamed(context, AppRoutes.premium);
+    }
+    return allowed;
+  }
+
+  Future<void> _showVisitors() async {
+    if (!await _requirePremium()) return;
+    final visitors = await MapLovRepository.instance.profileVisitors();
+    if (!mounted) return;
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) => ListView(
+        padding: const EdgeInsets.all(18),
+        children: [
+          const Text(
+            'Profile visitors',
+            style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
+          ),
+          if (visitors.isEmpty) const ListTile(title: Text('No visitors yet.')),
+          ...visitors.map(
+            (visitor) => ListTile(
+              leading: CircleAvatar(
+                backgroundImage: profileImageProvider(visitor),
+              ),
+              title: Text('${visitor.name}, ${visitor.age}'),
+              subtitle: Text(visitor.city),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showStatistics() async {
+    if (!await _requirePremium(elite: true)) return;
+    final statistics = await MapLovRepository.instance.profileStatistics();
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Profile statistics'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: statistics.entries
+              .map(
+                (entry) => ListTile(
+                  title: Text(entry.key),
+                  trailing: Text(
+                    '${entry.value}',
+                    style: const TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                ),
+              )
+              .toList(),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) => _MainPage(
     index: 4,
@@ -118,6 +191,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
         'Secret Garden',
         Icons.lock_outline,
         AppRoutes.gardenManagement,
+      ),
+      const SizedBox(height: 10),
+      Card(
+        child: ListTile(
+          leading: const Icon(
+            Icons.visibility_outlined,
+            color: AppColors.coral,
+          ),
+          title: const Text('Profile visitors'),
+          subtitle: const Text('Premium Plus'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: _showVisitors,
+        ),
+      ),
+      Card(
+        child: ListTile(
+          leading: const Icon(Icons.analytics_outlined, color: AppColors.coral),
+          title: const Text('Profile statistics'),
+          subtitle: const Text('Premium Elite'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: _showStatistics,
+        ),
       ),
       const SizedBox(height: 10),
       const _QuickCard('Dating preferences', Icons.tune, AppRoutes.preferences),

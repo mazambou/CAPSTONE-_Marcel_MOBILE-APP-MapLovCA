@@ -14,7 +14,10 @@ class _MainPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
-      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w800)),
+      title: Text(
+        context.tr(title),
+        style: const TextStyle(fontWeight: FontWeight.w800),
+      ),
       actions: actions,
     ),
     body: _ResponsiveBody(
@@ -95,7 +98,10 @@ class _AppPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
-      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w800)),
+      title: Text(
+        context.tr(title),
+        style: const TextStyle(fontWeight: FontWeight.w800),
+      ),
     ),
     body: SafeArea(
       child: _ResponsiveBody(
@@ -130,7 +136,10 @@ class _PrimaryButton extends StatelessWidget {
     child: FilledButton(
       onPressed: onPressed,
       style: FilledButton.styleFrom(padding: const EdgeInsets.all(16)),
-      child: Text(label, style: const TextStyle(fontWeight: FontWeight.w700)),
+      child: Text(
+        context.tr(label),
+        style: const TextStyle(fontWeight: FontWeight.w700),
+      ),
     ),
   );
 }
@@ -142,7 +151,7 @@ class _SectionTitle extends StatelessWidget {
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.only(top: 24, bottom: 12),
     child: Text(
-      text,
+      context.tr(text),
       style: Theme.of(
         context,
       ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),

@@ -26,10 +26,19 @@ class _SecretGardenScreenState extends State<SecretGardenScreen> {
     _ => null,
   };
 
+  bool _hasActiveAccess(GardenAlbumItem album) =>
+      album.accessStatus == 'approved' &&
+      (album.expiresAt == null || album.expiresAt!.isAfter(DateTime.now()));
+
   Future<void> _request(GardenAlbumItem album) async {
     try {
       await MapLovRepository.instance.requestGardenAccess(album.id, seconds);
       if (mounted) {
+        setState(() {
+          albums = MapLovRepository.instance.gardenAlbums(
+            ownerId: widget.owner?.id,
+          );
+        });
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(const SnackBar(content: Text('Access request sent.')));
@@ -87,35 +96,35 @@ class _SecretGardenScreenState extends State<SecretGardenScreen> {
             return const Text('No private album is available.');
           }
           return Column(
-            children: items
-                .map(
-                  (album) => Card(
-                    child: ListTile(
-                      leading: const Icon(
-                        Icons.lock_outline,
-                        color: AppColors.coral,
-                      ),
-                      title: Text(album.title),
-                      subtitle: Text('${album.photoCount} private photos'),
-                      trailing: widget.owner == null
-                          ? const Icon(Icons.chevron_right)
-                          : FilledButton(
-                              onPressed: () => _request(album),
-                              child: const Text('Request access'),
-                            ),
-                      onTap: widget.owner == null
-                          ? () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) =>
-                                    GardenViewerScreen(album: album),
-                              ),
-                            )
-                          : null,
-                    ),
+            children: items.map((album) {
+              final hasAccess = widget.owner == null || _hasActiveAccess(album);
+              return Card(
+                child: ListTile(
+                  leading: const Icon(
+                    Icons.lock_outline,
+                    color: AppColors.coral,
                   ),
-                )
-                .toList(),
+                  title: Text(album.title),
+                  subtitle: Text('${album.photoCount} private photos'),
+                  trailing: hasAccess
+                      ? const Icon(Icons.chevron_right)
+                      : album.accessStatus == 'pending'
+                      ? const Chip(label: Text('Pending'))
+                      : FilledButton(
+                          onPressed: () => _request(album),
+                          child: const Text('Request access'),
+                        ),
+                  onTap: hasAccess
+                      ? () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => GardenViewerScreen(album: album),
+                          ),
+                        )
+                      : null,
+                ),
+              );
+            }).toList(),
           );
         },
       ),

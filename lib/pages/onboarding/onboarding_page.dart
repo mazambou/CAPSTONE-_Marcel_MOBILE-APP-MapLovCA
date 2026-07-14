@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../routes/app_routes.dart';
+import '../../services/locale_service.dart';
 import '../../shared/theme/app_colors.dart';
 
 class OnboardingScreen extends StatefulWidget {
@@ -90,9 +91,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         ignoring: _currentPage == _items.length - 1,
                         child: TextButton(
                           onPressed: _skip,
-                          child: const Text(
-                            'Skip',
-                            style: TextStyle(
+                          child: Text(
+                            context.tr('Skip'),
+                            style: const TextStyle(
                               color: AppColors.darkText,
                               fontSize: 16,
                               fontWeight: FontWeight.w700,
@@ -128,9 +129,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         ),
                       ),
                       child: Text(
-                        _currentPage == _items.length - 1
-                            ? 'Get Started'
-                            : 'Next',
+                        context.tr(
+                          _currentPage == _items.length - 1
+                              ? 'Get Started'
+                              : 'Next',
+                        ),
                         style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w700,
@@ -170,7 +173,11 @@ class _OnboardingPage extends StatelessWidget {
     return Stack(
       fit: StackFit.expand,
       children: [
-        Image.asset(item.imagePath, fit: BoxFit.cover),
+        Image.asset(
+          item.imagePath,
+          fit: BoxFit.cover,
+          excludeFromSemantics: true,
+        ),
         const DecoratedBox(
           decoration: BoxDecoration(
             gradient: LinearGradient(
@@ -192,7 +199,7 @@ class _OnboardingPage extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
                 Text(
-                  item.title,
+                  context.tr(item.title),
                   textAlign: TextAlign.center,
                   style: const TextStyle(
                     color: AppColors.darkText,
@@ -203,7 +210,7 @@ class _OnboardingPage extends StatelessWidget {
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  item.description,
+                  context.tr(item.description),
                   textAlign: TextAlign.center,
                   style: const TextStyle(
                     color: AppColors.grayText,

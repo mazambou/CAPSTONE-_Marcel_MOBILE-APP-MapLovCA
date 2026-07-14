@@ -59,6 +59,77 @@ class _GardenManagementScreenState extends State<GardenManagementScreen> {
     if (mounted) setState(_reload);
   }
 
+  Future<void> _rename(GardenAlbumItem album) async {
+    final controller = TextEditingController(text: album.title);
+    final title = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Rename album'),
+        content: TextField(controller: controller),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, controller.text.trim()),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (title == null || title.isEmpty) return;
+    await MapLovRepository.instance.renameGardenAlbum(album.id, title);
+    if (mounted) setState(_reload);
+  }
+
+  Future<void> _showHistory() async {
+    final history = await MapLovRepository.instance.gardenAccessHistory();
+    if (!mounted) return;
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) => SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.all(18),
+          children: [
+            const Text(
+              'Access history',
+              style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
+            ),
+            if (history.isEmpty)
+              const ListTile(title: Text('No access history yet.')),
+            ...history.map(
+              (item) => ListTile(
+                leading: Icon(
+                  item['status'] == 'approved'
+                      ? Icons.lock_open
+                      : Icons.history,
+                ),
+                title: Text('${item['status']}'),
+                subtitle: Text(
+                  '${item['requested_at'] ?? ''}'.split('T').first,
+                ),
+                trailing: item['status'] == 'approved'
+                    ? TextButton(
+                        onPressed: () async {
+                          await MapLovRepository.instance.revokeGardenAccess(
+                            item['id'] as String,
+                          );
+                          if (context.mounted) Navigator.pop(context);
+                        },
+                        child: const Text('Revoke'),
+                      )
+                    : null,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) => _AppPage(
     title: 'Manage Secret Garden',
@@ -91,10 +162,28 @@ class _GardenManagementScreenState extends State<GardenManagementScreen> {
                       ),
                       title: Text(album.title),
                       subtitle: Text('${album.photoCount} photos'),
-                      trailing: IconButton(
-                        onPressed: () => _addPhoto(album),
-                        tooltip: 'Add private photo',
-                        icon: const Icon(Icons.add_a_photo_outlined),
+                      trailing: PopupMenuButton<String>(
+                        itemBuilder: (_) => const [
+                          PopupMenuItem(
+                            value: 'photo',
+                            child: Text('Add photo'),
+                          ),
+                          PopupMenuItem(value: 'rename', child: Text('Rename')),
+                          PopupMenuItem(
+                            value: 'delete',
+                            child: Text('Delete album'),
+                          ),
+                        ],
+                        onSelected: (value) async {
+                          if (value == 'photo') await _addPhoto(album);
+                          if (value == 'rename') await _rename(album);
+                          if (value == 'delete') {
+                            await MapLovRepository.instance.deleteGardenAlbum(
+                              album.id,
+                            );
+                            if (mounted) setState(_reload);
+                          }
+                        },
                       ),
                       onTap: () => Navigator.push(
                         context,
@@ -124,6 +213,11 @@ class _GardenManagementScreenState extends State<GardenManagementScreen> {
           onTap: () =>
               Navigator.pushNamed(context, AppRoutes.gardenAccessRequests),
         ),
+      ),
+      OutlinedButton.icon(
+        onPressed: _showHistory,
+        icon: const Icon(Icons.history),
+        label: const Text('Access history and active access'),
       ),
     ],
   );

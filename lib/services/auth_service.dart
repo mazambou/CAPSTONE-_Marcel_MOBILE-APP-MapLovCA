@@ -76,6 +76,29 @@ class AuthService {
     }
     final preferences = await SharedPreferences.getInstance();
     await preferences.setBool(_rememberSessionKey, rememberSession);
+    await validateCurrentAccount();
+  }
+
+  Future<void> validateCurrentAccount() async {
+    final client = _client;
+    final user = client?.auth.currentUser;
+    if (client == null || user == null) return;
+    final row = await client
+        .from('profiles')
+        .select('status')
+        .eq('id', user.id)
+        .maybeSingle();
+    final status = row?['status'] as String? ?? 'active';
+    if (status != 'active') {
+      await client.auth.signOut(scope: SignOutScope.local);
+      throw AuthException(
+        status == 'suspended'
+            ? 'This account is temporarily suspended.'
+            : status == 'banned'
+            ? 'This account has been banned.'
+            : 'This account is unavailable.',
+      );
+    }
   }
 
   Future<SignUpResult> signUp({
@@ -183,6 +206,9 @@ class AuthService {
     }
     if (message.contains('email not confirmed')) {
       return 'Please verify your email before signing in.';
+    }
+    if (message.contains('suspended') || message.contains('banned')) {
+      return raw;
     }
     if (message.contains('already registered') ||
         message.contains('already exists')) {

@@ -17,6 +17,11 @@ class _NotificationSettingsScreenState
     'garden_requests': 'Secret Garden requests',
     'compatibility_suggestions': 'Compatibility suggestions',
     'marketing': 'Marketing updates',
+    'security': 'Security alerts',
+    'push_enabled': 'Push notifications',
+    'in_app_enabled': 'In-app notifications',
+    'email_important': 'Important events by email',
+    'quiet_hours_enabled': 'Quiet hours (10 PM–7 AM)',
   };
 
   @override
@@ -50,7 +55,9 @@ class _NotificationSettingsScreenState
         ...values!.entries.map(
           (entry) => SwitchListTile(
             value: entry.value,
-            onChanged: (value) => _change(entry.key, value),
+            onChanged: entry.key == 'security'
+                ? null
+                : (value) => _change(entry.key, value),
             title: Text(labels[entry.key] ?? entry.key),
           ),
         ),

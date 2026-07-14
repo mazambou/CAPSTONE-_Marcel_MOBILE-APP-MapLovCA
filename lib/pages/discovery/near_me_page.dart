@@ -26,7 +26,10 @@ class _NearMeScreenState extends State<NearMeScreen> {
     }
     return MapLovRepository.instance.discoverProfiles(
       tab: 'Nearby',
-      filters: DiscoveryFilters(distanceKm: distance.round()),
+      filters: DiscoveryFilters(
+        distanceKm: distance.round(),
+        requiredLocation: true,
+      ),
     );
   }
 

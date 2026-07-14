@@ -61,6 +61,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
             ? 'CA'
             : null,
         'bio': bio.text.trim(),
+        'spoken_languages': const ['English'],
       });
       if (mounted) Navigator.pushNamed(context, AppRoutes.preferences);
     } catch (error) {

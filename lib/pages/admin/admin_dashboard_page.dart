@@ -1,7 +1,20 @@
 part of '../../app.dart';
 
-class AdminDashboardScreen extends StatelessWidget {
+class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
+
+  @override
+  State<AdminDashboardScreen> createState() => _AdminDashboardScreenState();
+}
+
+class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
+  late Future<Map<String, int>> metrics;
+
+  @override
+  void initState() {
+    super.initState();
+    metrics = MapLovRepository.instance.adminMetrics();
+  }
 
   @override
   Widget build(BuildContext context) => _AppPage(
@@ -12,20 +25,30 @@ class AdminDashboardScreen extends StatelessWidget {
         style: TextStyle(color: AppColors.grayText),
       ),
       const SizedBox(height: 16),
-      const Row(
-        children: [
-          Expanded(
-            child: _AdminMetric('Open reports', '12', Icons.flag_outlined),
-          ),
-          SizedBox(width: 12),
-          Expanded(
-            child: _AdminMetric(
-              'Review queue',
-              '7',
-              Icons.manage_accounts_outlined,
-            ),
-          ),
-        ],
+      FutureBuilder<Map<String, int>>(
+        future: metrics,
+        builder: (context, snapshot) {
+          final values = snapshot.data ?? const {'reports': 0, 'review': 0};
+          return Row(
+            children: [
+              Expanded(
+                child: _AdminMetric(
+                  'Open reports',
+                  '${values['reports'] ?? 0}',
+                  Icons.flag_outlined,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _AdminMetric(
+                  'Review queue',
+                  '${values['review'] ?? 0}',
+                  Icons.manage_accounts_outlined,
+                ),
+              ),
+            ],
+          );
+        },
       ),
       const _SectionTitle('Moderation'),
       ListTile(

@@ -11,6 +11,26 @@ class _PrivacyScreenState extends State<PrivacyScreen> {
   bool discoverable = true;
   bool approximateDistance = true;
   bool onlineStatus = false;
+  bool premium = false;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_load());
+  }
+
+  Future<void> _load() async {
+    final profile = await MapLovRepository.instance.myProfileDetails();
+    final subscription = await MapLovRepository.instance.subscriptionInfo();
+    if (!mounted) return;
+    setState(() {
+      discoverable = profile?['is_discoverable'] as bool? ?? true;
+      approximateDistance =
+          profile?['show_approximate_distance'] as bool? ?? true;
+      onlineStatus = profile?['show_online_status'] as bool? ?? false;
+      premium = subscription.isPremium;
+    });
+  }
 
   Future<void> _save(String key, bool value) async {
     await MapLovRepository.instance.saveMyProfile({key: value});
@@ -23,6 +43,15 @@ class _PrivacyScreenState extends State<PrivacyScreen> {
       SwitchListTile(
         value: discoverable,
         onChanged: (value) {
+          if (!value && !premium) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Invisible mode requires Premium Plus.'),
+              ),
+            );
+            Navigator.pushNamed(context, AppRoutes.premium);
+            return;
+          }
           setState(() => discoverable = value);
           unawaited(_save('is_discoverable', value));
         },

@@ -1,9 +1,10 @@
 part of '../../app.dart';
 
 class NewMatchScreen extends StatelessWidget {
-  const NewMatchScreen({super.key});
+  const NewMatchScreen({super.key, this.profile});
 
-  UserProfile get _match => mockProfiles.first;
+  final UserProfile? profile;
+  UserProfile get _match => profile ?? mockProfiles.first;
 
   Future<void> _openChat(BuildContext context) async {
     try {
@@ -365,8 +366,22 @@ class _MatchIdentity extends StatelessWidget {
   );
 }
 
-class MatchScreen extends StatelessWidget {
+class MatchScreen extends StatefulWidget {
   const MatchScreen({super.key});
+
+  @override
+  State<MatchScreen> createState() => _MatchScreenState();
+}
+
+class _MatchScreenState extends State<MatchScreen> {
+  late Future<List<MatchItem>> matches;
+
+  @override
+  void initState() {
+    super.initState();
+    matches = MapLovRepository.instance.myMatches();
+  }
+
   @override
   Widget build(BuildContext context) => _MainPage(
     index: 3,
@@ -377,20 +392,63 @@ class MatchScreen extends StatelessWidget {
         style: TextStyle(color: AppColors.grayText),
       ),
       const SizedBox(height: 16),
-      ...mockProfiles.map(
-        (p) => Card(
-          child: ListTile(
-            leading: CircleAvatar(backgroundImage: profileImageProvider(p)),
-            title: Text('${p.name}, ${p.age}'),
-            subtitle: Text(
-              '${p.compatibilityScore}% compatible • Travel, music',
-            ),
-            trailing: IconButton(
-              onPressed: () => Navigator.pushNamed(context, AppRoutes.chat),
-              icon: const Icon(Icons.chat_bubble_outline),
-            ),
-          ),
-        ),
+      FutureBuilder<List<MatchItem>>(
+        future: matches,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          final items = snapshot.data ?? const <MatchItem>[];
+          if (items.isEmpty) {
+            return const ListTile(
+              leading: Icon(Icons.favorite_border),
+              title: Text('No mutual matches yet'),
+              subtitle: Text('Keep discovering people you like.'),
+            );
+          }
+          return Column(
+            children: items
+                .map(
+                  (item) => Card(
+                    child: ListTile(
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) =>
+                              PublicProfileScreen(profile: item.profile),
+                        ),
+                      ),
+                      leading: CircleAvatar(
+                        backgroundImage: profileImageProvider(item.profile),
+                      ),
+                      title: Text('${item.profile.name}, ${item.profile.age}'),
+                      subtitle: Text(
+                        '${item.profile.compatibilityScore}% compatible • Matched ${DateFormat.yMMMd().format(item.date)}',
+                      ),
+                      trailing: IconButton(
+                        onPressed: () async {
+                          final id = await MapLovRepository.instance
+                              .startConversation(item.profile.id);
+                          if (context.mounted) {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => ChatScreen(
+                                  conversationId: id,
+                                  profile: item.profile,
+                                ),
+                              ),
+                            );
+                          }
+                        },
+                        icon: const Icon(Icons.chat_bubble_outline),
+                      ),
+                    ),
+                  ),
+                )
+                .toList(),
+          );
+        },
       ),
     ],
   );

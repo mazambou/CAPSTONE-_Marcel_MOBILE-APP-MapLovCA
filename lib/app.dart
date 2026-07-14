@@ -2,8 +2,11 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' as material show Text, TextDirection;
+import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
 
@@ -18,6 +21,14 @@ import 'services/purchase_service.dart';
 import 'shared/theme/app_colors.dart';
 
 export 'models/user_profile.dart';
+export 'services/locale_service.dart' show MapLovLocalizations;
+export 'services/maplov_repository.dart'
+    show
+        DiscoveryFilters,
+        MapLovRepository,
+        MatchItem,
+        ProfileLikeResult,
+        SubscriptionInfo;
 import 'pages/onboarding/onboarding_page.dart';
 import 'pages/splash/splash_page.dart';
 
@@ -74,6 +85,108 @@ part 'pages/admin/moderation_reports_page.dart';
 part 'pages/admin/admin_users_page.dart';
 part 'pages/admin/admin_audit_page.dart';
 part 'shared/widgets/app_widgets.dart';
+
+/// Keeps every plain screen label on the same bilingual translation path.
+/// User-generated values that are not present in the catalogue stay unchanged.
+class Text extends StatelessWidget {
+  const Text(
+    String this.data, {
+    super.key,
+    this.style,
+    this.strutStyle,
+    this.textAlign,
+    this.textDirection,
+    this.locale,
+    this.softWrap,
+    this.overflow,
+    this.textScaler,
+    this.maxLines,
+    this.semanticsLabel,
+    this.semanticsIdentifier,
+    this.textWidthBasis,
+    this.textHeightBehavior,
+    this.selectionColor,
+  }) : textSpan = null;
+
+  const Text.rich(
+    InlineSpan this.textSpan, {
+    super.key,
+    this.style,
+    this.strutStyle,
+    this.textAlign,
+    this.textDirection,
+    this.locale,
+    this.softWrap,
+    this.overflow,
+    this.textScaler,
+    this.maxLines,
+    this.semanticsLabel,
+    this.semanticsIdentifier,
+    this.textWidthBasis,
+    this.textHeightBehavior,
+    this.selectionColor,
+  }) : data = null;
+
+  final String? data;
+  final InlineSpan? textSpan;
+  final TextStyle? style;
+  final StrutStyle? strutStyle;
+  final TextAlign? textAlign;
+  final material.TextDirection? textDirection;
+  final Locale? locale;
+  final bool? softWrap;
+  final TextOverflow? overflow;
+  final TextScaler? textScaler;
+  final int? maxLines;
+  final String? semanticsLabel;
+  final String? semanticsIdentifier;
+  final TextWidthBasis? textWidthBasis;
+  final TextHeightBehavior? textHeightBehavior;
+  final Color? selectionColor;
+
+  @override
+  Widget build(BuildContext context) {
+    final translatedSemantics = semanticsLabel == null
+        ? null
+        : context.tr(semanticsLabel!);
+    if (textSpan != null) {
+      return material.Text.rich(
+        textSpan!,
+        style: style,
+        strutStyle: strutStyle,
+        textAlign: textAlign,
+        textDirection: textDirection,
+        locale: locale,
+        softWrap: softWrap,
+        overflow: overflow,
+        textScaler: textScaler,
+        maxLines: maxLines,
+        semanticsLabel: translatedSemantics,
+        semanticsIdentifier: semanticsIdentifier,
+        textWidthBasis: textWidthBasis,
+        textHeightBehavior: textHeightBehavior,
+        selectionColor: selectionColor,
+      );
+    }
+    return material.Text(
+      context.tr(data!),
+      style: style,
+      strutStyle: strutStyle,
+      textAlign: textAlign,
+      textDirection: textDirection,
+      locale: locale,
+      softWrap: softWrap,
+      overflow: overflow,
+      textScaler: textScaler,
+      maxLines: maxLines,
+      semanticsLabel: translatedSemantics,
+      semanticsIdentifier: semanticsIdentifier,
+      textWidthBasis: textWidthBasis,
+      textHeightBehavior: textHeightBehavior,
+      selectionColor: selectionColor,
+    );
+  }
+}
 
 class MapLoveApp extends StatefulWidget {
   const MapLoveApp({super.key});

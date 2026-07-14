@@ -30,7 +30,14 @@ class _HomeScreenState extends State<HomeScreen> {
         tab: selectedTab,
         filters: _filters,
       );
-      if (mounted) setState(() => _profiles = profiles);
+      if (mounted) {
+        setState(() {
+          _profiles = profiles;
+          likedProfiles
+            ..clear()
+            ..addAll(profiles.where((p) => p.likedByMe).map((p) => p.name));
+        });
+      }
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -74,12 +81,39 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  void _toggleLike(UserProfile profile) {
+  Future<void> _toggleLike(UserProfile profile) async {
+    final previous = likedProfiles.contains(profile.name);
     setState(() {
-      if (!likedProfiles.add(profile.name)) {
+      if (previous) {
         likedProfiles.remove(profile.name);
+      } else {
+        likedProfiles.add(profile.name);
       }
     });
+    try {
+      final result = await MapLovRepository.instance.toggleProfileLike(
+        profile.id,
+      );
+      if (!mounted) return;
+      if (result.matched) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => NewMatchScreen(profile: profile)),
+        );
+      }
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        if (previous) {
+          likedProfiles.add(profile.name);
+        } else {
+          likedProfiles.remove(profile.name);
+        }
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Unable to update this like: $error')),
+      );
+    }
   }
 
   @override

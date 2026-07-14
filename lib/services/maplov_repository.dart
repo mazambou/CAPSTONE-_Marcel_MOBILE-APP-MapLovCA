@@ -20,6 +20,18 @@ class DiscoveryFilters {
     this.relationshipGoals = const [],
     this.verifiedOnly = false,
     this.activeTodayOnly = false,
+    this.genders = const [],
+    this.personalities = const [],
+    this.interestSlugs = const [],
+    this.religions = const [],
+    this.bodyTypes = const [],
+    this.minimumHeightCm,
+    this.maximumHeightCm,
+    this.interestImportance = 1,
+    this.requiredGenders = false,
+    this.requiredLocation = false,
+    this.requiredLanguages = false,
+    this.requiredRelationshipGoal = false,
   });
 
   final int minimumAge;
@@ -32,8 +44,20 @@ class DiscoveryFilters {
   final List<String> relationshipGoals;
   final bool verifiedOnly;
   final bool activeTodayOnly;
+  final List<String> genders;
+  final List<String> personalities;
+  final List<String> interestSlugs;
+  final List<String> religions;
+  final List<String> bodyTypes;
+  final int? minimumHeightCm;
+  final int? maximumHeightCm;
+  final int interestImportance;
+  final bool requiredGenders;
+  final bool requiredLocation;
+  final bool requiredLanguages;
+  final bool requiredRelationshipGoal;
 
-  Map<String, Object> toDatabase() => {
+  Map<String, Object?> toDatabase() => {
     'minimum_age': minimumAge,
     'maximum_age': maximumAge,
     'distance_km': distanceKm,
@@ -44,7 +68,94 @@ class DiscoveryFilters {
     'relationship_goals': relationshipGoals,
     'verified_only': verifiedOnly,
     'active_today_only': activeTodayOnly,
+    'genders': genders,
+    'personalities': personalities,
+    'interest_slugs': interestSlugs,
+    'religions': religions,
+    'body_types': bodyTypes,
+    'minimum_height_cm': minimumHeightCm,
+    'maximum_height_cm': maximumHeightCm,
+    'interest_importance': interestImportance,
+    'required_genders': requiredGenders,
+    'required_location': requiredLocation,
+    'required_languages': requiredLanguages,
+    'required_relationship_goal': requiredRelationshipGoal,
   };
+
+  factory DiscoveryFilters.fromDatabase(Map<String, dynamic> row) =>
+      DiscoveryFilters(
+        minimumAge: row['minimum_age'] as int? ?? 18,
+        maximumAge: row['maximum_age'] as int? ?? 80,
+        distanceKm: row['distance_km'] as int? ?? 50,
+        locationMode: row['location_mode'] as String? ?? 'near_me',
+        countries: List<String>.from(row['country_codes'] ?? const []),
+        cities: List<String>.from(row['cities'] ?? const []),
+        languages: List<String>.from(row['languages'] ?? const []),
+        relationshipGoals: List<String>.from(
+          row['relationship_goals'] ?? const [],
+        ),
+        verifiedOnly: row['verified_only'] as bool? ?? false,
+        activeTodayOnly: row['active_today_only'] as bool? ?? false,
+        genders: List<String>.from(row['genders'] ?? const []),
+        personalities: List<String>.from(row['personalities'] ?? const []),
+        interestSlugs: List<String>.from(row['interest_slugs'] ?? const []),
+        religions: List<String>.from(row['religions'] ?? const []),
+        bodyTypes: List<String>.from(row['body_types'] ?? const []),
+        minimumHeightCm: row['minimum_height_cm'] as int?,
+        maximumHeightCm: row['maximum_height_cm'] as int?,
+        interestImportance: row['interest_importance'] as int? ?? 1,
+        requiredGenders: row['required_genders'] as bool? ?? false,
+        requiredLocation: row['required_location'] as bool? ?? false,
+        requiredLanguages: row['required_languages'] as bool? ?? false,
+        requiredRelationshipGoal:
+            row['required_relationship_goal'] as bool? ?? false,
+      );
+}
+
+class ProfileLikeResult {
+  const ProfileLikeResult({required this.liked, required this.matched});
+  final bool liked;
+  final bool matched;
+}
+
+class MatchItem {
+  const MatchItem({
+    required this.id,
+    required this.profile,
+    required this.date,
+  });
+  final String id;
+  final UserProfile profile;
+  final DateTime date;
+}
+
+class PostCommentItem {
+  const PostCommentItem({
+    required this.id,
+    required this.author,
+    required this.body,
+    required this.mine,
+  });
+  final String id;
+  final UserProfile author;
+  final String body;
+  final bool mine;
+}
+
+class SubscriptionInfo {
+  const SubscriptionInfo({
+    this.tier = 'free',
+    this.status = 'active',
+    this.renewsAt,
+    this.history = const [],
+  });
+  final String tier;
+  final String status;
+  final DateTime? renewsAt;
+  final List<Map<String, dynamic>> history;
+
+  bool get isPremium => tier == 'plus' || tier == 'elite' || tier == 'vip';
+  bool get isElite => tier == 'elite' || tier == 'vip';
 }
 
 class FriendshipItem {
@@ -83,15 +194,19 @@ class MapLovMessage {
     required this.createdAt,
     this.body,
     this.mediaUrl,
+    this.mediaBytes,
     this.deleted = false,
+    this.read = false,
   });
   final String id;
   final String senderId;
   final String kind;
   final String? body;
   final String? mediaUrl;
+  final Uint8List? mediaBytes;
   final DateTime createdAt;
   final bool deleted;
+  final bool read;
 }
 
 class MapLovPost {
@@ -105,6 +220,8 @@ class MapLovPost {
     this.comments = 0,
     this.likedByMe = false,
     this.commentsEnabled = true,
+    this.mediaUrls = const [],
+    this.mine = false,
   });
   final String id;
   final UserProfile author;
@@ -115,6 +232,8 @@ class MapLovPost {
   final int comments;
   final bool likedByMe;
   final bool commentsEnabled;
+  final List<String> mediaUrls;
+  final bool mine;
 }
 
 class GardenAlbumItem {
@@ -125,6 +244,8 @@ class GardenAlbumItem {
     this.description = '',
     this.coverUrl,
     this.photoCount = 0,
+    this.accessStatus,
+    this.expiresAt,
   });
   final String id;
   final String ownerId;
@@ -132,6 +253,8 @@ class GardenAlbumItem {
   final String description;
   final String? coverUrl;
   final int photoCount;
+  final String? accessStatus;
+  final DateTime? expiresAt;
 }
 
 class GardenRequestItem {
@@ -157,6 +280,9 @@ class MapLovNotification {
     required this.kind,
     required this.createdAt,
     required this.isRead,
+    this.entityType,
+    this.entityId,
+    this.archived = false,
   });
   final String id;
   final String title;
@@ -164,6 +290,9 @@ class MapLovNotification {
   final String kind;
   final DateTime createdAt;
   final bool isRead;
+  final String? entityType;
+  final String? entityId;
+  final bool archived;
 }
 
 /// Single data gateway for the app. It uses PostgreSQL through Supabase when a
@@ -179,6 +308,9 @@ class MapLovRepository {
       StreamController<List<MapLovMessage>>.broadcast();
   final Set<String> _demoBlockedIds = {};
   final Set<String> _demoFriendIds = {};
+  final Set<String> _demoLikedIds = {};
+  final Set<String> _demoReciprocalLikeIds = {mockProfiles.first.id};
+  final Set<String> _demoReadConversations = {};
   final List<MapLovNotification> _demoNotifications = [
     MapLovNotification(
       id: 'demo-notification-1',
@@ -203,24 +335,28 @@ class MapLovRepository {
     DiscoveryFilters filters = const DiscoveryFilters(),
   }) async {
     if (!isLive) {
-      return mockProfiles.where((profile) {
-        if (_demoBlockedIds.contains(profile.id)) return false;
-        if (profile.age < filters.minimumAge ||
-            profile.age > filters.maximumAge) {
-          return false;
-        }
-        if (profile.distanceKm > filters.distanceKm &&
-            filters.locationMode == 'near_me') {
-          return false;
-        }
-        if (tab == 'Nearby' && profile.distanceKm > 10) return false;
-        if (tab == 'Online' && !profile.isOnline) return false;
-        if (tab == 'New' && !profile.isNew) return false;
-        return true;
-      }).toList();
+      final profiles =
+          mockProfiles.where((profile) {
+            if (_demoBlockedIds.contains(profile.id)) return false;
+            if (!_profileMatchesFilters(profile, filters)) return false;
+            if (tab == 'Nearby' && profile.distanceKm > 10) return false;
+            if (tab == 'Online' && !profile.isOnline) return false;
+            if (tab == 'New' && !profile.isNew) return false;
+            return true;
+          }).toList()..sort(
+            (a, b) => b.compatibilityScore.compareTo(a.compatibilityScore),
+          );
+      return profiles;
     }
 
-    if (tab == 'Nearby' || filters.locationMode == 'near_me') {
+    try {
+      await _client!.rpc('refresh_my_compatibility_scores');
+    } on PostgrestException {
+      // The additive MVP migration may not have reached this environment yet.
+    }
+
+    if (tab == 'Nearby' ||
+        (filters.locationMode == 'near_me' && filters.requiredLocation)) {
       try {
         final nearby =
             await _client!.rpc(
@@ -235,7 +371,13 @@ class MapLovRepository {
         for (final raw in nearby.cast<Map<String, dynamic>>()) {
           result.add(await _profileFromRow(raw));
         }
-        return result;
+        final enriched = await Future.wait(result.map(_enrichCompatibility));
+        return enriched
+            .where((p) => _profileMatchesFilters(p, filters))
+            .toList()
+          ..sort(
+            (a, b) => b.compatibilityScore.compareTo(a.compatibilityScore),
+          );
       } on PostgrestException {
         // A new account may not have shared its position yet. Continue with
         // discovery instead of making the page unusable.
@@ -258,13 +400,105 @@ class MapLovRepository {
       }
       if (tab == 'Online' && !profile.isOnline) continue;
       if (tab == 'New' && !profile.isNew) continue;
-      if (filters.verifiedOnly && !profile.isVerified) continue;
-      if (filters.cities.isNotEmpty && !filters.cities.contains(profile.city)) {
-        continue;
-      }
-      profiles.add(profile);
+      final enriched = await _enrichCompatibility(profile);
+      if (!_profileMatchesFilters(enriched, filters)) continue;
+      profiles.add(enriched);
     }
+    profiles.sort(
+      (a, b) => b.compatibilityScore.compareTo(a.compatibilityScore),
+    );
     return profiles;
+  }
+
+  bool _profileMatchesFilters(UserProfile profile, DiscoveryFilters filters) {
+    if (profile.age < filters.minimumAge || profile.age > filters.maximumAge) {
+      return false;
+    }
+    if (filters.requiredLocation &&
+        filters.locationMode == 'near_me' &&
+        profile.distanceKm > filters.distanceKm) {
+      return false;
+    }
+    if (filters.requiredGenders &&
+        filters.genders.isNotEmpty &&
+        !filters.genders.contains(profile.gender)) {
+      return false;
+    }
+    if (filters.requiredLocation &&
+        filters.countries.isNotEmpty &&
+        !filters.countries.any(
+          (value) => value.toLowerCase() == profile.country.toLowerCase(),
+        )) {
+      return false;
+    }
+    if (filters.requiredLocation &&
+        filters.cities.isNotEmpty &&
+        !filters.cities.any(
+          (value) => value.toLowerCase() == profile.city.toLowerCase(),
+        )) {
+      return false;
+    }
+    if (filters.requiredLanguages &&
+        filters.languages.isNotEmpty &&
+        !filters.languages.any(profile.languages.contains)) {
+      return false;
+    }
+    if (filters.requiredRelationshipGoal &&
+        filters.relationshipGoals.isNotEmpty &&
+        !filters.relationshipGoals.contains(profile.relationshipGoal)) {
+      return false;
+    }
+    if (filters.interestSlugs.isNotEmpty &&
+        !filters.interestSlugs.any(profile.interests.contains)) {
+      return false;
+    }
+    if (filters.religions.isNotEmpty &&
+        !filters.religions.contains(profile.religion)) {
+      return false;
+    }
+    if (filters.bodyTypes.isNotEmpty &&
+        !filters.bodyTypes.contains(profile.bodyType)) {
+      return false;
+    }
+    if (filters.minimumHeightCm != null &&
+        (profile.heightCm ?? 0) < filters.minimumHeightCm!) {
+      return false;
+    }
+    if (filters.maximumHeightCm != null &&
+        (profile.heightCm ?? 1000) > filters.maximumHeightCm!) {
+      return false;
+    }
+    if (filters.verifiedOnly && !profile.isVerified) return false;
+    if (filters.activeTodayOnly &&
+        (profile.lastActiveAt == null ||
+            DateTime.now().difference(profile.lastActiveAt!).inHours > 24)) {
+      return false;
+    }
+    return true;
+  }
+
+  Future<UserProfile> _enrichCompatibility(UserProfile profile) async {
+    if (!isLive) return profile;
+    final row = await _client!
+        .from('compatibility_scores')
+        .select('score, breakdown')
+        .eq('user_id', currentUserId!)
+        .eq('candidate_id', profile.id)
+        .maybeSingle();
+    final liked = await _client!
+        .from('profile_likes')
+        .select('liked_id')
+        .eq('liker_id', currentUserId!)
+        .eq('liked_id', profile.id)
+        .maybeSingle();
+    return _copyProfile(
+      profile,
+      compatibilityScore: row?['score'] as int? ?? profile.compatibilityScore,
+      compatibilityBreakdown: Map<String, dynamic>.from(
+        row?['breakdown'] as Map? ?? const {},
+      ),
+      likedByMe: liked != null,
+    );
   }
 
   Future<UserProfile?> getProfile(String id) async {
@@ -281,7 +515,47 @@ class MapLovRepository {
 
   Future<void> saveMyProfile(Map<String, Object?> values) async {
     if (!isLive) return;
-    await _client!.from('profiles').update(values).eq('id', currentUserId!);
+    final editableValues = Map<String, Object?>.from(values)
+      ..remove('profile_completed_at')
+      ..remove('is_discoverable');
+    await _client!
+        .from('profiles')
+        .update(editableValues)
+        .eq('id', currentUserId!);
+    await completeProfileIfReady();
+  }
+
+  Future<bool> completeProfileIfReady() async {
+    if (!isLive) return true;
+    final profile = await myProfileDetails();
+    final photos = await _client!
+        .from('profile_photos')
+        .select('id')
+        .eq('user_id', currentUserId!)
+        .limit(1);
+    final ready =
+        profile?['first_name'] != null &&
+        profile?['date_of_birth'] != null &&
+        profile?['gender'] != null &&
+        profile?['city'] != null &&
+        profile?['country_name'] != null &&
+        (profile?['spoken_languages'] as List?)?.isNotEmpty == true &&
+        photos.isNotEmpty;
+    if (ready && profile?['profile_completed_at'] == null) {
+      await _client!
+          .from('profiles')
+          .update({
+            'profile_completed_at': DateTime.now().toUtc().toIso8601String(),
+            'is_discoverable': true,
+          })
+          .eq('id', currentUserId!);
+    } else if (!ready) {
+      await _client!
+          .from('profiles')
+          .update({'profile_completed_at': null, 'is_discoverable': false})
+          .eq('id', currentUserId!);
+    }
+    return ready;
   }
 
   Future<Map<String, dynamic>?> myProfileDetails() async {
@@ -299,6 +573,97 @@ class MapLovRepository {
       'user_id': currentUserId!,
       ...filters.toDatabase(),
     });
+    await _client!.rpc('refresh_my_compatibility_scores');
+  }
+
+  Future<DiscoveryFilters> myPreferences() async {
+    if (!isLive) return const DiscoveryFilters();
+    final row = await _client!
+        .from('dating_preferences')
+        .select()
+        .eq('user_id', currentUserId!)
+        .maybeSingle();
+    return row == null
+        ? const DiscoveryFilters()
+        : DiscoveryFilters.fromDatabase(row);
+  }
+
+  Future<ProfileLikeResult> toggleProfileLike(String profileId) async {
+    if (!isLive) {
+      final liked = _demoLikedIds.add(profileId);
+      if (!liked) _demoLikedIds.remove(profileId);
+      return ProfileLikeResult(
+        liked: liked,
+        matched: liked && _demoReciprocalLikeIds.contains(profileId),
+      );
+    }
+    final existing = await _client!
+        .from('profile_likes')
+        .select('liked_id')
+        .eq('liker_id', currentUserId!)
+        .eq('liked_id', profileId)
+        .maybeSingle();
+    if (existing != null) {
+      await _client!
+          .from('profile_likes')
+          .delete()
+          .eq('liker_id', currentUserId!)
+          .eq('liked_id', profileId);
+      return const ProfileLikeResult(liked: false, matched: false);
+    }
+    await _client!.from('profile_likes').insert({
+      'liker_id': currentUserId!,
+      'liked_id': profileId,
+    });
+    final match = await _client!
+        .from('matches')
+        .select('id')
+        .or(
+          'and(user_a.eq.$currentUserId,user_b.eq.$profileId),and(user_a.eq.$profileId,user_b.eq.$currentUserId)',
+        )
+        .maybeSingle();
+    return ProfileLikeResult(liked: true, matched: match != null);
+  }
+
+  Future<List<MatchItem>> myMatches() async {
+    if (!isLive) {
+      final profiles = _demoLikedIds
+          .where(_demoReciprocalLikeIds.contains)
+          .map((id) => mockProfiles.where((p) => p.id == id).firstOrNull)
+          .whereType<UserProfile>();
+      final source = profiles.isEmpty ? mockProfiles.take(3) : profiles;
+      return source
+          .map(
+            (profile) => MatchItem(
+              id: 'demo-match-${profile.id}',
+              profile: profile,
+              date: DateTime.now(),
+            ),
+          )
+          .toList();
+    }
+    final rows = await _client!
+        .from('matches')
+        .select()
+        .or('user_a.eq.$currentUserId,user_b.eq.$currentUserId')
+        .order('matched_at', ascending: false);
+    final result = <MatchItem>[];
+    for (final row in rows) {
+      final otherId = row['user_a'] == currentUserId
+          ? row['user_b'] as String
+          : row['user_a'] as String;
+      final profile = await getProfile(otherId);
+      if (profile != null) {
+        result.add(
+          MatchItem(
+            id: row['id'] as String,
+            profile: await _enrichCompatibility(profile),
+            date: DateTime.parse(row['matched_at'] as String),
+          ),
+        );
+      }
+    }
+    return result;
   }
 
   Future<void> updateLocation({
@@ -321,6 +686,12 @@ class MapLovRepository {
     required Uint8List bytes,
     required String extension,
   }) async {
+    _validateMedia(
+      bytes,
+      extension,
+      allowed: const {'jpg', 'jpeg', 'png', 'webp'},
+      maxBytes: 10 * 1024 * 1024,
+    );
     if (!isLive) return;
     final userId = currentUserId!;
     final existing = await _client!
@@ -343,6 +714,7 @@ class MapLovRepository {
         'display_order': existing.length,
         'is_primary': existing.isEmpty,
       });
+      await completeProfileIfReady();
     } catch (_) {
       await _client!.storage.from('profile-media').remove([path]);
       rethrow;
@@ -351,12 +723,13 @@ class MapLovRepository {
 
   Future<List<Map<String, dynamic>>> myPhotos() async {
     if (!isLive) {
-      return mockProfiles
+      return mockProfiles.indexed
           .map(
-            (p) => {
-              'id': p.id,
-              'url': p.imagePath,
-              'storage_path': p.imagePath,
+            (entry) => {
+              'id': entry.$2.id,
+              'url': entry.$2.imagePath,
+              'storage_path': entry.$2.imagePath,
+              'is_primary': entry.$1 == 0,
             },
           )
           .toList();
@@ -378,12 +751,61 @@ class MapLovRepository {
     );
   }
 
-  Future<void> deleteProfilePhoto(Map<String, dynamic> photo) async {
-    if (!isLive) return;
+  Future<bool> deleteProfilePhoto(Map<String, dynamic> photo) async {
+    if (!isLive) return true;
+    final photos = await _client!
+        .from('profile_photos')
+        .select('id, is_primary')
+        .eq('user_id', currentUserId!)
+        .order('display_order');
+    if (photos.length <= 1) return false;
+    final wasPrimary = photo['is_primary'] == true;
     await _client!.from('profile_photos').delete().eq('id', photo['id']);
     await _client!.storage.from('profile-media').remove([
       photo['storage_path'] as String,
     ]);
+    if (wasPrimary) {
+      final remaining = await _client!
+          .from('profile_photos')
+          .select('id')
+          .eq('user_id', currentUserId!)
+          .order('display_order')
+          .limit(1);
+      if (remaining.isNotEmpty) {
+        await setPrimaryPhoto(remaining.first['id'] as String);
+      }
+    }
+    return true;
+  }
+
+  Future<void> setPrimaryPhoto(String photoId) async {
+    if (!isLive) return;
+    await _client!
+        .from('profile_photos')
+        .update({'is_primary': false})
+        .eq('user_id', currentUserId!);
+    await _client!
+        .from('profile_photos')
+        .update({'is_primary': true})
+        .eq('id', photoId)
+        .eq('user_id', currentUserId!);
+  }
+
+  Future<void> reorderProfilePhotos(List<Map<String, dynamic>> photos) async {
+    if (!isLive) return;
+    // Move through temporary values first to preserve the unique order index.
+    for (var index = 0; index < photos.length; index++) {
+      await _client!
+          .from('profile_photos')
+          .update({'display_order': index + 1000})
+          .eq('id', photos[index]['id']);
+    }
+    for (var index = 0; index < photos.length; index++) {
+      await _client!
+          .from('profile_photos')
+          .update({'display_order': index})
+          .eq('id', photos[index]['id']);
+    }
   }
 
   Future<void> togglePhotoLike(
@@ -561,6 +983,21 @@ class MapLovRepository {
           .eq('conversation_id', conversationId)
           .order('created_at', ascending: false)
           .limit(1);
+      final readRow = await _client!
+          .from('conversation_reads')
+          .select('last_read_at')
+          .eq('conversation_id', conversationId)
+          .eq('user_id', currentUserId!)
+          .maybeSingle();
+      final unreadRows = await _client!
+          .from('messages')
+          .select('id')
+          .eq('conversation_id', conversationId)
+          .neq('sender_id', currentUserId!)
+          .gt(
+            'created_at',
+            readRow?['last_read_at'] as String? ?? '1970-01-01T00:00:00Z',
+          );
       result.add(
         ConversationItem(
           id: conversationId,
@@ -571,6 +1008,7 @@ class MapLovRepository {
           updatedAt: latest.isEmpty
               ? DateTime.now()
               : DateTime.parse(latest.first['created_at'] as String),
+          unread: unreadRows.length,
         ),
       );
     }
@@ -591,7 +1029,21 @@ class MapLovRepository {
         .stream(primaryKey: ['id'])
         .eq('conversation_id', conversationId)
         .order('created_at')
-        .asyncMap((rows) async => Future.wait(rows.map(_messageFromRow)));
+        .asyncMap((rows) async {
+          final otherReads = await _client!
+              .from('conversation_reads')
+              .select('last_read_at')
+              .eq('conversation_id', conversationId)
+              .neq('user_id', currentUserId!)
+              .order('last_read_at', ascending: false)
+              .limit(1);
+          final readAt = otherReads.isEmpty
+              ? null
+              : DateTime.tryParse(otherReads.first['last_read_at'] as String);
+          return Future.wait(
+            rows.map((row) => _messageFromRow(row, otherReadAt: readAt)),
+          );
+        });
   }
 
   Future<void> sendMessage(String conversationId, String body) async {
@@ -624,7 +1076,28 @@ class MapLovRepository {
     required String extension,
     required String kind,
   }) async {
-    if (!isLive) return;
+    _validateMedia(
+      bytes,
+      extension,
+      allowed: kind == 'voice'
+          ? const {'m4a', 'aac', 'mp3', 'ogg'}
+          : const {'jpg', 'jpeg', 'png', 'webp'},
+      maxBytes: 25 * 1024 * 1024,
+    );
+    if (!isLive) {
+      _demoMessages.add(
+        MapLovMessage(
+          id: _uuid.v4(),
+          senderId: 'me',
+          kind: kind,
+          body: kind == 'voice' ? 'Voice message' : 'Photo message',
+          mediaBytes: bytes,
+          createdAt: DateTime.now(),
+        ),
+      );
+      _demoMessageStream.add(List.unmodifiable(_demoMessages));
+      return;
+    }
     final path = '${currentUserId!}/$conversationId/${_uuid.v4()}.$extension';
     await _client!.storage.from('chat-media').uploadBinary(path, bytes);
     await _client!.from('messages').insert({
@@ -633,6 +1106,39 @@ class MapLovRepository {
       'kind': kind,
       'media_path': path,
     });
+  }
+
+  Future<void> markConversationRead(String conversationId) async {
+    if (!isLive) {
+      _demoReadConversations.add(conversationId);
+      return;
+    }
+    await _client!.from('conversation_reads').upsert({
+      'conversation_id': conversationId,
+      'user_id': currentUserId!,
+      'last_read_at': DateTime.now().toUtc().toIso8601String(),
+    });
+  }
+
+  Future<void> deleteMessage(String messageId) async {
+    if (!isLive) {
+      final index = _demoMessages.indexWhere(
+        (message) => message.id == messageId,
+      );
+      if (index >= 0) {
+        final old = _demoMessages[index];
+        _demoMessages[index] = MapLovMessage(
+          id: old.id,
+          senderId: old.senderId,
+          kind: old.kind,
+          createdAt: old.createdAt,
+          deleted: true,
+        );
+        _demoMessageStream.add(List.unmodifiable(_demoMessages));
+      }
+      return;
+    }
+    await _client!.rpc('delete_my_message', params: {'message_id': messageId});
   }
 
   Future<List<MapLovPost>> posts() async {
@@ -665,8 +1171,12 @@ class MapLovRepository {
           .from('post_media')
           .select('storage_path')
           .eq('post_id', row['id'])
-          .order('display_order')
-          .limit(1);
+          .order('display_order');
+      final mediaUrls = await Future.wait(
+        media.map(
+          (item) => _signedUrl('post-media', item['storage_path'] as String),
+        ),
+      );
       final likes = await _client!
           .from('post_likes')
           .select('user_id')
@@ -681,17 +1191,14 @@ class MapLovRepository {
           id: row['id'] as String,
           author: author,
           body: row['body'] as String? ?? '',
-          mediaUrl: media.isEmpty
-              ? null
-              : await _signedUrl(
-                  'post-media',
-                  media.first['storage_path'] as String,
-                ),
+          mediaUrl: mediaUrls.firstOrNull,
+          mediaUrls: mediaUrls,
           createdAt: DateTime.parse(row['created_at'] as String),
           likes: likes.length,
           comments: comments.length,
           likedByMe: likes.any((like) => like['user_id'] == currentUserId),
           commentsEnabled: row['comments_enabled'] as bool? ?? true,
+          mine: row['author_id'] == currentUserId,
         ),
       );
     }
@@ -703,6 +1210,8 @@ class MapLovRepository {
     required bool commentsEnabled,
     Uint8List? image,
     String extension = 'jpg',
+    List<Uint8List> images = const [],
+    List<String> extensions = const [],
   }) async {
     if (!isLive) {
       _demoPosts.insert(
@@ -726,14 +1235,34 @@ class MapLovRepository {
         })
         .select('id')
         .single();
-    if (image != null) {
+    final selectedImages = images.isNotEmpty
+        ? images
+        : image == null
+        ? const <Uint8List>[]
+        : [image];
+    final selectedExtensions = extensions.isNotEmpty ? extensions : [extension];
+    if (selectedImages.isNotEmpty) {
       final postId = row['id'] as String;
-      final path = '${currentUserId!}/$postId/${_uuid.v4()}.$extension';
-      await _client!.storage.from('post-media').uploadBinary(path, image);
-      await _client!.from('post_media').insert({
-        'post_id': postId,
-        'storage_path': path,
-      });
+      for (var index = 0; index < selectedImages.length; index++) {
+        final ext = index < selectedExtensions.length
+            ? selectedExtensions[index]
+            : 'jpg';
+        _validateMedia(
+          selectedImages[index],
+          ext,
+          allowed: const {'jpg', 'jpeg', 'png', 'webp'},
+          maxBytes: 15 * 1024 * 1024,
+        );
+        final path = '${currentUserId!}/$postId/${_uuid.v4()}.$ext';
+        await _client!.storage
+            .from('post-media')
+            .uploadBinary(path, selectedImages[index]);
+        await _client!.from('post_media').insert({
+          'post_id': postId,
+          'storage_path': path,
+          'display_order': index,
+        });
+      }
     }
   }
 
@@ -762,6 +1291,70 @@ class MapLovRepository {
     });
   }
 
+  Future<List<PostCommentItem>> postComments(String postId) async {
+    if (!isLive) {
+      return [
+        PostCommentItem(
+          id: 'demo-comment',
+          author: mockProfiles.first,
+          body: 'This looks wonderful!',
+          mine: false,
+        ),
+      ];
+    }
+    final rows = await _client!
+        .from('post_comments')
+        .select()
+        .eq('post_id', postId)
+        .isFilter('deleted_at', null)
+        .order('created_at');
+    final result = <PostCommentItem>[];
+    for (final row in rows) {
+      final author = await getProfile(row['author_id'] as String);
+      if (author != null) {
+        result.add(
+          PostCommentItem(
+            id: row['id'] as String,
+            author: author,
+            body: row['body'] as String,
+            mine: row['author_id'] == currentUserId,
+          ),
+        );
+      }
+    }
+    return result;
+  }
+
+  Future<void> updatePostComment(String id, String body) async {
+    if (!isLive || body.trim().isEmpty) return;
+    await _client!
+        .from('post_comments')
+        .update({'body': body.trim()})
+        .eq('id', id)
+        .eq('author_id', currentUserId!);
+  }
+
+  Future<void> deletePostComment(String id) async {
+    if (!isLive) return;
+    await _client!
+        .from('post_comments')
+        .update({'deleted_at': DateTime.now().toUtc().toIso8601String()})
+        .eq('id', id)
+        .eq('author_id', currentUserId!);
+  }
+
+  Future<void> deletePost(String id) async {
+    if (!isLive) {
+      _demoPosts.removeWhere((post) => post.id == id);
+      return;
+    }
+    await _client!
+        .from('posts')
+        .update({'deleted_at': DateTime.now().toUtc().toIso8601String()})
+        .eq('id', id)
+        .eq('author_id', currentUserId!);
+  }
+
   Future<List<GardenAlbumItem>> gardenAlbums({String? ownerId}) async {
     if (!isLive) {
       return [
@@ -773,17 +1366,37 @@ class MapLovRepository {
         ),
       ];
     }
-    final rows = await _client!
-        .from('garden_albums')
-        .select()
-        .eq('owner_id', ownerId ?? currentUserId!)
-        .order('created_at');
+    final List<dynamic> rows;
+    if (ownerId != null && ownerId != currentUserId) {
+      rows = List<dynamic>.from(
+        await _client!.rpc(
+          'garden_album_summaries',
+          params: {'album_owner': ownerId},
+        ),
+      );
+    } else {
+      rows = await _client!
+          .from('garden_albums')
+          .select()
+          .eq('owner_id', currentUserId!)
+          .order('created_at');
+    }
     final result = <GardenAlbumItem>[];
+    final requestRows = ownerId != null && ownerId != currentUserId
+        ? await _client!
+              .from('garden_access_requests')
+              .select('album_id, status, expires_at')
+              .eq('requester_id', currentUserId!)
+              .order('requested_at', ascending: false)
+        : const <dynamic>[];
     for (final row in rows) {
-      final photos = await _client!
-          .from('garden_photos')
-          .select('id')
-          .eq('album_id', row['id']);
+      final count = row['photo_count'] as int?;
+      final photos = count == null
+          ? await _client!
+                .from('garden_photos')
+                .select('id')
+                .eq('album_id', row['id'])
+          : const <dynamic>[];
       result.add(
         GardenAlbumItem(
           id: row['id'] as String,
@@ -793,7 +1406,19 @@ class MapLovRepository {
           coverUrl: row['cover_path'] == null
               ? null
               : await _signedUrl('secret-garden', row['cover_path'] as String),
-          photoCount: photos.length,
+          photoCount: count ?? photos.length,
+          accessStatus:
+              requestRows
+                      .where((request) => request['album_id'] == row['id'])
+                      .firstOrNull?['status']
+                  as String?,
+          expiresAt: DateTime.tryParse(
+            requestRows
+                        .where((request) => request['album_id'] == row['id'])
+                        .firstOrNull?['expires_at']
+                    as String? ??
+                '',
+          ),
         ),
       );
     }
@@ -815,6 +1440,12 @@ class MapLovRepository {
     required Uint8List bytes,
     required String extension,
   }) async {
+    _validateMedia(
+      bytes,
+      extension,
+      allowed: const {'jpg', 'jpeg', 'png', 'webp'},
+      maxBytes: 10 * 1024 * 1024,
+    );
     if (!isLive) return;
     final existing = await _client!
         .from('garden_photos')
@@ -920,6 +1551,95 @@ class MapLovRepository {
         .eq('id', id);
   }
 
+  Future<List<Map<String, dynamic>>> gardenAccessHistory() async {
+    if (!isLive) return [];
+    final albums = await gardenAlbums();
+    if (albums.isEmpty) return [];
+    return List<Map<String, dynamic>>.from(
+      await _client!
+          .from('garden_access_requests')
+          .select()
+          .inFilter('album_id', albums.map((album) => album.id).toList())
+          .order('requested_at', ascending: false),
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> myGardenRequests() async {
+    if (!isLive) return [];
+    return List<Map<String, dynamic>>.from(
+      await _client!
+          .from('garden_access_requests')
+          .select()
+          .eq('requester_id', currentUserId!)
+          .order('requested_at', ascending: false),
+    );
+  }
+
+  Future<void> revokeGardenAccess(String requestId) async {
+    if (!isLive) return;
+    await _client!
+        .from('garden_access_requests')
+        .update({
+          'status': 'revoked',
+          'revoked_at': DateTime.now().toUtc().toIso8601String(),
+        })
+        .eq('id', requestId);
+  }
+
+  Future<void> renameGardenAlbum(String id, String title) async {
+    if (!isLive || title.trim().isEmpty) return;
+    await _client!
+        .from('garden_albums')
+        .update({'title': title.trim()})
+        .eq('id', id)
+        .eq('owner_id', currentUserId!);
+  }
+
+  Future<void> deleteGardenAlbum(String id) async {
+    if (!isLive) return;
+    final photos = await _client!
+        .from('garden_photos')
+        .select('storage_path')
+        .eq('album_id', id);
+    if (photos.isNotEmpty) {
+      await _client!.storage
+          .from('secret-garden')
+          .remove(
+            photos.map((photo) => photo['storage_path'] as String).toList(),
+          );
+    }
+    await _client!
+        .from('garden_albums')
+        .delete()
+        .eq('id', id)
+        .eq('owner_id', currentUserId!);
+  }
+
+  Future<void> deleteGardenPhoto(String id, String path) async {
+    if (!isLive) return;
+    await _client!.from('garden_photos').delete().eq('id', id);
+    await _client!.storage.from('secret-garden').remove([path]);
+  }
+
+  Future<List<Map<String, dynamic>>> gardenPhotos(String albumId) async {
+    if (!isLive) return [];
+    final rows = await _client!
+        .from('garden_photos')
+        .select()
+        .eq('album_id', albumId)
+        .order('display_order');
+    return Future.wait(
+      rows.map((row) async {
+        final value = Map<String, dynamic>.from(row);
+        value['url'] = await _signedUrl(
+          'secret-garden',
+          row['storage_path'] as String,
+        );
+        return value;
+      }),
+    );
+  }
+
   Future<void> blockUser(String userId) async {
     if (!isLive) {
       _demoBlockedIds.add(userId);
@@ -985,7 +1705,7 @@ class MapLovRepository {
     );
   }
 
-  Future<void> moderateReport(String id, String status) async {
+  Future<void> moderateReport(String id, String status, {String? notes}) async {
     if (!isLive) return;
     final resolved = status == 'resolved' || status == 'dismissed';
     await _client!
@@ -995,6 +1715,7 @@ class MapLovRepository {
           'resolved_at': resolved
               ? DateTime.now().toUtc().toIso8601String()
               : null,
+          'resolution_notes': notes?.trim().isEmpty == true ? null : notes,
         })
         .eq('id', id);
     await _client!.from('admin_actions').insert({
@@ -1054,8 +1775,12 @@ class MapLovRepository {
                   kind: row['kind'] as String,
                   createdAt: DateTime.parse(row['created_at'] as String),
                   isRead: row['read_at'] != null,
+                  entityType: row['entity_type'] as String?,
+                  entityId: row['entity_id'] as String?,
+                  archived: row['archived_at'] != null,
                 ),
               )
+              .where((item) => !item.archived)
               .toList(),
         );
   }
@@ -1082,6 +1807,39 @@ class MapLovRepository {
         .isFilter('read_at', null);
   }
 
+  Future<void> markNotificationRead(String id) async {
+    if (!isLive) return;
+    await _client!
+        .from('notifications')
+        .update({'read_at': DateTime.now().toUtc().toIso8601String()})
+        .eq('id', id)
+        .eq('user_id', currentUserId!);
+  }
+
+  Future<void> archiveNotification(String id) async {
+    if (!isLive) {
+      _demoNotifications.removeWhere((item) => item.id == id);
+      return;
+    }
+    await _client!
+        .from('notifications')
+        .update({'archived_at': DateTime.now().toUtc().toIso8601String()})
+        .eq('id', id)
+        .eq('user_id', currentUserId!);
+  }
+
+  Future<void> deleteNotification(String id) async {
+    if (!isLive) {
+      _demoNotifications.removeWhere((item) => item.id == id);
+      return;
+    }
+    await _client!
+        .from('notifications')
+        .delete()
+        .eq('id', id)
+        .eq('user_id', currentUserId!);
+  }
+
   Future<Map<String, bool>> notificationPreferences() async {
     const defaults = {
       'messages': true,
@@ -1090,6 +1848,11 @@ class MapLovRepository {
       'garden_requests': true,
       'compatibility_suggestions': false,
       'marketing': false,
+      'security': true,
+      'push_enabled': true,
+      'in_app_enabled': true,
+      'email_important': true,
+      'quiet_hours_enabled': false,
     };
     if (!isLive) return defaults;
     final row = await _client!
@@ -1111,12 +1874,149 @@ class MapLovRepository {
     });
   }
 
+  Future<Map<String, dynamic>?> currentAccount() async {
+    if (!isLive) return {'status': 'active', 'role': 'user'};
+    return _client!
+        .from('profiles')
+        .select('status, role, profile_completed_at')
+        .eq('id', currentUserId!)
+        .maybeSingle();
+  }
+
+  Future<SubscriptionInfo> subscriptionInfo() async {
+    if (!isLive) return const SubscriptionInfo();
+    final rows = await _client!
+        .from('subscriptions')
+        .select()
+        .eq('user_id', currentUserId!)
+        .order('created_at', ascending: false);
+    final history = List<Map<String, dynamic>>.from(rows);
+    final current = history
+        .where((item) => item['is_current'] == true)
+        .firstOrNull;
+    return SubscriptionInfo(
+      tier: current?['tier'] as String? ?? 'free',
+      status: current?['status'] as String? ?? 'active',
+      renewsAt: DateTime.tryParse(
+        current?['current_period_end'] as String? ?? '',
+      ),
+      history: history,
+    );
+  }
+
+  Future<void> recordProfileView(String profileId) async {
+    if (!isLive || profileId == currentUserId) return;
+    await _client!.from('profile_views').insert({
+      'viewer_id': currentUserId!,
+      'viewed_id': profileId,
+    });
+  }
+
+  Future<List<UserProfile>> profileVisitors() async {
+    if (!isLive) return mockProfiles.take(2).toList();
+    final rows = await _client!
+        .from('profile_views')
+        .select('viewer_id, viewed_at')
+        .eq('viewed_id', currentUserId!)
+        .order('viewed_at', ascending: false)
+        .limit(100);
+    final result = <UserProfile>[];
+    final seen = <String>{};
+    for (final row in rows) {
+      final id = row['viewer_id'] as String;
+      if (seen.add(id)) {
+        final profile = await getProfile(id);
+        if (profile != null) result.add(profile);
+      }
+    }
+    return result;
+  }
+
+  Future<Map<String, int>> profileStatistics() async {
+    if (!isLive) {
+      return const {'views': 24, 'likes': 8, 'matches': 3, 'messages': 4};
+    }
+    final views = await _client!
+        .from('profile_views')
+        .select('viewer_id')
+        .eq('viewed_id', currentUserId!);
+    final likes = await _client!
+        .from('profile_likes')
+        .select('liker_id')
+        .eq('liked_id', currentUserId!);
+    final matches = await _client!
+        .from('matches')
+        .select('id')
+        .or('user_a.eq.$currentUserId,user_b.eq.$currentUserId');
+    final conversations = await _client!
+        .from('conversation_members')
+        .select('conversation_id')
+        .eq('user_id', currentUserId!);
+    return {
+      'views': views.length,
+      'likes': likes.length,
+      'matches': matches.length,
+      'messages': conversations.length,
+    };
+  }
+
+  Future<Map<String, int>> adminMetrics() async {
+    if (!isLive) return const {'reports': 0, 'review': 0, 'users': 0};
+    final reports = await _client!.from('reports').select('id, status');
+    final users = await _client!.from('profiles').select('id');
+    return {
+      'reports': reports.where((item) => item['status'] == 'open').length,
+      'review': reports
+          .where((item) => item['status'] == 'under_review')
+          .length,
+      'users': users.length,
+    };
+  }
+
+  Future<void> verifyProfile(String userId, {bool photo = false}) async {
+    if (!isLive) return;
+    await _client!
+        .from('profiles')
+        .update({photo ? 'is_photo_verified' : 'is_verified': true})
+        .eq('id', userId);
+    await _client!.from('admin_actions').insert({
+      'admin_id': currentUserId!,
+      'action': photo ? 'photo_verified' : 'profile_verified',
+      'target_type': 'user',
+      'target_id': userId,
+    });
+  }
+
+  Future<void> adminRemoveContent(String type, String id) async {
+    if (!isLive) return;
+    if (type == 'post') {
+      await _client!
+          .from('posts')
+          .update({'deleted_at': DateTime.now().toUtc().toIso8601String()})
+          .eq('id', id);
+    } else if (type == 'comment') {
+      await _client!
+          .from('post_comments')
+          .update({'deleted_at': DateTime.now().toUtc().toIso8601String()})
+          .eq('id', id);
+    } else if (type == 'photo') {
+      await _client!.from('profile_photos').delete().eq('id', id);
+    }
+    await _client!.from('admin_actions').insert({
+      'admin_id': currentUserId!,
+      'action': 'content_removed',
+      'target_type': type,
+      'target_id': id,
+    });
+  }
+
   Future<UserProfile> _profileFromRow(Map<String, dynamic> row) async {
     final id = row['id'] as String;
     final photos = await _client!
         .from('profile_photos')
-        .select('id, storage_path')
+        .select('id, storage_path, is_primary')
         .eq('user_id', id)
+        .order('is_primary', ascending: false)
         .order('display_order');
     final urls = <String>[];
     final photoIds = <String>[];
@@ -1169,24 +2069,125 @@ class MapLovRepository {
           false,
       bio: row['bio'] as String? ?? '',
       isVerified: row['is_verified'] as bool? ?? false,
+      gender: row['gender'] as String? ?? '',
+      languages: List<String>.from(row['spoken_languages'] ?? const []),
+      relationshipGoal: row['relationship_goal'] as String? ?? '',
+      interests: List<String>.from(row['interest_slugs'] ?? const []),
+      religion: row['religion'] as String? ?? '',
+      bodyType: row['body_type'] as String? ?? '',
+      heightCm: row['height_cm'] as int?,
+      lastActiveAt: lastActive,
     );
   }
 
-  Future<MapLovMessage> _messageFromRow(Map<String, dynamic> row) async {
+  UserProfile _copyProfile(
+    UserProfile value, {
+    int? compatibilityScore,
+    Map<String, dynamic>? compatibilityBreakdown,
+    bool? likedByMe,
+  }) => UserProfile(
+    id: value.id,
+    name: value.name,
+    age: value.age,
+    city: value.city,
+    country: value.country,
+    compatibilityScore: compatibilityScore ?? value.compatibilityScore,
+    imagePath: value.imagePath,
+    photoUrls: value.photoUrls,
+    photoIds: value.photoIds,
+    photoDisplayStyle: value.photoDisplayStyle,
+    profession: value.profession,
+    distanceKm: value.distanceKm,
+    isOnline: value.isOnline,
+    isNew: value.isNew,
+    bio: value.bio,
+    isVerified: value.isVerified,
+    gender: value.gender,
+    languages: value.languages,
+    relationshipGoal: value.relationshipGoal,
+    interests: value.interests,
+    religion: value.religion,
+    bodyType: value.bodyType,
+    heightCm: value.heightCm,
+    compatibilityBreakdown:
+        compatibilityBreakdown ?? value.compatibilityBreakdown,
+    likedByMe: likedByMe ?? value.likedByMe,
+    lastActiveAt: value.lastActiveAt,
+  );
+
+  Future<MapLovMessage> _messageFromRow(
+    Map<String, dynamic> row, {
+    DateTime? otherReadAt,
+  }) async {
     String? mediaUrl;
     final path = row['media_path'] as String?;
     if (path != null) mediaUrl = await _signedUrl('chat-media', path);
+    final createdAt = DateTime.parse(row['created_at'] as String);
     return MapLovMessage(
       id: row['id'] as String,
       senderId: row['sender_id'] as String,
       kind: row['kind'] as String,
       body: row['body'] as String?,
       mediaUrl: mediaUrl,
-      createdAt: DateTime.parse(row['created_at'] as String),
+      createdAt: createdAt,
       deleted: row['deleted_at'] != null,
+      read:
+          row['sender_id'] == currentUserId &&
+          otherReadAt != null &&
+          !createdAt.isAfter(otherReadAt),
     );
   }
 
   Future<String> _signedUrl(String bucket, String path) =>
       _client!.storage.from(bucket).createSignedUrl(path, 3600);
+
+  void _validateMedia(
+    Uint8List bytes,
+    String extension, {
+    required Set<String> allowed,
+    required int maxBytes,
+  }) {
+    final normalized = extension.toLowerCase().replaceAll('.', '');
+    if (!allowed.contains(normalized)) {
+      throw ArgumentError('Unsupported media format: $normalized');
+    }
+    if (bytes.isEmpty || bytes.lengthInBytes > maxBytes) {
+      throw ArgumentError('The selected media file is empty or too large.');
+    }
+    final signatureMatches = switch (normalized) {
+      'jpg' || 'jpeg' =>
+        bytes.length >= 3 &&
+            bytes[0] == 0xff &&
+            bytes[1] == 0xd8 &&
+            bytes[2] == 0xff,
+      'png' =>
+        bytes.length >= 8 &&
+            bytes[0] == 0x89 &&
+            bytes[1] == 0x50 &&
+            bytes[2] == 0x4e &&
+            bytes[3] == 0x47,
+      'webp' =>
+        bytes.length >= 12 &&
+            String.fromCharCodes(bytes.sublist(0, 4)) == 'RIFF' &&
+            String.fromCharCodes(bytes.sublist(8, 12)) == 'WEBP',
+      'm4a' =>
+        bytes.length >= 12 &&
+            String.fromCharCodes(bytes.sublist(4, 8)) == 'ftyp',
+      'aac' =>
+        bytes.length >= 2 &&
+            bytes[0] == 0xff &&
+            (bytes[1] == 0xf1 || bytes[1] == 0xf9),
+      'mp3' =>
+        bytes.length >= 3 &&
+            (String.fromCharCodes(bytes.sublist(0, 3)) == 'ID3' ||
+                (bytes[0] == 0xff && (bytes[1] & 0xe0) == 0xe0)),
+      'ogg' =>
+        bytes.length >= 4 &&
+            String.fromCharCodes(bytes.sublist(0, 4)) == 'OggS',
+      _ => false,
+    };
+    if (!signatureMatches) {
+      throw ArgumentError('The file content does not match its extension.');
+    }
+  }
 }

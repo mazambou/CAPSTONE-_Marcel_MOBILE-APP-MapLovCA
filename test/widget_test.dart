@@ -249,6 +249,80 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('edit profile exposes attributes used by discovery filters', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(const MaterialApp(home: EditProfileScreen()));
+    await tester.tap(find.text('Profile details'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const Key('edit_profile_filter_details_tab')),
+      findsOneWidget,
+    );
+    expect(find.text('Basic matching information'), findsOneWidget);
+    expect(find.text('Gender'), findsOneWidget);
+    final detailsList = find.byKey(
+      const Key('edit_profile_filter_details_tab'),
+    );
+    await tester.scrollUntilVisible(
+      find.text('Religion'),
+      300,
+      scrollable: find
+          .descendant(of: detailsList, matching: find.byType(Scrollable))
+          .first,
+    );
+    expect(find.text('Religion'), findsOneWidget);
+    expect(find.text('Children preference'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'navigation uses search for Discover and replaces Map with Matches',
+    (tester) async {
+      await tester.pumpWidget(const MaterialApp(home: HomeScreen()));
+
+      expect(find.byIcon(Icons.search), findsOneWidget);
+      expect(find.text('Map'), findsNothing);
+      expect(find.text('Matches'), findsOneWidget);
+    },
+  );
+
+  testWidgets('new match page keeps the message and discovery actions', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(const MaterialApp(home: NewMatchScreen()));
+
+    expect(find.text("It's a Match!"), findsOneWidget);
+    expect(find.byKey(const Key('new_match_send_message')), findsOneWidget);
+    expect(find.byKey(const Key('new_match_keep_swiping')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'profile exposes album management without removing photo previews',
+    (tester) async {
+      await tester.pumpWidget(const MaterialApp(home: ProfileScreen()));
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('manage_album_button')),
+        250,
+      );
+
+      expect(find.byKey(const Key('manage_album_button')), findsOneWidget);
+      expect(find.text('Photos'), findsOneWidget);
+    },
+  );
+
   final screens = <String, Widget>{
     'login': const LoginScreen(),
     'register': const RegisterScreen(),
@@ -262,6 +336,7 @@ void main() {
     'near me': const NearMeScreen(),
     'filters': const FilterScreen(),
     'matches': const MatchScreen(),
+    'new match': const NewMatchScreen(),
     'messages': const MessagesScreen(),
     'chat': const ChatScreen(),
     'report user': const ReportUserScreen(),

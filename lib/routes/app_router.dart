@@ -23,6 +23,7 @@ class AppRouter {
     AppRoutes.nearMe: (_) => const NearMeScreen(),
     AppRoutes.filters: (_) => const FilterScreen(),
     AppRoutes.matches: (_) => const MatchScreen(),
+    AppRoutes.newMatch: (_) => const NewMatchScreen(),
     AppRoutes.messages: (_) => const MessagesScreen(),
     AppRoutes.chat: (_) => const ChatScreen(),
     AppRoutes.reportUser: (_) => const ReportUserScreen(),

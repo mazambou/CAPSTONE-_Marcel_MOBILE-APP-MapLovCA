@@ -37,7 +37,7 @@ class _MapLovNavigationBar extends StatelessWidget {
         const routes = [
           AppRoutes.home,
           AppRoutes.messages,
-          AppRoutes.nearMe,
+          AppRoutes.newMatch,
           AppRoutes.matches,
           AppRoutes.profile,
         ];
@@ -47,8 +47,8 @@ class _MapLovNavigationBar extends StatelessWidget {
       },
       destinations: [
         NavigationDestination(
-          icon: const Icon(Icons.favorite_outline),
-          selectedIcon: const Icon(Icons.favorite),
+          icon: const Icon(Icons.search),
+          selectedIcon: const Icon(Icons.search),
           label: MapLovLocalizations.of(context).text('discover'),
         ),
         NavigationDestination(
@@ -63,9 +63,9 @@ class _MapLovNavigationBar extends StatelessWidget {
           label: MapLovLocalizations.of(context).text('messages'),
         ),
         NavigationDestination(
-          icon: const Icon(Icons.location_on_outlined),
-          selectedIcon: const Icon(Icons.location_on),
-          label: MapLovLocalizations.of(context).text('map'),
+          icon: const Icon(Icons.favorite_border),
+          selectedIcon: const Icon(Icons.favorite),
+          label: MapLovLocalizations.of(context).text('matches'),
         ),
         NavigationDestination(
           icon: const Badge(

@@ -76,6 +76,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ],
       ),
       const _SectionTitle('Photos'),
+      Card(
+        color: AppColors.palePink,
+        child: ListTile(
+          key: const Key('manage_album_button'),
+          leading: const CircleAvatar(
+            backgroundColor: AppColors.deepPink,
+            foregroundColor: Colors.white,
+            child: Icon(Icons.add_photo_alternate_outlined),
+          ),
+          title: const Text(
+            'Manage my album',
+            style: TextStyle(fontWeight: FontWeight.w800),
+          ),
+          subtitle: const Text('Add or remove profile photos'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => Navigator.pushNamed(context, AppRoutes.managePhotos),
+        ),
+      ),
+      const SizedBox(height: 10),
       SizedBox(
         height: 100,
         child: ListView.separated(

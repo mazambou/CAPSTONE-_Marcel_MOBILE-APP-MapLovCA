@@ -15,6 +15,7 @@ class AppRoutes {
   static const nearMe = '/near-me';
   static const filters = '/filters';
   static const matches = '/matches';
+  static const newMatch = '/new-match';
   static const messages = '/messages';
   static const chat = '/chat';
   static const reportUser = '/report-user';

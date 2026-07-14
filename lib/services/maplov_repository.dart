@@ -284,6 +284,15 @@ class MapLovRepository {
     await _client!.from('profiles').update(values).eq('id', currentUserId!);
   }
 
+  Future<Map<String, dynamic>?> myProfileDetails() async {
+    if (!isLive) return null;
+    return _client!
+        .from('profiles')
+        .select()
+        .eq('id', currentUserId!)
+        .maybeSingle();
+  }
+
   Future<void> savePreferences(DiscoveryFilters filters) async {
     if (!isLive) return;
     await _client!.from('dating_preferences').upsert({

@@ -65,6 +65,159 @@ void main() {
     );
   });
 
+  testWidgets('birth calendar exposes year arrows and a scrollable year list', (
+    tester,
+  ) async {
+    await tester.pumpWidget(const MaterialApp(home: AgeGateScreen()));
+    await tester.tap(find.text('Date of birth'));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('previous_birth_year')), findsOneWidget);
+    expect(find.byKey(const Key('next_birth_year')), findsOneWidget);
+    expect(find.byKey(const Key('select_birth_year')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('select_birth_year')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('birth_year_list')), findsOneWidget);
+  });
+
+  testWidgets('registration passwords can be shown and hidden', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(home: RegisterScreen(dateOfBirth: DateTime(1990, 1, 1))),
+    );
+
+    expect(find.text('Phone number'), findsOneWidget);
+    expect(find.byKey(const Key('phone_country_indicator')), findsOneWidget);
+    final password = find.byType(TextField).at(3);
+    expect(tester.widget<TextField>(password).obscureText, isTrue);
+    await tester.tap(find.byKey(const Key('toggle_password')));
+    await tester.pump();
+    expect(tester.widget<TextField>(password).obscureText, isFalse);
+  });
+
+  testWidgets('registration country controls the city dropdown', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 1400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      MaterialApp(home: RegisterScreen(dateOfBirth: DateTime(1990, 1, 1))),
+    );
+
+    expect(
+      find.byKey(const Key('registration_country_dropdown')),
+      findsOneWidget,
+    );
+    final countryDropdown = tester.widget<DropdownButton<String>>(
+      find.descendant(
+        of: find.byKey(const Key('registration_country_dropdown')),
+        matching: find.byType(DropdownButton<String>),
+      ),
+    );
+    expect(countryDropdown.items!.length, greaterThanOrEqualTo(190));
+    expect(
+      find.byKey(const ValueKey('registration_city_dropdown_Canada')),
+      findsOneWidget,
+    );
+    expect(find.text('Toronto'), findsOneWidget);
+
+    countryDropdown.onChanged!('France');
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('registration_city_dropdown_France')),
+      findsOneWidget,
+    );
+    expect(find.text('Paris'), findsOneWidget);
+    final phoneIndicator = tester.widget<DropdownButton<String>>(
+      find.descendant(
+        of: find.byKey(const Key('phone_country_indicator')),
+        matching: find.byType(DropdownButton<String>),
+      ),
+    );
+    expect(phoneIndicator.value, 'France');
+    expect(find.text('+33'), findsOneWidget);
+
+    phoneIndicator.onChanged!('Cameroon');
+    await tester.pumpAndSettle();
+    final synchronizedCountry = tester.widget<DropdownButton<String>>(
+      find.descendant(
+        of: find.byKey(const Key('registration_country_dropdown')),
+        matching: find.byType(DropdownButton<String>),
+      ),
+    );
+    expect(synchronizedCountry.value, 'Cameroon');
+    expect(find.text('Douala'), findsOneWidget);
+    expect(find.text('+237'), findsOneWidget);
+  });
+
+  testWidgets('phone verification requires a six-digit code', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        routes: {'/home': (_) => const HomeScreen()},
+        home: const VerifyPhoneScreen(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const Key('phone_number_being_verified')),
+      findsOneWidget,
+    );
+    expect(find.text('Phone number being verified'), findsOneWidget);
+    await tester.drag(find.byType(ListView), const Offset(0, -500));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('defer_phone_verification')), findsOneWidget);
+
+    await tester.drag(find.byType(ListView), const Offset(0, 500));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const Key('phone_verification_code')),
+      '123',
+    );
+    await tester.tap(find.text('Verify phone number'));
+    await tester.pump();
+
+    expect(find.text('Enter the 6-digit code sent by SMS.'), findsOneWidget);
+  });
+
+  testWidgets('profile setup does not ask registration details twice', (
+    tester,
+  ) async {
+    await tester.pumpWidget(const MaterialApp(home: ProfileSetupScreen()));
+    await tester.pumpAndSettle();
+
+    expect(find.text('First name'), findsNothing);
+    expect(find.text('Date of birth'), findsNothing);
+    expect(find.text('City'), findsNothing);
+    expect(find.text('Country'), findsNothing);
+    expect(find.text('Gender'), findsOneWidget);
+  });
+
+  testWidgets('profile setup can continue without uploading a photo', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        routes: {'/profile/preferences': (_) => const PreferencesScreen()},
+        home: const ProfileSetupScreen(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.dragUntilVisible(
+      find.byKey(const Key('profile_setup_continue')),
+      find.byType(ListView).first,
+      const Offset(0, -250),
+    );
+    await tester.tap(find.byKey(const Key('profile_setup_continue')));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(PreferencesScreen), findsOneWidget);
+  });
+
   testWidgets('opens the full-screen gallery when a profile photo is tapped', (
     tester,
   ) async {
@@ -165,6 +318,32 @@ void main() {
     expect(find.text('International search'), findsOneWidget);
   });
 
+  testWidgets('preferences reuses the geographic filter selector', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 1200);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(const MaterialApp(home: PreferencesScreen()));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('location_mode_Near me')), findsOneWidget);
+    expect(find.byKey(const Key('location_mode_My country')), findsOneWidget);
+    expect(
+      find.byKey(const Key('location_mode_International')),
+      findsOneWidget,
+    );
+    expect(find.text('Search radius'), findsOneWidget);
+    await tester.scrollUntilVisible(find.text('Next'), 300);
+    expect(find.text('Next'), findsOneWidget);
+    expect(
+      find.byKey(const Key('preferences_back_to_profile')),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('opens Standard and Advanced filters with Show Results', (
     tester,
   ) async {
@@ -209,6 +388,15 @@ void main() {
       await tester.pumpWidget(
         const MaterialApp(
           home: PhotoViewerScreen(
+            profile: UserProfile(
+              id: 'social-photo-test',
+              name: 'Morgan',
+              age: 29,
+              city: 'Toronto',
+              compatibilityScore: 75,
+              imagePath: 'assets/avatars/story_02.png',
+              photoDisplayStyle: PhotoDisplayStyle.social,
+            ),
             displayStyleOverride: PhotoDisplayStyle.social,
           ),
         ),
@@ -225,7 +413,7 @@ void main() {
 
       await tester.tap(find.byKey(const Key('social_photo_comment')));
       await tester.pumpAndSettle();
-      expect(find.text('Comments on Sophie’s photo'), findsOneWidget);
+      expect(find.text('Comments on Morgan’s photo'), findsOneWidget);
     },
   );
 
@@ -291,8 +479,38 @@ void main() {
       expect(find.byIcon(Icons.search), findsOneWidget);
       expect(find.text('Map'), findsNothing);
       expect(find.text('Matches'), findsOneWidget);
+      expect(find.byType(NavigationDestination), findsNWidgets(5));
+      expect(find.text('Likes'), findsOneWidget);
     },
   );
+
+  testWidgets('incoming like must be opened before liking back', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(const MaterialApp(home: LikesScreen()));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('incoming_like_photo_Sophie')), findsOneWidget);
+    expect(find.byKey(const Key('grid_like_Sophie')), findsNothing);
+
+    await tester.tap(find.byKey(const Key('incoming_like_photo_Sophie')));
+    await tester.pumpAndSettle();
+    expect(find.byType(PhotoViewerScreen), findsOneWidget);
+    expect(find.byKey(const Key('photo_profile_like_Sophie')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('photo_profile_like_Sophie')));
+    await tester.pumpAndSettle();
+    expect(find.byType(NewMatchScreen), findsOneWidget);
+
+    await MapLovRepository.instance.toggleProfileLike(
+      '00000000-0000-4000-8000-000000000001',
+    );
+  });
 
   testWidgets('new match page keeps the message and discovery actions', (
     tester,
@@ -323,6 +541,23 @@ void main() {
       expect(find.text('Photos'), findsOneWidget);
     },
   );
+
+  testWidgets('my photo opens the current account instead of a mock profile', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 1200);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(const MaterialApp(home: ProfileScreen()));
+    await tester.tap(find.byKey(const Key('my_profile_photo_0')));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(PhotoViewerScreen), findsOneWidget);
+    expect(find.text('Jamie, 29'), findsOneWidget);
+    expect(find.text('Sophie, 27'), findsNothing);
+  });
 
   test('discovery preferences keep all V1 criteria', () {
     final filters = DiscoveryFilters.fromDatabase({
@@ -360,6 +595,26 @@ void main() {
       profileId,
     );
     expect(removed.liked, isFalse);
+  });
+
+  test('reciprocal photo likes create a new match', () async {
+    const profileId = '00000000-0000-4000-8000-000000000001';
+    final result = await MapLovRepository.instance.togglePhotoLike(
+      'demo-photo-$profileId',
+      profileId: profileId,
+      currentlyLiked: false,
+    );
+
+    expect(result.liked, isTrue);
+    expect(result.matched, isTrue);
+    final matches = await MapLovRepository.instance.myMatches();
+    expect(matches.any((item) => item.profile.id == profileId), isTrue);
+
+    await MapLovRepository.instance.togglePhotoLike(
+      'demo-photo-$profileId',
+      profileId: profileId,
+      currentlyLiked: true,
+    );
   });
 
   testWidgets('compatibility details use the selected profile score', (
@@ -492,12 +747,14 @@ void main() {
     'forgot password': const ForgotPasswordScreen(),
     'reset password': const ResetPasswordScreen(),
     'verify email': const VerifyEmailScreen(),
+    'verify phone': const VerifyPhoneScreen(),
     'delete account': const DeleteAccountScreen(),
     'home': const HomeScreen(),
     'discover': const DiscoverScreen(),
     'near me': const NearMeScreen(),
     'filters': const FilterScreen(),
     'matches': const MatchScreen(),
+    'likes': const LikesScreen(),
     'new match': const NewMatchScreen(),
     'messages': const MessagesScreen(),
     'chat': const ChatScreen(),

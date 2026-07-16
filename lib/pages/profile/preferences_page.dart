@@ -9,17 +9,19 @@ class PreferencesScreen extends StatefulWidget {
 
 class _PreferencesScreenState extends State<PreferencesScreen> {
   RangeValues ages = const RangeValues(24, 38);
-  String searchMode = 'Around me';
+  String searchMode = 'Near me';
+  double distance = 50;
+  String selectedCity = 'Any city';
+  String preferredCountry = 'Canada';
   String gender = 'Everyone';
   String relationshipGoal = 'Long-term';
   String language = 'Any language';
   String personality = 'Any personality';
   bool requiredGender = false;
-  bool requiredLocation = false;
   bool requiredLanguage = false;
   bool requiredGoal = false;
-  final country = TextEditingController();
   bool loading = true;
+  bool saving = false;
 
   @override
   void initState() {
@@ -36,28 +38,96 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
         saved.maximumAge.toDouble(),
       );
       searchMode = switch (saved.locationMode) {
-        'my_country' => 'Country',
-        'specific_country' => 'Specific country',
-        'worldwide' => 'Worldwide',
-        _ => 'Around me',
+        'my_country' => 'My country',
+        'specific_country' || 'worldwide' => 'International',
+        _ => 'Near me',
       };
+      distance = saved.distanceKm.toDouble().clamp(1, 100);
+      selectedCity = saved.cities.firstOrNull ?? 'Any city';
       gender = saved.genders.firstOrNull ?? 'Everyone';
       relationshipGoal = saved.relationshipGoals.firstOrNull ?? 'Long-term';
       language = saved.languages.firstOrNull ?? 'Any language';
       personality = saved.personalities.firstOrNull ?? 'Any personality';
-      country.text = saved.countries.firstOrNull ?? '';
+      preferredCountry = saved.countries.firstOrNull ?? 'Canada';
       requiredGender = saved.requiredGenders;
-      requiredLocation = saved.requiredLocation;
       requiredLanguage = saved.requiredLanguages;
       requiredGoal = saved.requiredRelationshipGoal;
       loading = false;
     });
   }
 
-  @override
-  void dispose() {
-    country.dispose();
-    super.dispose();
+  void _backToProfileDetails() {
+    if (Navigator.canPop(context)) {
+      Navigator.pop(context);
+    } else {
+      Navigator.pushReplacementNamed(context, AppRoutes.profileSetup);
+    }
+  }
+
+  Future<void> _continue() async {
+    if (loading || saving) return;
+    final completingRegistration =
+        !AuthService.instance.isConfigured ||
+        AuthService.instance.requiresPreferencesCompletion;
+    setState(() => saving = true);
+    try {
+      await MapLovRepository.instance.savePreferences(
+        DiscoveryFilters(
+          minimumAge: ages.start.round(),
+          maximumAge: ages.end.round(),
+          distanceKm: distance.round(),
+          locationMode: switch (searchMode) {
+            'My country' => 'my_country',
+            'International' => 'specific_country',
+            _ => 'near_me',
+          },
+          countries: searchMode == 'International'
+              ? [preferredCountry]
+              : const [],
+          cities: searchMode == 'My country' && selectedCity != 'Any city'
+              ? [selectedCity]
+              : const [],
+          genders: gender == 'Everyone' ? const [] : [gender],
+          relationshipGoals: [relationshipGoal],
+          languages: language == 'Any language'
+              ? const []
+              : language == 'English & French'
+              ? const ['English', 'French']
+              : [language],
+          personalities: personality == 'Any personality'
+              ? const []
+              : [personality],
+          requiredGenders: requiredGender,
+          requiredLocation: true,
+          requiredLanguages: requiredLanguage,
+          requiredRelationshipGoal: requiredGoal,
+        ),
+      );
+      await AuthService.instance.markPreferencesCompleted();
+      if (!mounted) return;
+      if (AuthService.instance.isConfigured &&
+          AuthService.instance.isPhoneVerified) {
+        if (completingRegistration) {
+          Navigator.pushNamedAndRemoveUntil(
+            context,
+            AppRoutes.home,
+            (_) => false,
+          );
+          return;
+        }
+        if (Navigator.canPop(context)) Navigator.pop(context);
+        return;
+      }
+      Navigator.pushNamed(context, AppRoutes.verifyPhone);
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Unable to save preferences: $error')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => saving = false);
+    }
   }
 
   @override
@@ -93,24 +163,17 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
         onChanged: (value) => setState(() => ages = value),
       ),
       const _SectionTitle('Search location'),
-      SegmentedButton<String>(
-        segments: const [
-          ButtonSegment(value: 'Around me', label: Text('Nearby')),
-          ButtonSegment(value: 'Country', label: Text('Country')),
-          ButtonSegment(value: 'Specific country', label: Text('Specific')),
-          ButtonSegment(value: 'Worldwide', label: Text('World')),
-        ],
-        selected: {searchMode},
-        onSelectionChanged: (value) => setState(() => searchMode = value.first),
-      ),
-      const SizedBox(height: 14),
-      _Field('Preferred country', Icons.public, controller: country),
-      SwitchListTile.adaptive(
-        contentPadding: EdgeInsets.zero,
-        title: const Text('Required location criterion'),
-        subtitle: const Text('Otherwise, location remains a preference.'),
-        value: requiredLocation,
-        onChanged: (value) => setState(() => requiredLocation = value),
+      _SearchLocationSelector(
+        mode: searchMode,
+        distance: distance,
+        selectedCity: selectedCity,
+        selectedCountry: preferredCountry,
+        onModeChanged: (value) => setState(() => searchMode = value),
+        onDistanceChanged: (value) => setState(() => distance = value),
+        onCityChanged: (value) =>
+            setState(() => selectedCity = value ?? 'Any city'),
+        onCountryChanged: (value) =>
+            setState(() => preferredCountry = value ?? 'Canada'),
       ),
       const _SectionTitle('Compatibility priorities'),
       DropdownButtonFormField<String>(
@@ -164,46 +227,18 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
       ),
       const SizedBox(height: 20),
       _PrimaryButton(
-        loading ? 'Loading…' : 'Save preferences',
-        onPressed: () async {
-          if (loading) return;
-          await MapLovRepository.instance.savePreferences(
-            DiscoveryFilters(
-              minimumAge: ages.start.round(),
-              maximumAge: ages.end.round(),
-              locationMode: switch (searchMode) {
-                'Country' => 'my_country',
-                'Specific country' => 'specific_country',
-                'Worldwide' => 'worldwide',
-                _ => 'near_me',
-              },
-              countries: country.text.trim().isEmpty
-                  ? const []
-                  : [country.text.trim()],
-              genders: gender == 'Everyone' ? const [] : [gender],
-              relationshipGoals: [relationshipGoal],
-              languages: language == 'Any language'
-                  ? const []
-                  : language == 'English & French'
-                  ? const ['English', 'French']
-                  : [language],
-              personalities: personality == 'Any personality'
-                  ? const []
-                  : [personality],
-              requiredGenders: requiredGender,
-              requiredLocation: requiredLocation,
-              requiredLanguages: requiredLanguage,
-              requiredRelationshipGoal: requiredGoal,
-            ),
-          );
-          if (context.mounted) {
-            Navigator.pushNamedAndRemoveUntil(
-              context,
-              AppRoutes.home,
-              (_) => false,
-            );
-          }
-        },
+        loading
+            ? 'Loading…'
+            : saving
+            ? 'Saving…'
+            : 'Next',
+        onPressed: _continue,
+      ),
+      TextButton.icon(
+        key: const Key('preferences_back_to_profile'),
+        onPressed: saving ? null : _backToProfileDetails,
+        icon: const Icon(Icons.arrow_back),
+        label: const Text('Back to profile details'),
       ),
     ],
   );

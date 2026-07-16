@@ -49,6 +49,7 @@ class _DetailedPhotoViewerState extends State<_DetailedPhotoViewer> {
   late final UserProfile _profile;
   late final List<String> _photos;
   late int _currentIndex;
+  late bool _profileLiked;
 
   @override
   void initState() {
@@ -58,6 +59,7 @@ class _DetailedPhotoViewerState extends State<_DetailedPhotoViewer> {
         ? List.of(_profile.photoUrls)
         : [_profile.imagePath];
     _currentIndex = widget.initialIndex.clamp(0, _photos.length - 1);
+    _profileLiked = _profile.likedByMe;
     _pageController = PageController(initialPage: _currentIndex);
   }
 
@@ -87,6 +89,13 @@ class _DetailedPhotoViewerState extends State<_DetailedPhotoViewer> {
     );
   }
 
+  Future<void> _toggleProfileLike() async {
+    final result = await _toggleProfileLikeFromDetails(context, _profile);
+    if (result != null && mounted) {
+      setState(() => _profileLiked = result.liked);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -110,7 +119,11 @@ class _DetailedPhotoViewerState extends State<_DetailedPhotoViewer> {
               padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
               child: Column(
                 children: [
-                  _PhotoViewerHeader(profile: _profile),
+                  _PhotoViewerHeader(
+                    profile: _profile,
+                    profileLiked: _profileLiked,
+                    onProfileLike: _toggleProfileLike,
+                  ),
                   const SizedBox(height: 12),
                   Align(
                     alignment: Alignment.centerLeft,
@@ -184,6 +197,7 @@ class _SocialPhotoViewerState extends State<_SocialPhotoViewer> {
   late int _currentIndex;
   bool _liked = false;
   bool _superLiked = false;
+  late bool _profileLiked;
   int _likeCount = 24;
 
   @override
@@ -193,6 +207,7 @@ class _SocialPhotoViewerState extends State<_SocialPhotoViewer> {
         ? List.of(widget.profile.photoUrls)
         : [widget.profile.imagePath];
     _currentIndex = widget.initialIndex.clamp(0, _photos.length - 1);
+    _profileLiked = widget.profile.likedByMe;
     _pageController = PageController(initialPage: _currentIndex);
   }
 
@@ -211,22 +226,45 @@ class _SocialPhotoViewerState extends State<_SocialPhotoViewer> {
     );
   }
 
-  void _toggleLike() {
+  Future<void> _toggleLike() async {
     final photoId = widget.profile.photoIds.length > _currentIndex
         ? widget.profile.photoIds[_currentIndex]
-        : null;
-    if (photoId != null) {
-      unawaited(
-        MapLovRepository.instance.togglePhotoLike(
-          photoId,
-          currentlyLiked: _liked,
-        ),
+        : MapLovRepository.instance.isLive
+        ? null
+        : 'demo-photo-${widget.profile.id}-$_currentIndex';
+    if (photoId == null) return;
+    try {
+      final result = await MapLovRepository.instance.togglePhotoLike(
+        photoId,
+        profileId: widget.profile.id,
+        currentlyLiked: _liked,
+      );
+      if (!mounted) return;
+      setState(() {
+        _liked = result.liked;
+        _likeCount += result.liked ? 1 : -1;
+      });
+      if (result.matched) {
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => NewMatchScreen(profile: widget.profile),
+          ),
+        );
+      }
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Unable to update this photo like: $error')),
       );
     }
-    setState(() {
-      _liked = !_liked;
-      _likeCount += _liked ? 1 : -1;
-    });
+  }
+
+  Future<void> _toggleProfileLike() async {
+    final result = await _toggleProfileLikeFromDetails(context, widget.profile);
+    if (result != null && mounted) {
+      setState(() => _profileLiked = result.liked);
+    }
   }
 
   void _toggleSuperLike() {
@@ -271,7 +309,11 @@ class _SocialPhotoViewerState extends State<_SocialPhotoViewer> {
               padding: const EdgeInsets.fromLTRB(16, 10, 16, 18),
               child: Column(
                 children: [
-                  _PhotoViewerHeader(profile: widget.profile),
+                  _PhotoViewerHeader(
+                    profile: widget.profile,
+                    profileLiked: _profileLiked,
+                    onProfileLike: _toggleProfileLike,
+                  ),
                   const SizedBox(height: 12),
                   Align(
                     alignment: Alignment.centerLeft,
@@ -697,9 +739,15 @@ class _PhotoViewerGradient extends StatelessWidget {
 }
 
 class _PhotoViewerHeader extends StatelessWidget {
-  const _PhotoViewerHeader({required this.profile});
+  const _PhotoViewerHeader({
+    required this.profile,
+    required this.profileLiked,
+    required this.onProfileLike,
+  });
 
   final UserProfile profile;
+  final bool profileLiked;
+  final VoidCallback onProfileLike;
 
   @override
   Widget build(BuildContext context) {
@@ -719,12 +767,19 @@ class _PhotoViewerHeader extends StatelessWidget {
                   Flexible(
                     child: GestureDetector(
                       key: Key('viewer_profile_name_${profile.name}'),
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => PublicProfileScreen(profile: profile),
-                        ),
-                      ),
+                      onTap: () async {
+                        if (!await _requireProfilePhotos(context, minimum: 3) ||
+                            !context.mounted) {
+                          return;
+                        }
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) =>
+                                PublicProfileScreen(profile: profile),
+                          ),
+                        );
+                      },
                       child: Text(
                         '${profile.name}, ${profile.age}',
                         overflow: TextOverflow.ellipsis,
@@ -748,15 +803,28 @@ class _PhotoViewerHeader extends StatelessWidget {
                 children: [
                   const Icon(Icons.location_on, color: Colors.white, size: 16),
                   const SizedBox(width: 3),
-                  Text(
-                    '${profile.city}, Canada',
-                    style: const TextStyle(color: Colors.white, fontSize: 15),
+                  Expanded(
+                    child: Text(
+                      '${profile.city}, ${profile.country}',
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(color: Colors.white, fontSize: 15),
+                    ),
                   ),
                 ],
               ),
             ],
           ),
         ),
+        IconButton.filledTonal(
+          key: Key('photo_profile_like_${profile.name}'),
+          tooltip: profileLiked ? 'Remove profile like' : 'Like profile',
+          onPressed: onProfileLike,
+          icon: Icon(
+            profileLiked ? Icons.favorite : Icons.favorite_border,
+            color: AppColors.deepPink,
+          ),
+        ),
+        const SizedBox(width: 4),
         PopupMenuButton<String>(
           color: const Color(0xFF27232A),
           iconColor: Colors.white,
@@ -954,7 +1022,7 @@ class _PhotoActions extends StatelessWidget {
         ),
         const SizedBox(width: 22),
         _PhotoActionButton(
-          icon: Icons.favorite,
+          icon: Icons.chat_bubble_outline,
           color: AppColors.deepPink,
           size: 70,
           onPressed: onMessage,

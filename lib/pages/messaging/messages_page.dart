@@ -18,7 +18,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
 
   @override
   Widget build(BuildContext context) => _MainPage(
-    index: 1,
+    index: 3,
     title: 'Messages',
     children: [
       SizedBox(

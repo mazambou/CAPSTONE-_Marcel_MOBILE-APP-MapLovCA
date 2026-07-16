@@ -19,6 +19,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     bio:
         'Curious traveler, coffee enthusiast, and always ready for a live concert.',
   );
+  bool loading = AuthService.instance.isConfigured;
+  String? loadError;
 
   @override
   void initState() {
@@ -27,10 +29,44 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _load() async {
+    if (!AuthService.instance.isConfigured) return;
     final id = MapLovRepository.instance.currentUserId;
-    if (id == null) return;
-    final loaded = await MapLovRepository.instance.getProfile(id);
-    if (loaded != null && mounted) setState(() => profile = loaded);
+    if (mounted) setState(() => loading = true);
+    try {
+      if (id == null) throw StateError('No authenticated account was found.');
+      final loaded = await MapLovRepository.instance.getProfile(id);
+      if (loaded == null) throw StateError('Your profile could not be loaded.');
+      if (mounted) {
+        setState(() {
+          profile = loaded;
+          loadError = null;
+        });
+      }
+    } catch (error) {
+      if (mounted) setState(() => loadError = '$error');
+    } finally {
+      if (mounted) setState(() => loading = false);
+    }
+  }
+
+  Future<void> _editProfile() async {
+    await Navigator.pushNamed(context, AppRoutes.editProfile);
+    await _load();
+  }
+
+  Future<void> _managePhotos() async {
+    await Navigator.pushNamed(context, AppRoutes.managePhotos);
+    await _load();
+  }
+
+  void _openMyPhotos(int index) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) =>
+            PhotoViewerScreen(profile: profile, initialIndex: index),
+      ),
+    );
   }
 
   Future<bool> _requirePremium({bool elite = false}) async {
@@ -107,12 +143,49 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   @override
-  Widget build(BuildContext context) => _MainPage(
+  Widget build(BuildContext context) {
+    if (loading) {
+      return const _MainPage(
+        index: 4,
+        title: 'My profile',
+        children: [Center(child: CircularProgressIndicator())],
+      );
+    }
+    if (loadError != null && AuthService.instance.isConfigured) {
+      return _MainPage(
+        index: 4,
+        title: 'My profile',
+        children: [
+          const Icon(
+            Icons.person_off_outlined,
+            size: 70,
+            color: AppColors.coral,
+          ),
+          const SizedBox(height: 12),
+          const Text(
+            'Unable to load your MapLov profile.',
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            loadError!,
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: AppColors.grayText),
+          ),
+          const SizedBox(height: 16),
+          _PrimaryButton('Try again', onPressed: _load),
+        ],
+      );
+    }
+    return _buildProfile(context);
+  }
+
+  Widget _buildProfile(BuildContext context) => _MainPage(
     index: 4,
     title: 'My profile',
     actions: [
       IconButton(
-        onPressed: () => Navigator.pushNamed(context, AppRoutes.editProfile),
+        onPressed: _editProfile,
         icon: const Icon(Icons.edit_outlined),
       ),
       IconButton(
@@ -139,15 +212,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
       const SizedBox(height: 14),
       Text(profile.bio),
       const _SectionTitle('Interests'),
-      const Wrap(
-        spacing: 8,
-        children: [
-          Chip(label: Text('Travel')),
-          Chip(label: Text('Music')),
-          Chip(label: Text('Cooking')),
-          Chip(label: Text('Hiking')),
-        ],
-      ),
+      if (profile.interests.isEmpty && AuthService.instance.isConfigured)
+        const Text('No interests added yet.')
+      else
+        Wrap(
+          spacing: 8,
+          children:
+              (profile.interests.isEmpty
+                      ? const ['Travel', 'Music', 'Cooking', 'Hiking']
+                      : profile.interests)
+                  .map((interest) => Chip(label: Text(interest)))
+                  .toList(),
+        ),
       const _SectionTitle('Photos'),
       Card(
         color: AppColors.palePink,
@@ -164,29 +240,41 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
           subtitle: const Text('Add or remove profile photos'),
           trailing: const Icon(Icons.chevron_right),
-          onTap: () => Navigator.pushNamed(context, AppRoutes.managePhotos),
+          onTap: _managePhotos,
         ),
       ),
       const SizedBox(height: 10),
-      SizedBox(
-        height: 100,
-        child: ListView.separated(
-          scrollDirection: Axis.horizontal,
-          itemCount: profile.photoUrls.isEmpty
-              ? mockProfiles.length
-              : profile.photoUrls.length,
-          separatorBuilder: (_, _) => const SizedBox(width: 8),
-          itemBuilder: (_, i) => GestureDetector(
-            onTap: () => Navigator.pushNamed(context, AppRoutes.photoViewer),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(14),
-              child: profile.photoUrls.isEmpty
-                  ? profileImage(mockProfiles[i], width: 100)
-                  : mediaImage(profile.photoUrls[i], width: 100),
+      if (profile.photoUrls.isEmpty && AuthService.instance.isConfigured)
+        Card(
+          child: ListTile(
+            leading: const Icon(Icons.photo_library_outlined),
+            title: const Text('No profile photos yet'),
+            subtitle: const Text('Add photos to unlock profile interactions.'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: _managePhotos,
+          ),
+        )
+      else
+        SizedBox(
+          height: 100,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: profile.photoUrls.isEmpty
+                ? mockProfiles.length
+                : profile.photoUrls.length,
+            separatorBuilder: (_, _) => const SizedBox(width: 8),
+            itemBuilder: (_, i) => GestureDetector(
+              key: Key('my_profile_photo_$i'),
+              onTap: () => _openMyPhotos(i),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(14),
+                child: profile.photoUrls.isEmpty
+                    ? profileImage(mockProfiles[i], width: 100)
+                    : mediaImage(profile.photoUrls[i], width: 100),
+              ),
             ),
           ),
         ),
-      ),
       const _QuickCard(
         'Secret Garden',
         Icons.lock_outline,
@@ -242,32 +330,34 @@ class _ProfileScreenState extends State<ProfileScreen> {
         Icons.person_add_alt,
         AppRoutes.friendRequests,
       ),
-      const KeyedSubtree(
-        key: Key('personal_recent_activity'),
-        child: _SectionTitle('Recent activity'),
-      ),
-      const Card(
-        child: ListTile(
-          leading: CircleAvatar(
-            backgroundColor: AppColors.palePink,
-            child: Icon(Icons.favorite, color: AppColors.coral),
-          ),
-          title: Text('New compatible profiles'),
-          subtitle: Text('3 suggestions were added today'),
-          trailing: Icon(Icons.chevron_right),
+      if (!AuthService.instance.isConfigured) ...[
+        const KeyedSubtree(
+          key: Key('personal_recent_activity'),
+          child: _SectionTitle('Recent activity'),
         ),
-      ),
-      const Card(
-        child: ListTile(
-          leading: CircleAvatar(
-            backgroundColor: AppColors.palePink,
-            child: Icon(Icons.person_add_alt, color: AppColors.coral),
+        const Card(
+          child: ListTile(
+            leading: CircleAvatar(
+              backgroundColor: AppColors.palePink,
+              child: Icon(Icons.favorite, color: AppColors.coral),
+            ),
+            title: Text('New compatible profiles'),
+            subtitle: Text('3 suggestions were added today'),
+            trailing: Icon(Icons.chevron_right),
           ),
-          title: Text('Friend request accepted'),
-          subtitle: Text('Sophie is now your friend'),
-          trailing: Icon(Icons.chevron_right),
         ),
-      ),
+        const Card(
+          child: ListTile(
+            leading: CircleAvatar(
+              backgroundColor: AppColors.palePink,
+              child: Icon(Icons.person_add_alt, color: AppColors.coral),
+            ),
+            title: Text('Friend request accepted'),
+            subtitle: Text('Sophie is now your friend'),
+            trailing: Icon(Icons.chevron_right),
+          ),
+        ),
+      ],
     ],
   );
 }

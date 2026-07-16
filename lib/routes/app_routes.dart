@@ -9,12 +9,14 @@ class AppRoutes {
   static const forgotPassword = '/forgot-password';
   static const resetPassword = '/reset-password';
   static const verifyEmail = '/verify-email';
+  static const verifyPhone = '/verify-phone';
   static const deleteAccount = '/delete-account';
   static const home = '/home';
   static const discover = '/discover';
   static const nearMe = '/near-me';
   static const filters = '/filters';
   static const matches = '/matches';
+  static const likes = '/likes';
   static const newMatch = '/new-match';
   static const messages = '/messages';
   static const chat = '/chat';

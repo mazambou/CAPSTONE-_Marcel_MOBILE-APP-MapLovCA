@@ -39,9 +39,9 @@ class _MapLovNavigationBar extends StatelessWidget {
       onDestinationSelected: (index) {
         const routes = [
           AppRoutes.home,
-          AppRoutes.messages,
-          AppRoutes.newMatch,
+          AppRoutes.likes,
           AppRoutes.matches,
+          AppRoutes.messages,
           AppRoutes.profile,
         ];
         if (index != selectedIndex) {
@@ -55,6 +55,16 @@ class _MapLovNavigationBar extends StatelessWidget {
           label: MapLovLocalizations.of(context).text('discover'),
         ),
         NavigationDestination(
+          icon: const Icon(Icons.favorite_border),
+          selectedIcon: const Icon(Icons.favorite),
+          label: MapLovLocalizations.of(context).text('likes'),
+        ),
+        NavigationDestination(
+          icon: const Icon(Icons.handshake_outlined),
+          selectedIcon: const Icon(Icons.handshake),
+          label: MapLovLocalizations.of(context).text('matches'),
+        ),
+        NavigationDestination(
           icon: const Badge(
             label: Text('2'),
             child: Icon(Icons.chat_bubble_outline),
@@ -64,22 +74,6 @@ class _MapLovNavigationBar extends StatelessWidget {
             child: Icon(Icons.chat_bubble),
           ),
           label: MapLovLocalizations.of(context).text('messages'),
-        ),
-        NavigationDestination(
-          icon: const Icon(Icons.favorite_border),
-          selectedIcon: const Icon(Icons.favorite),
-          label: MapLovLocalizations.of(context).text('matches'),
-        ),
-        NavigationDestination(
-          icon: const Badge(
-            label: Text('7'),
-            child: Icon(Icons.favorite_border),
-          ),
-          selectedIcon: const Badge(
-            label: Text('7'),
-            child: Icon(Icons.favorite),
-          ),
-          label: MapLovLocalizations.of(context).text('likes'),
         ),
         NavigationDestination(
           icon: const Icon(Icons.person_outline),
@@ -204,74 +198,6 @@ class _ProfileCard extends StatelessWidget {
   );
 }
 
-class _DiscoverCard extends StatelessWidget {
-  const _DiscoverCard(this.profile);
-  final UserProfile profile;
-  @override
-  Widget build(BuildContext context) => Card(
-    clipBehavior: Clip.antiAlias,
-    child: Column(
-      children: [
-        Stack(
-          children: [
-            GestureDetector(
-              key: Key('discover_photo_${profile.name}'),
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => PhotoViewerScreen(profile: profile),
-                ),
-              ),
-              child: profileImage(
-                profile,
-                height: 310,
-                width: double.infinity,
-                fit: BoxFit.cover,
-              ),
-            ),
-            Positioned(
-              top: 14,
-              right: 14,
-              child: Chip(label: Text('${profile.compatibilityScore}% match')),
-            ),
-          ],
-        ),
-        ListTile(
-          title: Text(
-            '${profile.name}, ${profile.age}',
-            style: const TextStyle(fontWeight: FontWeight.w800),
-          ),
-          subtitle: Text(profile.city),
-          trailing: Wrap(
-            children: [
-              IconButton(
-                onPressed: () => Navigator.pushNamed(context, AppRoutes.chat),
-                icon: const Icon(Icons.message_outlined),
-              ),
-              IconButton(
-                onPressed: () =>
-                    MapLovRepository.instance.sendFriendRequest(profile.id),
-                icon: const Icon(Icons.person_add_alt),
-              ),
-              IconButton(
-                onPressed: () => ScaffoldMessenger.of(
-                  context,
-                ).showSnackBar(const SnackBar(content: Text('Profile liked.'))),
-                icon: const Icon(Icons.favorite_border, color: AppColors.coral),
-              ),
-              IconButton(
-                onPressed: () =>
-                    Navigator.pushNamed(context, AppRoutes.publicProfile),
-                icon: const Icon(Icons.open_in_new),
-              ),
-            ],
-          ),
-        ),
-      ],
-    ),
-  );
-}
-
 // Kept for legacy layouts that may reuse the highlighted navigation card.
 // ignore: unused_element
 class _HeroCard extends StatelessWidget {
@@ -387,4 +313,83 @@ class _UserSafetyCard extends StatelessWidget {
       subtitle: Text('Toronto, Canada'),
     ),
   );
+}
+
+Future<bool> _requireProfilePhotos(
+  BuildContext context, {
+  required int minimum,
+}) async {
+  final count = await MapLovRepository.instance.myPhotoCount();
+  if (!context.mounted) return false;
+  if (count >= minimum) return true;
+
+  final message = minimum == 1
+      ? 'Add a profile photo before using this action.'
+      : 'Add at least 3 profile photos before viewing another member’s profile.';
+  await showDialog<void>(
+    context: context,
+    barrierDismissible: false,
+    builder: (dialogContext) => AlertDialog(
+      icon: const Icon(
+        Icons.add_a_photo_outlined,
+        color: AppColors.coral,
+        size: 42,
+      ),
+      title: const Text('Profile photos required'),
+      content: Text(message, textAlign: TextAlign.center),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(dialogContext),
+          child: const Text('Not now'),
+        ),
+        FilledButton.icon(
+          key: Key('add_required_${minimum}_photos'),
+          onPressed: () {
+            Navigator.pop(dialogContext);
+            Navigator.pushNamed(context, AppRoutes.managePhotos);
+          },
+          icon: const Icon(Icons.add_a_photo_outlined),
+          label: const Text('Add photos'),
+        ),
+      ],
+    ),
+  );
+  return false;
+}
+
+Future<ProfileLikeResult?> _toggleProfileLikeFromDetails(
+  BuildContext context,
+  UserProfile profile,
+) async {
+  if (!await _requireProfilePhotos(context, minimum: 1) || !context.mounted) {
+    return null;
+  }
+  try {
+    final result = await MapLovRepository.instance.toggleProfileLike(
+      profile.id,
+    );
+    if (!context.mounted) return result;
+    if (result.matched) {
+      await Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => NewMatchScreen(profile: profile)),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            result.liked ? 'Profile liked.' : 'Profile like removed.',
+          ),
+        ),
+      );
+    }
+    return result;
+  } catch (error) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Unable to update this like: $error')),
+      );
+    }
+    return null;
+  }
 }

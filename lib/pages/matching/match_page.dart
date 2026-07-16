@@ -384,7 +384,7 @@ class _MatchScreenState extends State<MatchScreen> {
 
   @override
   Widget build(BuildContext context) => _MainPage(
-    index: 3,
+    index: 2,
     title: 'Your matches',
     children: [
       const Text(
@@ -411,13 +411,19 @@ class _MatchScreenState extends State<MatchScreen> {
                 .map(
                   (item) => Card(
                     child: ListTile(
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) =>
-                              PublicProfileScreen(profile: item.profile),
-                        ),
-                      ),
+                      onTap: () async {
+                        if (!await _requireProfilePhotos(context, minimum: 3) ||
+                            !context.mounted) {
+                          return;
+                        }
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) =>
+                                PublicProfileScreen(profile: item.profile),
+                          ),
+                        );
+                      },
                       leading: CircleAvatar(
                         backgroundImage: profileImageProvider(item.profile),
                       ),

@@ -29,9 +29,11 @@ class _SplashScreenState extends State<SplashScreen> {
 
   Future<void> _leaveSplash() async {
     if (!mounted) return;
+    var profileComplete = true;
     if (AuthService.instance.hasActiveSession) {
       try {
         await AuthService.instance.validateCurrentAccount();
+        profileComplete = await AuthService.instance.isCurrentProfileComplete();
       } catch (_) {
         if (!mounted) return;
         Navigator.of(context).pushReplacementNamed(AppRoutes.login);
@@ -39,9 +41,16 @@ class _SplashScreenState extends State<SplashScreen> {
       }
     }
     if (!mounted) return;
+    final signedInDestination = !profileComplete
+        ? AppRoutes.profileSetup
+        : AuthService.instance.requiresPreferencesCompletion
+        ? AppRoutes.preferences
+        : AuthService.instance.requiresPhoneVerification
+        ? AppRoutes.verifyPhone
+        : AppRoutes.home;
     Navigator.of(context).pushReplacementNamed(
       AuthService.instance.hasActiveSession
-          ? AppRoutes.home
+          ? signedInDestination
           : AppRoutes.onboarding,
     );
   }

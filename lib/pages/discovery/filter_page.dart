@@ -224,57 +224,17 @@ class _FilterScreenState extends State<FilterScreen> {
           onChanged: (value) => setState(() => ages = value),
         ),
         const _SectionTitle('Search location'),
-        const Text(
-          'Choose how far MapLov should search for profiles.',
-          style: TextStyle(color: AppColors.grayText),
-        ),
-        const SizedBox(height: 12),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: ['Near me', 'My country', 'International']
-              .map(
-                (mode) => ChoiceChip(
-                  key: Key('location_mode_$mode'),
-                  label: Text(mode),
-                  avatar: Icon(
-                    mode == 'Near me'
-                        ? Icons.near_me_outlined
-                        : mode == 'My country'
-                        ? Icons.flag_outlined
-                        : Icons.public,
-                    size: 18,
-                  ),
-                  selected: locationMode == mode,
-                  onSelected: (_) => setState(() => locationMode = mode),
-                ),
-              )
-              .toList(),
-        ),
-        const SizedBox(height: 16),
-        AnimatedSwitcher(
-          duration: const Duration(milliseconds: 220),
-          child: switch (locationMode) {
-            'My country' => _MyCountryFilter(
-              key: const ValueKey('my_country_filter'),
-              selectedCity: selectedCity,
-              onCityChanged: (city) {
-                setState(() => selectedCity = city ?? 'Any city');
-              },
-            ),
-            'International' => _InternationalFilter(
-              key: const ValueKey('international_filter'),
-              selectedCountry: selectedCountry,
-              onCountryChanged: (country) {
-                setState(() => selectedCountry = country ?? 'Canada');
-              },
-            ),
-            _ => _NearMeFilter(
-              key: const ValueKey('near_me_filter'),
-              distance: distance,
-              onDistanceChanged: (value) => setState(() => distance = value),
-            ),
-          },
+        _SearchLocationSelector(
+          mode: locationMode,
+          distance: distance,
+          selectedCity: selectedCity,
+          selectedCountry: selectedCountry,
+          onModeChanged: (value) => setState(() => locationMode = value),
+          onDistanceChanged: (value) => setState(() => distance = value),
+          onCityChanged: (value) =>
+              setState(() => selectedCity = value ?? 'Any city'),
+          onCountryChanged: (value) =>
+              setState(() => selectedCountry = value ?? 'Canada'),
         ),
         const _SectionTitle('More preferences'),
         const _Dropdown('Languages', ['English', 'French', 'Spanish']),
@@ -1123,6 +1083,83 @@ const _heightOptions = [
   '180 cm',
   '190 cm+',
 ];
+
+class _SearchLocationSelector extends StatelessWidget {
+  const _SearchLocationSelector({
+    required this.mode,
+    required this.distance,
+    required this.selectedCity,
+    required this.selectedCountry,
+    required this.onModeChanged,
+    required this.onDistanceChanged,
+    required this.onCityChanged,
+    required this.onCountryChanged,
+  });
+
+  final String mode;
+  final double distance;
+  final String selectedCity;
+  final String selectedCountry;
+  final ValueChanged<String> onModeChanged;
+  final ValueChanged<double> onDistanceChanged;
+  final ValueChanged<String?> onCityChanged;
+  final ValueChanged<String?> onCountryChanged;
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      const Text(
+        'Choose how far MapLov should search for profiles.',
+        style: TextStyle(color: AppColors.grayText),
+      ),
+      const SizedBox(height: 12),
+      Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: ['Near me', 'My country', 'International']
+            .map(
+              (value) => ChoiceChip(
+                key: Key('location_mode_$value'),
+                label: Text(value),
+                avatar: Icon(
+                  value == 'Near me'
+                      ? Icons.near_me_outlined
+                      : value == 'My country'
+                      ? Icons.flag_outlined
+                      : Icons.public,
+                  size: 18,
+                ),
+                selected: mode == value,
+                onSelected: (_) => onModeChanged(value),
+              ),
+            )
+            .toList(),
+      ),
+      const SizedBox(height: 16),
+      AnimatedSwitcher(
+        duration: const Duration(milliseconds: 220),
+        child: switch (mode) {
+          'My country' => _MyCountryFilter(
+            key: const ValueKey('my_country_filter'),
+            selectedCity: selectedCity,
+            onCityChanged: onCityChanged,
+          ),
+          'International' => _InternationalFilter(
+            key: const ValueKey('international_filter'),
+            selectedCountry: selectedCountry,
+            onCountryChanged: onCountryChanged,
+          ),
+          _ => _NearMeFilter(
+            key: const ValueKey('near_me_filter'),
+            distance: distance,
+            onDistanceChanged: onDistanceChanged,
+          ),
+        },
+      ),
+    ],
+  );
+}
 
 class _NearMeFilter extends StatelessWidget {
   const _NearMeFilter({

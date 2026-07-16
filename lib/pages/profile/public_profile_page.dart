@@ -10,6 +10,8 @@ class PublicProfileScreen extends StatefulWidget {
 }
 
 class _PublicProfileScreenState extends State<PublicProfileScreen> {
+  late bool liked = widget.profile?.likedByMe ?? false;
+
   @override
   void initState() {
     super.initState();
@@ -17,6 +19,11 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
     if (id != null && id.isNotEmpty) {
       unawaited(MapLovRepository.instance.recordProfileView(id));
     }
+  }
+
+  Future<void> _toggleLike(UserProfile profile) async {
+    final result = await _toggleProfileLikeFromDetails(context, profile);
+    if (result != null && mounted) setState(() => liked = result.liked);
   }
 
   @override
@@ -27,12 +34,18 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
       children: [
         GestureDetector(
           key: Key('public_profile_photo_${selectedProfile.name}'),
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => PhotoViewerScreen(profile: selectedProfile),
-            ),
-          ),
+          onTap: () async {
+            if (!await _requireProfilePhotos(context, minimum: 1) ||
+                !context.mounted) {
+              return;
+            }
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => PhotoViewerScreen(profile: selectedProfile),
+              ),
+            );
+          },
           child: ClipRRect(
             borderRadius: BorderRadius.circular(24),
             child: SizedBox(
@@ -75,6 +88,19 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
           '${selectedProfile.city}, Canada',
           style: const TextStyle(color: AppColors.grayText),
         ),
+        const SizedBox(height: 12),
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            key: Key('public_profile_like_${selectedProfile.name}'),
+            onPressed: () => _toggleLike(selectedProfile),
+            icon: Icon(liked ? Icons.favorite : Icons.favorite_border),
+            label: Text(liked ? 'Liked' : 'Like profile'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.deepPink,
+            ),
+          ),
+        ),
         const _SectionTitle('About'),
         Text(
           selectedProfile.bio.isEmpty
@@ -101,12 +127,19 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
                 subtitle: 'Visible to everyone',
                 imagePath: selectedProfile.imagePath,
                 icon: Icons.photo_library_outlined,
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => PhotoViewerScreen(profile: selectedProfile),
-                  ),
-                ),
+                onTap: () async {
+                  if (!await _requireProfilePhotos(context, minimum: 1) ||
+                      !context.mounted) {
+                    return;
+                  }
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) =>
+                          PhotoViewerScreen(profile: selectedProfile),
+                    ),
+                  );
+                },
               ),
             ),
             const SizedBox(width: 12),

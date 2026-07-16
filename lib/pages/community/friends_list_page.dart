@@ -47,13 +47,19 @@ class _FriendsListScreenState extends State<FriendsListScreen> {
                 .map(
                   (item) => Card(
                     child: ListTile(
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) =>
-                              PublicProfileScreen(profile: item.profile),
-                        ),
-                      ),
+                      onTap: () async {
+                        if (!await _requireProfilePhotos(context, minimum: 3) ||
+                            !context.mounted) {
+                          return;
+                        }
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) =>
+                                PublicProfileScreen(profile: item.profile),
+                          ),
+                        );
+                      },
                       leading: CircleAvatar(
                         backgroundImage: profileImageProvider(item.profile),
                       ),

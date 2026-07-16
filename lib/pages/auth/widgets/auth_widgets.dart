@@ -14,7 +14,7 @@ class _AuthPage extends StatelessWidget {
   final String title;
   final String subtitle;
   final String image;
-  final List<_Field> fields;
+  final List<Widget> fields;
   final String primaryLabel;
   final VoidCallback onPrimary;
   final String? errorText;
@@ -78,7 +78,7 @@ class _AuthPage extends StatelessWidget {
   }
 }
 
-class _Field extends StatelessWidget {
+class _Field extends StatefulWidget {
   const _Field(
     this.label,
     this.icon, {
@@ -101,14 +101,38 @@ class _Field extends StatelessWidget {
   final Iterable<String>? autofillHints;
 
   @override
+  State<_Field> createState() => _FieldState();
+}
+
+class _FieldState extends State<_Field> {
+  late bool _obscured = widget.secret;
+
+  @override
   Widget build(BuildContext context) => TextField(
-    controller: controller,
-    obscureText: secret,
-    keyboardType: keyboardType,
-    textInputAction: textInputAction,
-    onSubmitted: onSubmitted,
-    enabled: enabled,
-    autofillHints: autofillHints,
-    decoration: InputDecoration(labelText: label, prefixIcon: Icon(icon)),
+    controller: widget.controller,
+    obscureText: _obscured,
+    keyboardType: widget.keyboardType,
+    textInputAction: widget.textInputAction,
+    onSubmitted: widget.onSubmitted,
+    enabled: widget.enabled,
+    autofillHints: widget.autofillHints,
+    decoration: InputDecoration(
+      labelText: widget.label,
+      prefixIcon: Icon(widget.icon),
+      suffixIcon: widget.secret
+          ? IconButton(
+              key: Key(
+                'toggle_${widget.label.toLowerCase().replaceAll(' ', '_')}',
+              ),
+              tooltip: _obscured ? 'Show password' : 'Hide password',
+              onPressed: () => setState(() => _obscured = !_obscured),
+              icon: Icon(
+                _obscured
+                    ? Icons.visibility_outlined
+                    : Icons.visibility_off_outlined,
+              ),
+            )
+          : null,
+    ),
   );
 }

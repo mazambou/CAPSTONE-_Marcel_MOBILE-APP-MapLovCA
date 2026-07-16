@@ -42,7 +42,7 @@ class _NearMeScreenState extends State<NearMeScreen> {
 
   @override
   Widget build(BuildContext context) => _MainPage(
-    index: 2,
+    index: 0,
     title: 'Near me',
     children: [
       const Text(
@@ -94,12 +94,18 @@ class _NearMeScreenState extends State<NearMeScreen> {
             children: items
                 .map(
                   (profile) => ListTile(
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => PublicProfileScreen(profile: profile),
-                      ),
-                    ),
+                    onTap: () async {
+                      if (!await _requireProfilePhotos(context, minimum: 3) ||
+                          !context.mounted) {
+                        return;
+                      }
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => PublicProfileScreen(profile: profile),
+                        ),
+                      );
+                    },
                     leading: CircleAvatar(
                       backgroundImage: profileImageProvider(profile),
                     ),

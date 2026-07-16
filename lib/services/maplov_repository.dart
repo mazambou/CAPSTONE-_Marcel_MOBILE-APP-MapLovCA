@@ -310,6 +310,8 @@ class MapLovRepository {
   final Set<String> _demoFriendIds = {};
   final Set<String> _demoLikedIds = {};
   final Set<String> _demoReciprocalLikeIds = {mockProfiles.first.id};
+  final Set<String> _demoPhotoLikedProfileIds = {};
+  final Set<String> _demoReciprocalPhotoLikeIds = {mockProfiles.first.id};
   final Set<String> _demoReadConversations = {};
   final List<MapLovNotification> _demoNotifications = [
     MapLovNotification(
@@ -592,9 +594,15 @@ class MapLovRepository {
     if (!isLive) {
       final liked = _demoLikedIds.add(profileId);
       if (!liked) _demoLikedIds.remove(profileId);
+      final profile = mockProfiles
+          .where((item) => item.id == profileId)
+          .firstOrNull;
       return ProfileLikeResult(
         liked: liked,
-        matched: liked && _demoReciprocalLikeIds.contains(profileId),
+        matched:
+            liked &&
+            (_demoReciprocalLikeIds.contains(profileId) ||
+                (profile?.compatibilityScore ?? 0) > 80),
       );
     }
     final existing = await _client!
@@ -611,10 +619,26 @@ class MapLovRepository {
           .eq('liked_id', profileId);
       return const ProfileLikeResult(liked: false, matched: false);
     }
+    final wasMatched = await _hasMatchWith(profileId);
     await _client!.from('profile_likes').insert({
       'liker_id': currentUserId!,
       'liked_id': profileId,
     });
+    final isMatched = await _hasMatchWith(profileId);
+    return ProfileLikeResult(liked: true, matched: !wasMatched && isMatched);
+  }
+
+  Future<bool> _hasMatchWith(String profileId) async {
+    if (!isLive) {
+      final profile = mockProfiles
+          .where((item) => item.id == profileId)
+          .firstOrNull;
+      return (_demoLikedIds.contains(profileId) &&
+              (_demoReciprocalLikeIds.contains(profileId) ||
+                  (profile?.compatibilityScore ?? 0) > 80)) ||
+          (_demoPhotoLikedProfileIds.contains(profileId) &&
+              _demoReciprocalPhotoLikeIds.contains(profileId));
+    }
     final match = await _client!
         .from('matches')
         .select('id')
@@ -622,13 +646,55 @@ class MapLovRepository {
           'and(user_a.eq.$currentUserId,user_b.eq.$profileId),and(user_a.eq.$profileId,user_b.eq.$currentUserId)',
         )
         .maybeSingle();
-    return ProfileLikeResult(liked: true, matched: match != null);
+    return match != null;
+  }
+
+  Future<List<UserProfile>> profilesWhoLikedMe() async {
+    if (!isLive) {
+      return _demoReciprocalLikeIds
+          .where((id) => !_demoLikedIds.contains(id))
+          .map((id) => mockProfiles.where((p) => p.id == id).firstOrNull)
+          .whereType<UserProfile>()
+          .toList();
+    }
+    final incoming = await _client!
+        .from('profile_likes')
+        .select('liker_id, created_at')
+        .eq('liked_id', currentUserId!)
+        .order('created_at', ascending: false);
+    final outgoing = await _client!
+        .from('profile_likes')
+        .select('liked_id')
+        .eq('liker_id', currentUserId!);
+    final alreadyLiked = outgoing
+        .map((row) => row['liked_id'] as String)
+        .toSet();
+    final profiles = <UserProfile>[];
+    for (final row in incoming) {
+      final likerId = row['liker_id'] as String;
+      if (alreadyLiked.contains(likerId)) continue;
+      final profile = await getProfile(likerId);
+      if (profile != null) {
+        profiles.add(await _enrichCompatibility(profile));
+      }
+    }
+    return profiles;
   }
 
   Future<List<MatchItem>> myMatches() async {
     if (!isLive) {
-      final profiles = _demoLikedIds
-          .where(_demoReciprocalLikeIds.contains)
+      final candidateIds = {..._demoLikedIds, ..._demoPhotoLikedProfileIds};
+      final profiles = candidateIds
+          .where((id) {
+            final profile = mockProfiles
+                .where((item) => item.id == id)
+                .firstOrNull;
+            return (_demoLikedIds.contains(id) &&
+                    (_demoReciprocalLikeIds.contains(id) ||
+                        (profile?.compatibilityScore ?? 0) > 80)) ||
+                (_demoPhotoLikedProfileIds.contains(id) &&
+                    _demoReciprocalPhotoLikeIds.contains(id));
+          })
           .map((id) => mockProfiles.where((p) => p.id == id).firstOrNull)
           .whereType<UserProfile>();
       final source = profiles.isEmpty ? mockProfiles.take(3) : profiles;
@@ -751,6 +817,8 @@ class MapLovRepository {
     );
   }
 
+  Future<int> myPhotoCount() async => (await myPhotos()).length;
+
   Future<bool> deleteProfilePhoto(Map<String, dynamic> photo) async {
     if (!isLive) return true;
     final photos = await _client!
@@ -808,22 +876,38 @@ class MapLovRepository {
     }
   }
 
-  Future<void> togglePhotoLike(
+  Future<ProfileLikeResult> togglePhotoLike(
     String photoId, {
+    required String profileId,
     required bool currentlyLiked,
   }) async {
-    if (!isLive) return;
+    if (!isLive) {
+      final liked = !currentlyLiked;
+      if (liked) {
+        _demoPhotoLikedProfileIds.add(profileId);
+      } else {
+        _demoPhotoLikedProfileIds.remove(profileId);
+      }
+      return ProfileLikeResult(
+        liked: liked,
+        matched: liked && _demoReciprocalPhotoLikeIds.contains(profileId),
+      );
+    }
     if (currentlyLiked) {
       await _client!
           .from('photo_likes')
           .delete()
           .eq('photo_id', photoId)
           .eq('user_id', currentUserId!);
+      return const ProfileLikeResult(liked: false, matched: false);
     } else {
+      final wasMatched = await _hasMatchWith(profileId);
       await _client!.from('photo_likes').insert({
         'photo_id': photoId,
         'user_id': currentUserId!,
       });
+      final isMatched = await _hasMatchWith(profileId);
+      return ProfileLikeResult(liked: true, matched: !wasMatched && isMatched);
     }
   }
 

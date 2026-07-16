@@ -1,14 +1,16 @@
 part of '../../app.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  const HomeScreen({super.key, this.initialTab = 'Discover'});
+
+  final String initialTab;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  String selectedTab = 'Discover';
+  late String selectedTab;
   final Set<String> likedProfiles = {};
   List<UserProfile> _profiles = List.of(mockProfiles);
   DiscoveryFilters _filters = const DiscoveryFilters();
@@ -17,6 +19,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    selectedTab = widget.initialTab;
     unawaited(_loadProfiles());
   }
 
@@ -67,14 +70,16 @@ class _HomeScreenState extends State<HomeScreen> {
     };
   }
 
-  void _openPhoto(UserProfile profile) {
+  Future<void> _openPhoto(UserProfile profile) async {
+    if (!await _requireProfilePhotos(context, minimum: 1) || !mounted) return;
     Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => PhotoViewerScreen(profile: profile)),
     );
   }
 
-  void _openProfile(UserProfile profile) {
+  Future<void> _openProfile(UserProfile profile) async {
+    if (!await _requireProfilePhotos(context, minimum: 3) || !mounted) return;
     Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => PublicProfileScreen(profile: profile)),
@@ -82,6 +87,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _toggleLike(UserProfile profile) async {
+    if (!await _requireProfilePhotos(context, minimum: 1) || !mounted) return;
     final previous = likedProfiles.contains(profile.name);
     setState(() {
       if (previous) {
@@ -158,9 +164,9 @@ class _HomeScreenState extends State<HomeScreen> {
                         return _DiscoverGridCard(
                           profile: profile,
                           liked: likedProfiles.contains(profile.name),
-                          onPhotoTap: () => _openPhoto(profile),
-                          onNameTap: () => _openProfile(profile),
-                          onLike: () => _toggleLike(profile),
+                          onPhotoTap: () => unawaited(_openPhoto(profile)),
+                          onNameTap: () => unawaited(_openProfile(profile)),
+                          onLike: () => unawaited(_toggleLike(profile)),
                         );
                       },
                     ),

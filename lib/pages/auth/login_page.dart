@@ -28,7 +28,7 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _handleSignedIn() async {
     try {
       await AuthService.instance.validateCurrentAccount();
-      _goHome();
+      await _goHome();
     } catch (error) {
       if (mounted) {
         setState(() => _errorText = AuthService.instance.messageFor(error));
@@ -63,7 +63,7 @@ class _LoginScreenState extends State<LoginScreen> {
         password: password,
         rememberSession: _rememberMe,
       );
-      _goHome();
+      await _goHome();
     } catch (error) {
       if (mounted) {
         setState(() => _errorText = AuthService.instance.messageFor(error));
@@ -81,7 +81,7 @@ class _LoginScreenState extends State<LoginScreen> {
     });
     try {
       await signIn();
-      if (!AuthService.instance.isConfigured) _goHome();
+      if (!AuthService.instance.isConfigured) await _goHome();
     } catch (error) {
       if (mounted) {
         setState(() => _errorText = AuthService.instance.messageFor(error));
@@ -91,10 +91,19 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  void _goHome() {
+  Future<void> _goHome() async {
     if (!mounted || _isNavigating) return;
     _isNavigating = true;
-    Navigator.pushNamedAndRemoveUntil(context, AppRoutes.home, (_) => false);
+    final complete = await AuthService.instance.isCurrentProfileComplete();
+    if (!mounted) return;
+    final destination = !complete
+        ? AppRoutes.profileSetup
+        : AuthService.instance.requiresPreferencesCompletion
+        ? AppRoutes.preferences
+        : AuthService.instance.requiresPhoneVerification
+        ? AppRoutes.verifyPhone
+        : AppRoutes.home;
+    Navigator.pushNamedAndRemoveUntil(context, destination, (_) => false);
   }
 
   @override

@@ -7,62 +7,39 @@ class ProfileSetupScreen extends StatefulWidget {
 }
 
 class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
-  final firstName = TextEditingController();
-  final birthDate = TextEditingController();
-  final city = TextEditingController();
-  final country = TextEditingController(text: 'Canada');
   final bio = TextEditingController();
   String gender = 'Prefer not to say';
   bool saving = false;
+  late Future<List<Map<String, dynamic>>> photos;
+
+  @override
+  void initState() {
+    super.initState();
+    photos = MapLovRepository.instance.myPhotos();
+  }
 
   @override
   void dispose() {
-    firstName.dispose();
-    birthDate.dispose();
-    city.dispose();
-    country.dispose();
     bio.dispose();
     super.dispose();
   }
 
-  Future<void> _pickBirthDate() async {
-    final now = DateTime.now();
-    final selected = await showDatePicker(
-      context: context,
-      initialDate: DateTime(now.year - 25),
-      firstDate: DateTime(now.year - 100),
-      lastDate: DateTime(now.year - 18, now.month, now.day),
-    );
-    if (selected != null) {
-      birthDate.text = selected.toIso8601String().split('T').first;
+  Future<void> _managePhotos() async {
+    await Navigator.pushNamed(context, AppRoutes.managePhotos);
+    if (mounted) {
+      setState(() => photos = MapLovRepository.instance.myPhotos());
     }
   }
 
   Future<void> _continue() async {
-    if (firstName.text.trim().isEmpty ||
-        city.text.trim().isEmpty ||
-        DateTime.tryParse(birthDate.text) == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Add your first name, birth date, and city.'),
-        ),
-      );
-      return;
-    }
     setState(() => saving = true);
     try {
       await MapLovRepository.instance.saveMyProfile({
-        'first_name': firstName.text.trim(),
-        'date_of_birth': birthDate.text,
         'gender': gender,
-        'city': city.text.trim(),
-        'country_name': country.text.trim(),
-        'country_code': country.text.trim().toLowerCase() == 'canada'
-            ? 'CA'
-            : null,
         'bio': bio.text.trim(),
         'spoken_languages': const ['English'],
       });
+      await MapLovRepository.instance.completeProfileIfReady();
       if (mounted) Navigator.pushNamed(context, AppRoutes.preferences);
     } catch (error) {
       if (mounted) {
@@ -84,17 +61,36 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       Center(
         child: Stack(
           children: [
-            const CircleAvatar(
-              radius: 58,
-              backgroundColor: AppColors.palePink,
-              child: Icon(Icons.person, size: 70, color: AppColors.softPink),
+            FutureBuilder<List<Map<String, dynamic>>>(
+              future: photos,
+              builder: (context, snapshot) {
+                final photo = snapshot.data?.firstOrNull?['url'] as String?;
+                return ClipOval(
+                  child: SizedBox(
+                    width: 116,
+                    height: 116,
+                    child: photo == null
+                        ? const ColoredBox(
+                            color: AppColors.palePink,
+                            child: Icon(
+                              Icons.person,
+                              size: 70,
+                              color: AppColors.softPink,
+                            ),
+                          )
+                        : photo.startsWith('http')
+                        ? Image.network(photo, fit: BoxFit.cover)
+                        : Image.asset(photo, fit: BoxFit.cover),
+                  ),
+                );
+              },
             ),
             Positioned(
               right: 0,
               bottom: 0,
               child: IconButton.filled(
-                onPressed: () =>
-                    Navigator.pushNamed(context, AppRoutes.managePhotos),
+                tooltip: 'Add profile photo',
+                onPressed: _managePhotos,
                 icon: const Icon(Icons.add_a_photo_outlined),
               ),
             ),
@@ -102,22 +98,9 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
         ),
       ),
       const _SectionTitle('About you'),
-      TextField(
-        controller: firstName,
-        decoration: const InputDecoration(
-          labelText: 'First name',
-          prefixIcon: Icon(Icons.badge_outlined),
-        ),
-      ),
-      const SizedBox(height: 12),
-      TextField(
-        controller: birthDate,
-        readOnly: true,
-        onTap: _pickBirthDate,
-        decoration: const InputDecoration(
-          labelText: 'Date of birth',
-          prefixIcon: Icon(Icons.calendar_month_outlined),
-        ),
+      const Text(
+        'Your name, birth date and location are already saved. You can add photos now or after registration.',
+        style: TextStyle(color: AppColors.grayText),
       ),
       const SizedBox(height: 12),
       DropdownButtonFormField<String>(
@@ -131,22 +114,6 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       ),
       const SizedBox(height: 12),
       TextField(
-        controller: city,
-        decoration: const InputDecoration(
-          labelText: 'City',
-          prefixIcon: Icon(Icons.location_city_outlined),
-        ),
-      ),
-      const SizedBox(height: 12),
-      TextField(
-        controller: country,
-        decoration: const InputDecoration(
-          labelText: 'Country',
-          prefixIcon: Icon(Icons.public),
-        ),
-      ),
-      const SizedBox(height: 12),
-      TextField(
         controller: bio,
         maxLines: 4,
         decoration: const InputDecoration(
@@ -154,9 +121,12 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
         ),
       ),
       const SizedBox(height: 20),
-      _PrimaryButton(
-        saving ? 'Saving…' : 'Continue to preferences',
-        onPressed: saving ? () {} : _continue,
+      KeyedSubtree(
+        key: const Key('profile_setup_continue'),
+        child: _PrimaryButton(
+          saving ? 'Saving…' : 'Continue to preferences',
+          onPressed: saving ? () {} : _continue,
+        ),
       ),
     ],
   );

@@ -1,9 +1,23 @@
+import '../config/app_config.dart';
 import '../models/user_profile.dart';
 
 // Offline/demo fallback. MapLovRepository replaces these rows with PostgreSQL
 // data whenever a configured Supabase session is available.
 PhotoDisplayStyle currentUserPhotoDisplayStyle =
     PhotoDisplayStyle.profileDetails;
+
+const unavailableProfile = UserProfile(
+  id: 'unavailable',
+  name: 'Profile unavailable',
+  age: 18,
+  city: '',
+  compatibilityScore: 0,
+  imagePath: 'assets/profile/profile_user_placeholder.png',
+  photoDisplayStyle: PhotoDisplayStyle.profileDetails,
+);
+
+UserProfile get demoProfileOrUnavailable =>
+    AppConfig.allowDemoData ? mockProfiles.first : unavailableProfile;
 
 const mockProfiles = [
   UserProfile(

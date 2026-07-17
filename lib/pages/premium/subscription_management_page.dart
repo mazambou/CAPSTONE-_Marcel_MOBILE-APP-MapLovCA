@@ -39,7 +39,7 @@ class _SubscriptionManagementScreenState
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    'MapLov ${info.tier[0].toUpperCase()}${info.tier.substring(1)}',
+                    'MapLov ${info.displayName}',
                     style: const TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.w800,

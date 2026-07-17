@@ -4,7 +4,12 @@ import 'app_config.dart';
 import 'env.dart';
 
 abstract final class SupabaseConfig {
-  static bool get isConfigured => AppConfig.hasSupabaseConfiguration;
+  /// Keeps widget tests deterministic while development and release builds
+  /// connect to the configured MapLov project by default.
+  static bool forceUiOnlyForTesting = false;
+
+  static bool get isConfigured =>
+      !forceUiOnlyForTesting && AppConfig.hasSupabaseConfiguration;
 
   static Future<void> initialize() async {
     if (!isConfigured) return;

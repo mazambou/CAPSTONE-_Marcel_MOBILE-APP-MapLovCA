@@ -9,6 +9,7 @@ class ManagePhotosScreen extends StatefulWidget {
 
 class _ManagePhotosScreenState extends State<ManagePhotosScreen> {
   late Future<List<Map<String, dynamic>>> _photos;
+  final Set<String> _deleteControls = {};
   bool _uploading = false;
 
   @override
@@ -17,34 +18,66 @@ class _ManagePhotosScreenState extends State<ManagePhotosScreen> {
     _reload();
   }
 
-  void _reload() => _photos = MapLovRepository.instance.myPhotos();
+  void _reload() {
+    _photos = MapLovRepository.instance.myPhotos();
+  }
+
+  void _refreshPhotos() {
+    if (!mounted) return;
+    setState(() {
+      _deleteControls.clear();
+      _reload();
+    });
+  }
 
   Future<void> _addPhoto() async {
-    final photo = await ImagePicker().pickImage(
-      source: ImageSource.gallery,
-      imageQuality: 88,
-      maxWidth: 2048,
-    );
+    if (_uploading) return;
+    XFile? photo;
+    try {
+      photo = await pickImageForUpload(
+        context,
+        imageQuality: 88,
+        maxWidth: 2048,
+      );
+    } catch (error) {
+      if (mounted) _showError('Unable to open the camera or gallery: $error');
+      return;
+    }
     if (photo == null) return;
     setState(() => _uploading = true);
     try {
+      final bytes = await photo.readAsBytes();
       await MapLovRepository.instance.uploadProfilePhoto(
-        bytes: await photo.readAsBytes(),
+        bytes: bytes,
         extension: photo.name.split('.').last.toLowerCase(),
       );
-      if (mounted) setState(_reload);
+      _refreshPhotos();
     } catch (error) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Photo upload failed: $error')));
-      }
+      if (mounted) _showError('Photo upload failed: $error');
     } finally {
       if (mounted) setState(() => _uploading = false);
     }
   }
 
   Future<void> _deletePhoto(Map<String, dynamic> photo) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete this photo?'),
+        content: const Text('This action cannot be undone.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
     final deleted = await MapLovRepository.instance.deleteProfilePhoto(photo);
     if (!deleted && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -54,27 +87,48 @@ class _ManagePhotosScreenState extends State<ManagePhotosScreen> {
       );
       return;
     }
-    if (mounted) setState(_reload);
+    _refreshPhotos();
   }
 
-  Future<void> _setPrimary(Map<String, dynamic> photo) async {
-    await MapLovRepository.instance.setPrimaryPhoto(photo['id'] as String);
-    if (mounted) setState(_reload);
-  }
-
-  Future<void> _move(
+  Future<void> _openPhoto(
+    Map<String, dynamic> photo,
     List<Map<String, dynamic>> photos,
-    int index,
-    int offset,
   ) async {
-    final target = index + offset;
-    if (target < 0 || target >= photos.length) return;
-    final reordered = List<Map<String, dynamic>>.from(photos);
-    final item = reordered.removeAt(index);
-    reordered.insert(target, item);
-    await MapLovRepository.instance.reorderProfilePhotos(reordered);
-    if (mounted) setState(_reload);
+    if (photo['moderation_status'] == 'under_review') return;
+    final profileId = MapLovRepository.instance.currentUserId;
+    final loaded = profileId == null
+        ? demoProfileOrUnavailable
+        : await MapLovRepository.instance.getProfile(profileId);
+    if (!mounted || loaded == null) return;
+    final visiblePhotos = photos
+        .where((item) => item['moderation_status'] != 'under_review')
+        .toList();
+    final visibleIndex = visiblePhotos.indexWhere(
+      (item) => item['id'] == photo['id'],
+    );
+    final profileIndex = loaded.photoIds.indexOf(photo['id'] as String);
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => PhotoViewerScreen(
+          profile: loaded,
+          initialIndex: profileIndex >= 0 ? profileIndex : visibleIndex,
+        ),
+      ),
+    );
   }
+
+  void _showDeleteControl(String id) {
+    setState(() {
+      _deleteControls
+        ..clear()
+        ..add(id);
+    });
+  }
+
+  void _showError(String message) => ScaffoldMessenger.of(
+    context,
+  ).showSnackBar(SnackBar(content: Text(message)));
 
   @override
   Widget build(BuildContext context) => _AppPage(
@@ -100,76 +154,62 @@ class _ManagePhotosScreenState extends State<ManagePhotosScreen> {
             crossAxisSpacing: 12,
             mainAxisSpacing: 12,
             children: [
-              ...photos.asMap().entries.map(
-                (entry) => ClipRRect(
-                  borderRadius: BorderRadius.circular(18),
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      (entry.value['url'] as String).startsWith('http')
-                          ? Image.network(
-                              entry.value['url'] as String,
-                              fit: BoxFit.cover,
-                            )
-                          : Image.asset(
-                              entry.value['url'] as String,
-                              fit: BoxFit.cover,
+              ...photos.map((photo) {
+                final id = photo['id'] as String;
+                final underReview =
+                    photo['moderation_status'] == 'under_review';
+                return GestureDetector(
+                  key: Key('managed_photo_$id'),
+                  onTap: underReview ? null : () => _openPhoto(photo, photos),
+                  onLongPress: () => _showDeleteControl(id),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(18),
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        mediaImage(photo['url'] as String, fit: BoxFit.cover),
+                        if (underReview)
+                          ColoredBox(
+                            color: Colors.black.withValues(alpha: .58),
+                            child: const Center(
+                              child: Padding(
+                                padding: EdgeInsets.all(12),
+                                child: Text(
+                                  'Photo under moderation',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                              ),
                             ),
-                      Positioned(
-                        top: 8,
-                        right: 8,
-                        child: IconButton.filled(
-                          tooltip: 'Delete photo',
-                          onPressed: () => _deletePhoto(entry.value),
-                          icon: const Icon(Icons.close, size: 17),
-                        ),
-                      ),
-                      Positioned(
-                        left: 7,
-                        top: 7,
-                        child: ActionChip(
-                          avatar: Icon(
-                            entry.value['is_primary'] == true
-                                ? Icons.star
-                                : Icons.star_border,
-                            size: 16,
                           ),
-                          label: Text(
-                            entry.value['is_primary'] == true
-                                ? 'Main'
-                                : 'Set main',
+                        if (_deleteControls.contains(id))
+                          Positioned(
+                            top: 7,
+                            right: 7,
+                            child: IconButton.filled(
+                              key: Key('delete_managed_photo_$id'),
+                              tooltip: 'Delete photo',
+                              onPressed: () => _deletePhoto(photo),
+                              constraints: const BoxConstraints.tightFor(
+                                width: 38,
+                                height: 38,
+                              ),
+                              padding: EdgeInsets.zero,
+                              style: IconButton.styleFrom(
+                                backgroundColor: AppColors.coral,
+                                foregroundColor: Colors.white,
+                              ),
+                              icon: const Icon(Icons.close, size: 20),
+                            ),
                           ),
-                          onPressed: () => _setPrimary(entry.value),
-                        ),
-                      ),
-                      Positioned(
-                        left: 6,
-                        right: 6,
-                        bottom: 6,
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            IconButton.filledTonal(
-                              tooltip: 'Move earlier',
-                              onPressed: entry.key == 0
-                                  ? null
-                                  : () => _move(photos, entry.key, -1),
-                              icon: const Icon(Icons.arrow_back, size: 18),
-                            ),
-                            IconButton.filledTonal(
-                              tooltip: 'Move later',
-                              onPressed: entry.key == photos.length - 1
-                                  ? null
-                                  : () => _move(photos, entry.key, 1),
-                              icon: const Icon(Icons.arrow_forward, size: 18),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-              ),
+                );
+              }),
               InkWell(
                 onTap: _uploading ? null : _addPhoto,
                 borderRadius: BorderRadius.circular(18),

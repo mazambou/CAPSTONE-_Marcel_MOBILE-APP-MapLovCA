@@ -14,7 +14,7 @@ class PhotoViewerScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final selectedProfile = profile ?? mockProfiles.first;
+    final selectedProfile = profile ?? demoProfileOrUnavailable;
     final displayStyle =
         displayStyleOverride ?? selectedProfile.photoDisplayStyle;
 
@@ -28,6 +28,62 @@ class PhotoViewerScreen extends StatelessWidget {
         initialIndex: initialIndex,
       ),
     };
+  }
+}
+
+Future<void> _confirmPhotoReport(
+  BuildContext context, {
+  required UserProfile profile,
+  required int photoIndex,
+}) async {
+  final photoId = profile.photoIds.length > photoIndex
+      ? profile.photoIds[photoIndex]
+      : MapLovRepository.instance.isLive
+      ? null
+      : 'demo-photo-${profile.id}-$photoIndex';
+  if (photoId == null) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('This photo cannot be reported.')),
+    );
+    return;
+  }
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: const Text('Report this photo?'),
+      content: const Text(
+        'The photo will be reviewed confidentially by the MapLov moderation team.',
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context, false),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(context, true),
+          child: const Text('Report'),
+        ),
+      ],
+    ),
+  );
+  if (confirmed != true || !context.mounted) return;
+  try {
+    final submitted = await MapLovRepository.instance.reportPhoto(photoId);
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          submitted
+              ? 'Photo reported for review.'
+              : 'You have already reported this photo.',
+        ),
+      ),
+    );
+  } catch (error) {
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Unable to report this photo: $error')),
+    );
   }
 }
 
@@ -50,6 +106,7 @@ class _DetailedPhotoViewerState extends State<_DetailedPhotoViewer> {
   late final List<String> _photos;
   late int _currentIndex;
   late bool _profileLiked;
+  bool _focusMode = false;
 
   @override
   void initState() {
@@ -96,6 +153,31 @@ class _DetailedPhotoViewerState extends State<_DetailedPhotoViewer> {
     }
   }
 
+  Future<void> _openChat() async {
+    try {
+      final id = await MapLovRepository.instance.startConversation(_profile.id);
+      if (!mounted) return;
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ChatScreen(conversationId: id, profile: _profile),
+        ),
+      );
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Unable to start conversation: $error')),
+        );
+      }
+    }
+  }
+
+  Future<void> _reportCurrentPhoto() => _confirmPhotoReport(
+    context,
+    profile: _profile,
+    photoIndex: _currentIndex,
+  );
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -113,7 +195,14 @@ class _DetailedPhotoViewerState extends State<_DetailedPhotoViewer> {
               alignment: Alignment.center,
             ),
           ),
-          const _PhotoViewerGradient(),
+          if (!_focusMode) const _PhotoViewerGradient(),
+          Positioned.fill(
+            child: GestureDetector(
+              key: const Key('detailed_photo_focus_toggle'),
+              behavior: HitTestBehavior.translucent,
+              onTap: () => setState(() => _focusMode = !_focusMode),
+            ),
+          ),
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
@@ -123,25 +212,28 @@ class _DetailedPhotoViewerState extends State<_DetailedPhotoViewer> {
                     profile: _profile,
                     profileLiked: _profileLiked,
                     onProfileLike: _toggleProfileLike,
+                    compact: _focusMode,
                   ),
-                  const SizedBox(height: 12),
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: Wrap(
-                      spacing: 8,
-                      children: [
-                        _PhotoBadge(
-                          icon: Icons.photo_library_outlined,
-                          label: '${_photos.length} photos',
-                        ),
-                        const _PhotoBadge(
-                          icon: Icons.circle,
-                          label: 'Online',
-                          iconColor: Color(0xFF29D391),
-                        ),
-                      ],
+                  if (!_focusMode) ...[
+                    const SizedBox(height: 12),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Wrap(
+                        spacing: 8,
+                        children: [
+                          _PhotoBadge(
+                            icon: Icons.photo_library_outlined,
+                            label: '${_photos.length} photos',
+                          ),
+                          const _PhotoBadge(
+                            icon: Icons.circle,
+                            label: 'Online',
+                            iconColor: Color(0xFF29D391),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
+                  ],
                   const Spacer(),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -156,7 +248,7 @@ class _DetailedPhotoViewerState extends State<_DetailedPhotoViewer> {
                       ),
                     ],
                   ),
-                  const Spacer(flex: 2),
+                  Spacer(flex: _focusMode ? 4 : 2),
                   Align(
                     alignment: Alignment.centerLeft,
                     child: _PhotoBadge(
@@ -164,12 +256,16 @@ class _DetailedPhotoViewerState extends State<_DetailedPhotoViewer> {
                       label: '${_currentIndex + 1}/${_photos.length}',
                     ),
                   ),
-                  const SizedBox(height: 10),
-                  _PhotoProfilePanel(profile: _profile),
+                  if (!_focusMode) ...[
+                    const SizedBox(height: 10),
+                    _PhotoProfilePanel(profile: _profile),
+                  ],
                   const SizedBox(height: 12),
                   _PhotoActions(
-                    onMessage: () =>
-                        Navigator.pushNamed(context, AppRoutes.chat),
+                    onMessage: _openChat,
+                    onReport: _reportCurrentPhoto,
+                    showReport:
+                        MapLovRepository.instance.currentUserId != _profile.id,
                   ),
                 ],
               ),
@@ -286,6 +382,12 @@ class _SocialPhotoViewerState extends State<_SocialPhotoViewer> {
     );
   }
 
+  Future<void> _reportCurrentPhoto() => _confirmPhotoReport(
+    context,
+    profile: widget.profile,
+    photoIndex: _currentIndex,
+  );
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -345,6 +447,14 @@ class _SocialPhotoViewerState extends State<_SocialPhotoViewer> {
                     ),
                   ),
                   const Spacer(),
+                  if (MapLovRepository.instance.currentUserId !=
+                      widget.profile.id) ...[
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: _PhotoReportButton(onPressed: _reportCurrentPhoto),
+                    ),
+                    const SizedBox(height: 10),
+                  ],
                   _SocialProfileFacts(profile: widget.profile),
                   const SizedBox(height: 18),
                   Row(
@@ -418,9 +528,13 @@ class _SocialPhotoActions extends StatelessWidget {
         const SizedBox(height: 13),
         _SocialSideAction(
           key: const Key('social_photo_super_like'),
-          icon: Icons.star,
+          iconWidget: _SuperLikeGlyph(
+            key: const Key('super_like_love_icon'),
+            active: superLiked,
+            size: 31,
+          ),
           label: superLiked ? 'Super Liked' : 'Super Like',
-          color: superLiked ? const Color(0xFFFFC12E) : Colors.white,
+          color: Colors.white,
           onPressed: onSuperLike,
         ),
       ],
@@ -431,13 +545,15 @@ class _SocialPhotoActions extends StatelessWidget {
 class _SocialSideAction extends StatelessWidget {
   const _SocialSideAction({
     super.key,
-    required this.icon,
+    this.icon,
+    this.iconWidget,
     required this.label,
     required this.color,
     required this.onPressed,
   });
 
-  final IconData icon;
+  final IconData? icon;
+  final Widget? iconWidget;
   final String label;
   final Color color;
   final VoidCallback onPressed;
@@ -457,7 +573,7 @@ class _SocialSideAction extends StatelessWidget {
               child: SizedBox(
                 width: 54,
                 height: 54,
-                child: Icon(icon, color: color, size: 29),
+                child: iconWidget ?? Icon(icon, color: color, size: 29),
               ),
             ),
           ),
@@ -743,11 +859,13 @@ class _PhotoViewerHeader extends StatelessWidget {
     required this.profile,
     required this.profileLiked,
     required this.onProfileLike,
+    this.compact = false,
   });
 
   final UserProfile profile;
   final bool profileLiked;
   final VoidCallback onProfileLike;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -757,87 +875,110 @@ class _PhotoViewerHeader extends StatelessWidget {
           icon: Icons.close,
           onPressed: () => Navigator.pop(context),
         ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Flexible(
-                    child: GestureDetector(
-                      key: Key('viewer_profile_name_${profile.name}'),
-                      onTap: () async {
-                        if (!await _requireProfilePhotos(context, minimum: 3) ||
-                            !context.mounted) {
-                          return;
-                        }
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) =>
-                                PublicProfileScreen(profile: profile),
+        if (!compact) const SizedBox(width: 12),
+        if (!compact)
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Flexible(
+                      child: GestureDetector(
+                        key: Key('viewer_profile_name_${profile.name}'),
+                        onTap: () async {
+                          if (!await _requireProfilePhotos(
+                                context,
+                                minimum: 3,
+                              ) ||
+                              !context.mounted) {
+                            return;
+                          }
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) =>
+                                  PublicProfileScreen(profile: profile),
+                            ),
+                          );
+                        },
+                        child: Text(
+                          '${profile.name}, ${profile.age}',
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 25,
+                            fontWeight: FontWeight.w800,
                           ),
-                        );
-                      },
-                      child: Text(
-                        '${profile.name}, ${profile.age}',
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 25,
-                          fontWeight: FontWeight.w800,
                         ),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 6),
-                  const Icon(
-                    Icons.verified,
-                    color: Color(0xFF2D8CFF),
-                    size: 22,
-                  ),
-                ],
-              ),
-              Row(
-                children: [
-                  const Icon(Icons.location_on, color: Colors.white, size: 16),
-                  const SizedBox(width: 3),
-                  Expanded(
-                    child: Text(
-                      '${profile.city}, ${profile.country}',
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(color: Colors.white, fontSize: 15),
+                    const SizedBox(width: 6),
+                    const Icon(
+                      Icons.verified,
+                      color: Color(0xFF2D8CFF),
+                      size: 22,
                     ),
-                  ),
-                ],
-              ),
-            ],
+                    if (profile.isVip) ...[
+                      const SizedBox(width: 6),
+                      const _VipBadge(compact: true),
+                    ],
+                  ],
+                ),
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.location_on,
+                      color: Colors.white,
+                      size: 16,
+                    ),
+                    const SizedBox(width: 3),
+                    Expanded(
+                      child: Text(
+                        '${profile.city}, ${profile.country}',
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 15,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
-        ),
+        if (compact) const Spacer(),
         IconButton.filledTonal(
           key: Key('photo_profile_like_${profile.name}'),
           tooltip: profileLiked ? 'Remove profile like' : 'Like profile',
           onPressed: onProfileLike,
+          constraints: const BoxConstraints.tightFor(width: 56, height: 56),
           icon: Icon(
             profileLiked ? Icons.favorite : Icons.favorite_border,
             color: AppColors.deepPink,
+            size: 33,
           ),
         ),
-        const SizedBox(width: 4),
-        PopupMenuButton<String>(
-          color: const Color(0xFF27232A),
-          iconColor: Colors.white,
-          icon: const Icon(Icons.more_horiz, size: 30),
-          itemBuilder: (_) => const [
-            PopupMenuItem(value: 'report', child: Text('Report profile')),
-            PopupMenuItem(value: 'block', child: Text('Block profile')),
-          ],
-          onSelected: (value) => Navigator.pushNamed(
-            context,
-            value == 'block' ? AppRoutes.blockUser : AppRoutes.reportUser,
+        if (!compact) const SizedBox(width: 4),
+        if (!compact)
+          PopupMenuButton<String>(
+            color: const Color(0xFF27232A),
+            iconColor: Colors.white,
+            icon: const Icon(Icons.more_horiz, size: 30),
+            itemBuilder: (_) => const [
+              PopupMenuItem(value: 'report', child: Text('Report profile')),
+              PopupMenuItem(value: 'block', child: Text('Block profile')),
+            ],
+            onSelected: (value) => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => value == 'block'
+                    ? BlockUserScreen(profile: profile)
+                    : ReportUserScreen(profile: profile),
+              ),
+            ),
           ),
-        ),
       ],
     );
   }
@@ -1005,37 +1146,53 @@ class _PhotoFactDivider extends StatelessWidget {
 }
 
 class _PhotoActions extends StatelessWidget {
-  const _PhotoActions({required this.onMessage});
+  const _PhotoActions({
+    required this.onMessage,
+    required this.onReport,
+    required this.showReport,
+  });
 
   final VoidCallback onMessage;
+  final VoidCallback onReport;
+  final bool showReport;
 
   @override
   Widget build(BuildContext context) {
     return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        _PhotoActionButton(
-          icon: Icons.close,
-          color: AppColors.coral,
-          size: 58,
-          onPressed: () => Navigator.pop(context),
+        Expanded(
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: showReport
+                ? _PhotoReportButton(onPressed: onReport)
+                : const SizedBox.shrink(),
+          ),
         ),
-        const SizedBox(width: 22),
-        _PhotoActionButton(
-          icon: Icons.chat_bubble_outline,
-          color: AppColors.deepPink,
-          size: 70,
-          onPressed: onMessage,
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _PhotoActionButton(
+              icon: Icons.chat_bubble_outline,
+              color: AppColors.deepPink,
+              size: 70,
+              onPressed: onMessage,
+            ),
+            const SizedBox(width: 16),
+            _PhotoActionButton(
+              color: AppColors.coral,
+              size: 58,
+              onPressed: () => ScaffoldMessenger.of(
+                context,
+              ).showSnackBar(const SnackBar(content: Text('Super Like sent.'))),
+              child: const _SuperLikeGlyph(
+                key: Key('super_like_love_icon'),
+                size: 31,
+              ),
+            ),
+          ],
         ),
-        const SizedBox(width: 22),
-        _PhotoActionButton(
-          icon: Icons.star,
-          color: const Color(0xFFFFB020),
-          size: 58,
-          onPressed: () => ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(const SnackBar(content: Text('Super Like sent.'))),
-        ),
+        const Spacer(),
       ],
     );
   }
@@ -1043,13 +1200,15 @@ class _PhotoActions extends StatelessWidget {
 
 class _PhotoActionButton extends StatelessWidget {
   const _PhotoActionButton({
-    required this.icon,
+    this.icon,
+    this.child,
     required this.color,
     required this.size,
     required this.onPressed,
-  });
+  }) : assert(icon != null || child != null);
 
-  final IconData icon;
+  final IconData? icon;
+  final Widget? child;
   final Color color;
   final double size;
   final VoidCallback onPressed;
@@ -1066,11 +1225,59 @@ class _PhotoActionButton extends StatelessWidget {
         child: SizedBox(
           width: size,
           height: size,
-          child: Icon(icon, color: color, size: size * 0.48),
+          child: child ?? Icon(icon, color: color, size: size * 0.48),
         ),
       ),
     );
   }
+}
+
+class _PhotoReportButton extends StatelessWidget {
+  const _PhotoReportButton({required this.onPressed});
+
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) => OutlinedButton.icon(
+    key: const Key('report_current_photo'),
+    onPressed: onPressed,
+    style: OutlinedButton.styleFrom(
+      foregroundColor: Colors.white,
+      backgroundColor: Colors.black.withValues(alpha: .58),
+      side: const BorderSide(color: Colors.white54),
+      minimumSize: const Size(48, 48),
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+    ),
+    icon: const Icon(Icons.flag_outlined, size: 20),
+    label: const Text('Report'),
+  );
+}
+
+class _SuperLikeGlyph extends StatelessWidget {
+  const _SuperLikeGlyph({super.key, this.active = true, required this.size});
+
+  final bool active;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) => SizedBox.square(
+    dimension: size,
+    child: Stack(
+      alignment: Alignment.center,
+      children: [
+        Icon(
+          Icons.favorite,
+          color: active ? AppColors.coral : Colors.white,
+          size: size,
+        ),
+        Icon(
+          Icons.north_east_rounded,
+          color: active ? Colors.white : AppColors.coral,
+          size: size * .58,
+        ),
+      ],
+    ),
+  );
 }
 
 class _PhotoNavigationButton extends StatelessWidget {

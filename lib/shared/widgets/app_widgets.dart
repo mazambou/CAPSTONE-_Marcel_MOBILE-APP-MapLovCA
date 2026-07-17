@@ -153,6 +153,45 @@ class _SectionTitle extends StatelessWidget {
   );
 }
 
+class _VipBadge extends StatelessWidget {
+  const _VipBadge({this.compact = false});
+
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: EdgeInsets.symmetric(
+      horizontal: compact ? 7 : 9,
+      vertical: compact ? 3 : 4,
+    ),
+    decoration: BoxDecoration(
+      gradient: const LinearGradient(
+        colors: [Color(0xFFD14C9A), AppColors.deepPink],
+      ),
+      borderRadius: BorderRadius.circular(20),
+    ),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(
+          Icons.workspace_premium_rounded,
+          size: compact ? 12 : 14,
+          color: AppColors.white,
+        ),
+        const SizedBox(width: 4),
+        Text(
+          'VIP',
+          style: TextStyle(
+            color: AppColors.white,
+            fontSize: compact ? 10 : 12,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
 // Kept for legacy layouts that may reuse the horizontal recommendation card.
 // ignore: unused_element
 class _ProfileCard extends StatelessWidget {
@@ -278,6 +317,8 @@ class _Dropdown extends StatelessWidget {
   );
 }
 
+// Retained for the validated compact-message presentation variant.
+// ignore: unused_element
 class _Bubble extends StatelessWidget {
   const _Bubble(this.text, this.mine);
   final String text;

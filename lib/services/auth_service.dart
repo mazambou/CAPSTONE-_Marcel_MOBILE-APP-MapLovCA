@@ -181,6 +181,8 @@ class AuthService {
     required String country,
     required String city,
     required DateTime dateOfBirth,
+    required Map<String, String> acceptedDocuments,
+    required DateTime legalAcceptedAt,
   }) async {
     final normalizedEmail = email.trim().toLowerCase();
     final normalizedPhone = phone.replaceAll(RegExp(r'[\s().-]'), '');
@@ -206,6 +208,8 @@ class AuthService {
         'country_name': country.trim(),
         'city': city.trim(),
         'date_of_birth': _dateOnly(dateOfBirth),
+        'accepted_legal_documents': acceptedDocuments,
+        'legal_accepted_at': legalAcceptedAt.toUtc().toIso8601String(),
       },
     );
     return SignUpResult(requiresEmailConfirmation: response.session == null);

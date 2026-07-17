@@ -2,7 +2,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const productTiers: Record<string, 'plus' | 'elite' | 'vip'> = {
   maplov_plus_monthly: 'plus',
-  maplov_elite_monthly: 'elite',
+  maplov_elite_monthly: 'vip',
   maplov_vip_monthly: 'vip',
 };
 

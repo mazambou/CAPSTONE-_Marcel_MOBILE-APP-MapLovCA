@@ -59,9 +59,9 @@ class _PostDetailsScreenState extends State<PostDetailsScreen> {
         widget.post ??
         MapLovPost(
           id: 'demo-post',
-          author: mockProfiles.first,
+          author: demoProfileOrUnavailable,
           body: 'A perfect day exploring the city ✨',
-          mediaUrl: mockProfiles.first.imagePath,
+          mediaUrl: demoProfileOrUnavailable.imagePath,
           createdAt: DateTime.now(),
         );
     return _AppPage(

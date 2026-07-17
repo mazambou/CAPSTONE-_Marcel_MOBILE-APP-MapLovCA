@@ -14,16 +14,21 @@ class UserProfile {
     this.isOnline = true,
     this.isNew = false,
     this.country = 'Canada',
+    this.originCountry = '',
+    this.originCity = '',
     this.bio = '',
     this.photoUrls = const [],
     this.photoIds = const [],
     this.isVerified = false,
+    this.isVip = false,
     this.gender = '',
     this.languages = const [],
     this.relationshipGoal = '',
     this.interests = const [],
     this.religion = '',
     this.bodyType = '',
+    this.eyeColor = '',
+    this.hairColor = '',
     this.heightCm,
     this.compatibilityBreakdown = const {},
     this.likedByMe = false,
@@ -42,16 +47,21 @@ class UserProfile {
   final bool isOnline;
   final bool isNew;
   final String country;
+  final String originCountry;
+  final String originCity;
   final String bio;
   final List<String> photoUrls;
   final List<String> photoIds;
   final bool isVerified;
+  final bool isVip;
   final String gender;
   final List<String> languages;
   final String relationshipGoal;
   final List<String> interests;
   final String religion;
   final String bodyType;
+  final String eyeColor;
+  final String hairColor;
   final int? heightCm;
   final Map<String, dynamic> compatibilityBreakdown;
   final bool likedByMe;

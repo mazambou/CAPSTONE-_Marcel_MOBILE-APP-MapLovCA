@@ -8,6 +8,7 @@ class GardenManagementScreen extends StatefulWidget {
 
 class _GardenManagementScreenState extends State<GardenManagementScreen> {
   late Future<List<GardenAlbumItem>> albums;
+  bool creatingAlbum = false;
   @override
   void initState() {
     super.initState();
@@ -41,23 +42,41 @@ class _GardenManagementScreenState extends State<GardenManagementScreen> {
     );
     controller.dispose();
     if (title == null || title.isEmpty) return;
-    await MapLovRepository.instance.createGardenAlbum(title);
-    if (mounted) setState(_reload);
+    setState(() => creatingAlbum = true);
+    try {
+      await MapLovRepository.instance.createGardenAlbum(title);
+      if (mounted) setState(_reload);
+    } catch (error) {
+      if (mounted) _showError('Unable to create the private album: $error');
+    } finally {
+      if (mounted) setState(() => creatingAlbum = false);
+    }
   }
 
   Future<void> _addPhoto(GardenAlbumItem album) async {
-    final image = await ImagePicker().pickImage(
-      source: ImageSource.gallery,
-      imageQuality: 88,
-    );
+    XFile? image;
+    try {
+      image = await pickImageForUpload(context, imageQuality: 88);
+    } catch (error) {
+      if (mounted) _showError('Unable to open the camera or gallery: $error');
+      return;
+    }
     if (image == null) return;
-    await MapLovRepository.instance.uploadGardenPhoto(
-      albumId: album.id,
-      bytes: await image.readAsBytes(),
-      extension: image.name.split('.').last,
-    );
-    if (mounted) setState(_reload);
+    try {
+      await MapLovRepository.instance.uploadGardenPhoto(
+        albumId: album.id,
+        bytes: await image.readAsBytes(),
+        extension: image.name.split('.').last.toLowerCase(),
+      );
+      if (mounted) setState(_reload);
+    } catch (error) {
+      if (mounted) _showError('Unable to add the private photo: $error');
+    }
   }
+
+  void _showError(String message) => ScaffoldMessenger.of(
+    context,
+  ).showSnackBar(SnackBar(content: Text(message)));
 
   Future<void> _rename(GardenAlbumItem album) async {
     final controller = TextEditingController(text: album.title);
@@ -151,6 +170,22 @@ class _GardenManagementScreenState extends State<GardenManagementScreen> {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
+          if (snapshot.hasError) {
+            return Card(
+              child: ListTile(
+                leading: const Icon(
+                  Icons.error_outline,
+                  color: AppColors.coral,
+                ),
+                title: const Text('Unable to load private albums'),
+                subtitle: Text('${snapshot.error}'),
+                trailing: IconButton(
+                  onPressed: () => setState(_reload),
+                  icon: const Icon(Icons.refresh),
+                ),
+              ),
+            );
+          }
           return Column(
             children: items
                 .map(
@@ -199,9 +234,14 @@ class _GardenManagementScreenState extends State<GardenManagementScreen> {
         },
       ),
       OutlinedButton.icon(
-        onPressed: _create,
-        icon: const Icon(Icons.create_new_folder_outlined),
-        label: const Text('Create private album'),
+        onPressed: creatingAlbum ? null : _create,
+        icon: creatingAlbum
+            ? const SizedBox.square(
+                dimension: 18,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : const Icon(Icons.create_new_folder_outlined),
+        label: Text(creatingAlbum ? 'Creating album…' : 'Create private album'),
       ),
       const _SectionTitle('Access control'),
       Card(

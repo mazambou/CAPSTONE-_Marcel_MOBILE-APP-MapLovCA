@@ -1,9 +1,12 @@
 part of '../../app.dart';
 
 class RegisterScreen extends StatefulWidget {
-  const RegisterScreen({super.key, this.dateOfBirth});
+  const RegisterScreen({super.key, this.gateData, this.dateOfBirth});
 
+  final RegistrationGateData? gateData;
   final DateTime? dateOfBirth;
+
+  DateTime? get effectiveDateOfBirth => gateData?.dateOfBirth ?? dateOfBirth;
 
   @override
   State<RegisterScreen> createState() => _RegisterScreenState();
@@ -74,7 +77,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
         password: _passwordController.text,
         country: _country,
         city: _selectedCity,
-        dateOfBirth: widget.dateOfBirth!,
+        dateOfBirth: widget.effectiveDateOfBirth!,
+        acceptedDocuments:
+            widget.gateData?.acceptedDocuments ?? _legalDocumentVersions,
+        legalAcceptedAt: widget.gateData?.acceptedAt ?? DateTime.now().toUtc(),
       );
       if (!mounted) return;
       if (result.requiresEmailConfirmation) {
@@ -103,8 +109,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   String? _validate() {
-    if (widget.dateOfBirth == null) {
-      return 'Confirm your date of birth before creating an account.';
+    if (widget.effectiveDateOfBirth == null) {
+      return 'Confirm your age and accept every required agreement first.';
     }
     if (_fullNameController.text.trim().length < 2) {
       return 'Enter your full name.';

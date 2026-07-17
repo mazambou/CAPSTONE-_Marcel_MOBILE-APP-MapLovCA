@@ -59,6 +59,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
     await _load();
   }
 
+  Future<void> _choosePhotoDisplay() async {
+    await Navigator.pushNamed(context, AppRoutes.photoDisplaySettings);
+    await _load();
+  }
+
   void _openMyPhotos(int index) {
     Navigator.push(
       context,
@@ -69,15 +74,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Future<bool> _requirePremium({bool elite = false}) async {
+  Future<bool> _requirePremium({bool vip = false}) async {
     final info = await MapLovRepository.instance.subscriptionInfo();
-    final allowed = elite ? info.isElite : info.isPremium;
+    final allowed = vip ? info.isVip : info.isPremium;
     if (!allowed && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            elite
-                ? 'Profile statistics require Premium Elite.'
+            vip
+                ? 'Profile statistics require Premium VIP.'
                 : 'Profile visitors require Premium Plus.',
           ),
         ),
@@ -117,7 +122,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _showStatistics() async {
-    if (!await _requirePremium(elite: true)) return;
+    if (!await _requirePremium(vip: true)) return;
     final statistics = await MapLovRepository.instance.profileStatistics();
     if (!mounted) return;
     await showDialog<void>(
@@ -199,16 +204,29 @@ class _ProfileScreenState extends State<ProfileScreen> {
         child: profileImage(profile, height: 280, width: double.infinity),
       ),
       const SizedBox(height: 16),
-      Text(
-        '${profile.name}, ${profile.age}',
-        style: Theme.of(
-          context,
-        ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
+      Wrap(
+        spacing: 8,
+        runSpacing: 6,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          Text(
+            '${profile.name}, ${profile.age}',
+            style: Theme.of(
+              context,
+            ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
+          ),
+          if (profile.isVip) const _VipBadge(),
+        ],
       ),
       Text(
         '${profile.city}, ${profile.country}',
         style: const TextStyle(color: AppColors.grayText),
       ),
+      if (profile.originCountry.isNotEmpty)
+        Text(
+          'Originally from ${profile.originCity.isEmpty ? '' : '${profile.originCity}, '}${profile.originCountry}',
+          style: const TextStyle(color: AppColors.grayText),
+        ),
       const SizedBox(height: 14),
       Text(profile.bio),
       const _SectionTitle('Interests'),
@@ -241,6 +259,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
           subtitle: const Text('Add or remove profile photos'),
           trailing: const Icon(Icons.chevron_right),
           onTap: _managePhotos,
+        ),
+      ),
+      Card(
+        color: AppColors.palePink,
+        child: ListTile(
+          key: const Key('profile_photo_display_button'),
+          leading: const CircleAvatar(
+            backgroundColor: AppColors.coral,
+            foregroundColor: Colors.white,
+            child: Icon(Icons.view_carousel_outlined),
+          ),
+          title: const Text(
+            'Photo display',
+            style: TextStyle(fontWeight: FontWeight.w800),
+          ),
+          subtitle: Text(
+            profile.photoDisplayStyle == PhotoDisplayStyle.social
+                ? 'Social interactions'
+                : 'Profile details',
+          ),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: _choosePhotoDisplay,
         ),
       ),
       const SizedBox(height: 10),
@@ -297,7 +337,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         child: ListTile(
           leading: const Icon(Icons.analytics_outlined, color: AppColors.coral),
           title: const Text('Profile statistics'),
-          subtitle: const Text('Premium Elite'),
+          subtitle: const Text('Premium VIP'),
           trailing: const Icon(Icons.chevron_right),
           onTap: _showStatistics,
         ),

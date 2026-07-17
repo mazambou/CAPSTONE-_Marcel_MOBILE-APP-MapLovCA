@@ -4,7 +4,7 @@ import 'dart:typed_data';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 
-import '../config/app_config.dart';
+import '../config/supabase_config.dart';
 import '../data/mock_data.dart';
 import '../models/user_profile.dart';
 
@@ -16,6 +16,8 @@ class DiscoveryFilters {
     this.locationMode = 'near_me',
     this.countries = const [],
     this.cities = const [],
+    this.originCountries = const [],
+    this.originCities = const [],
     this.languages = const [],
     this.relationshipGoals = const [],
     this.verifiedOnly = false,
@@ -25,6 +27,8 @@ class DiscoveryFilters {
     this.interestSlugs = const [],
     this.religions = const [],
     this.bodyTypes = const [],
+    this.eyeColors = const [],
+    this.hairColors = const [],
     this.minimumHeightCm,
     this.maximumHeightCm,
     this.interestImportance = 1,
@@ -40,6 +44,8 @@ class DiscoveryFilters {
   final String locationMode;
   final List<String> countries;
   final List<String> cities;
+  final List<String> originCountries;
+  final List<String> originCities;
   final List<String> languages;
   final List<String> relationshipGoals;
   final bool verifiedOnly;
@@ -49,6 +55,8 @@ class DiscoveryFilters {
   final List<String> interestSlugs;
   final List<String> religions;
   final List<String> bodyTypes;
+  final List<String> eyeColors;
+  final List<String> hairColors;
   final int? minimumHeightCm;
   final int? maximumHeightCm;
   final int interestImportance;
@@ -64,6 +72,8 @@ class DiscoveryFilters {
     'location_mode': locationMode,
     'country_codes': countries,
     'cities': cities,
+    'origin_country_names': originCountries,
+    'origin_cities': originCities,
     'languages': languages,
     'relationship_goals': relationshipGoals,
     'verified_only': verifiedOnly,
@@ -73,6 +83,8 @@ class DiscoveryFilters {
     'interest_slugs': interestSlugs,
     'religions': religions,
     'body_types': bodyTypes,
+    'eye_colors': eyeColors,
+    'hair_colors': hairColors,
     'minimum_height_cm': minimumHeightCm,
     'maximum_height_cm': maximumHeightCm,
     'interest_importance': interestImportance,
@@ -82,34 +94,44 @@ class DiscoveryFilters {
     'required_relationship_goal': requiredRelationshipGoal,
   };
 
-  factory DiscoveryFilters.fromDatabase(Map<String, dynamic> row) =>
-      DiscoveryFilters(
-        minimumAge: row['minimum_age'] as int? ?? 18,
-        maximumAge: row['maximum_age'] as int? ?? 80,
-        distanceKm: row['distance_km'] as int? ?? 50,
-        locationMode: row['location_mode'] as String? ?? 'near_me',
-        countries: List<String>.from(row['country_codes'] ?? const []),
-        cities: List<String>.from(row['cities'] ?? const []),
-        languages: List<String>.from(row['languages'] ?? const []),
-        relationshipGoals: List<String>.from(
-          row['relationship_goals'] ?? const [],
-        ),
-        verifiedOnly: row['verified_only'] as bool? ?? false,
-        activeTodayOnly: row['active_today_only'] as bool? ?? false,
-        genders: List<String>.from(row['genders'] ?? const []),
-        personalities: List<String>.from(row['personalities'] ?? const []),
-        interestSlugs: List<String>.from(row['interest_slugs'] ?? const []),
-        religions: List<String>.from(row['religions'] ?? const []),
-        bodyTypes: List<String>.from(row['body_types'] ?? const []),
-        minimumHeightCm: row['minimum_height_cm'] as int?,
-        maximumHeightCm: row['maximum_height_cm'] as int?,
-        interestImportance: row['interest_importance'] as int? ?? 1,
-        requiredGenders: row['required_genders'] as bool? ?? false,
-        requiredLocation: row['required_location'] as bool? ?? false,
-        requiredLanguages: row['required_languages'] as bool? ?? false,
-        requiredRelationshipGoal:
-            row['required_relationship_goal'] as bool? ?? false,
-      );
+  factory DiscoveryFilters.fromDatabase(Map<String, dynamic> row) {
+    final minimumAge = (row['minimum_age'] as int? ?? 18).clamp(18, 80);
+    final rawMaximumAge = (row['maximum_age'] as int? ?? 80).clamp(18, 80);
+    final maximumAge = rawMaximumAge < minimumAge ? minimumAge : rawMaximumAge;
+    return DiscoveryFilters(
+      minimumAge: minimumAge,
+      maximumAge: maximumAge,
+      distanceKm: row['distance_km'] as int? ?? 50,
+      locationMode: row['location_mode'] as String? ?? 'near_me',
+      countries: List<String>.from(row['country_codes'] ?? const []),
+      cities: List<String>.from(row['cities'] ?? const []),
+      originCountries: List<String>.from(
+        row['origin_country_names'] ?? const [],
+      ),
+      originCities: List<String>.from(row['origin_cities'] ?? const []),
+      languages: List<String>.from(row['languages'] ?? const []),
+      relationshipGoals: List<String>.from(
+        row['relationship_goals'] ?? const [],
+      ),
+      verifiedOnly: row['verified_only'] as bool? ?? false,
+      activeTodayOnly: row['active_today_only'] as bool? ?? false,
+      genders: List<String>.from(row['genders'] ?? const []),
+      personalities: List<String>.from(row['personalities'] ?? const []),
+      interestSlugs: List<String>.from(row['interest_slugs'] ?? const []),
+      religions: List<String>.from(row['religions'] ?? const []),
+      bodyTypes: List<String>.from(row['body_types'] ?? const []),
+      eyeColors: List<String>.from(row['eye_colors'] ?? const []),
+      hairColors: List<String>.from(row['hair_colors'] ?? const []),
+      minimumHeightCm: row['minimum_height_cm'] as int?,
+      maximumHeightCm: row['maximum_height_cm'] as int?,
+      interestImportance: row['interest_importance'] as int? ?? 1,
+      requiredGenders: row['required_genders'] as bool? ?? false,
+      requiredLocation: row['required_location'] as bool? ?? false,
+      requiredLanguages: row['required_languages'] as bool? ?? false,
+      requiredRelationshipGoal:
+          row['required_relationship_goal'] as bool? ?? false,
+    );
+  }
 }
 
 class ProfileLikeResult {
@@ -155,7 +177,13 @@ class SubscriptionInfo {
   final List<Map<String, dynamic>> history;
 
   bool get isPremium => tier == 'plus' || tier == 'elite' || tier == 'vip';
-  bool get isElite => tier == 'elite' || tier == 'vip';
+  bool get isVip => tier == 'elite' || tier == 'vip';
+  bool get isElite => isVip;
+  String get displayName => isVip
+      ? 'VIP'
+      : tier == 'plus'
+      ? 'Plus'
+      : 'Free';
 }
 
 class FriendshipItem {
@@ -312,7 +340,10 @@ class MapLovRepository {
   final Set<String> _demoReciprocalLikeIds = {mockProfiles.first.id};
   final Set<String> _demoPhotoLikedProfileIds = {};
   final Set<String> _demoReciprocalPhotoLikeIds = {mockProfiles.first.id};
+  final Set<String> _demoReportedPhotoIds = {};
   final Set<String> _demoReadConversations = {};
+  final Map<String, DateTime> _demoConversationClearedAt = {};
+  final Set<String> _demoHiddenMessageIds = {};
   final List<MapLovNotification> _demoNotifications = [
     MapLovNotification(
       id: 'demo-notification-1',
@@ -324,10 +355,7 @@ class MapLovRepository {
     ),
   ];
 
-  SupabaseClient? get _client {
-    if (!AppConfig.hasSupabaseConfiguration) return null;
-    return Supabase.instance.client;
-  }
+  SupabaseClient? get _client => SupabaseConfig.client;
 
   String? get currentUserId => _client?.auth.currentUser?.id;
   bool get isLive => _client != null && currentUserId != null;
@@ -337,6 +365,7 @@ class MapLovRepository {
     DiscoveryFilters filters = const DiscoveryFilters(),
   }) async {
     if (!isLive) {
+      if (_client != null) return const [];
       final profiles =
           mockProfiles.where((profile) {
             if (_demoBlockedIds.contains(profile.id)) return false;
@@ -371,7 +400,8 @@ class MapLovRepository {
                 as List<dynamic>;
         final result = <UserProfile>[];
         for (final raw in nearby.cast<Map<String, dynamic>>()) {
-          result.add(await _profileFromRow(raw));
+          final profile = await _profileFromRow(raw);
+          if (profile.photoUrls.isNotEmpty) result.add(profile);
         }
         final enriched = await Future.wait(result.map(_enrichCompatibility));
         return enriched
@@ -396,6 +426,7 @@ class MapLovRepository {
     final profiles = <UserProfile>[];
     for (final row in rows) {
       final profile = await _profileFromRow(row);
+      if (profile.photoUrls.isEmpty) continue;
       if (profile.age < filters.minimumAge ||
           profile.age > filters.maximumAge) {
         continue;
@@ -440,6 +471,18 @@ class MapLovRepository {
         )) {
       return false;
     }
+    if (filters.originCountries.isNotEmpty &&
+        !filters.originCountries.any(
+          (value) => value.toLowerCase() == profile.originCountry.toLowerCase(),
+        )) {
+      return false;
+    }
+    if (filters.originCities.isNotEmpty &&
+        !filters.originCities.any(
+          (value) => value.toLowerCase() == profile.originCity.toLowerCase(),
+        )) {
+      return false;
+    }
     if (filters.requiredLanguages &&
         filters.languages.isNotEmpty &&
         !filters.languages.any(profile.languages.contains)) {
@@ -460,6 +503,14 @@ class MapLovRepository {
     }
     if (filters.bodyTypes.isNotEmpty &&
         !filters.bodyTypes.contains(profile.bodyType)) {
+      return false;
+    }
+    if (filters.eyeColors.isNotEmpty &&
+        !filters.eyeColors.contains(profile.eyeColor)) {
+      return false;
+    }
+    if (filters.hairColors.isNotEmpty &&
+        !filters.hairColors.contains(profile.hairColor)) {
       return false;
     }
     if (filters.minimumHeightCm != null &&
@@ -505,6 +556,7 @@ class MapLovRepository {
 
   Future<UserProfile?> getProfile(String id) async {
     if (!isLive) {
+      if (_client != null) return null;
       return mockProfiles.where((profile) => profile.id == id).firstOrNull;
     }
     final row = await _client!
@@ -534,6 +586,7 @@ class MapLovRepository {
         .from('profile_photos')
         .select('id')
         .eq('user_id', currentUserId!)
+        .eq('moderation_status', 'visible')
         .limit(1);
     final ready =
         profile?['first_name'] != null &&
@@ -760,11 +813,6 @@ class MapLovRepository {
     );
     if (!isLive) return;
     final userId = currentUserId!;
-    final existing = await _client!
-        .from('profile_photos')
-        .select('id, storage_path, display_order, is_primary')
-        .eq('user_id', userId)
-        .order('display_order');
     final path = '$userId/${_uuid.v4()}.$extension';
     await _client!.storage
         .from('profile-media')
@@ -774,12 +822,10 @@ class MapLovRepository {
           fileOptions: const FileOptions(upsert: false),
         );
     try {
-      await _client!.from('profile_photos').insert({
-        'user_id': userId,
-        'storage_path': path,
-        'display_order': existing.length,
-        'is_primary': existing.isEmpty,
-      });
+      await _client!.rpc(
+        'register_profile_photo',
+        params: {'storage_path_value': path},
+      );
       await completeProfileIfReady();
     } catch (_) {
       await _client!.storage.from('profile-media').remove([path]);
@@ -796,6 +842,8 @@ class MapLovRepository {
               'url': entry.$2.imagePath,
               'storage_path': entry.$2.imagePath,
               'is_primary': entry.$1 == 0,
+              'display_order': entry.$1,
+              'moderation_status': 'visible',
             },
           )
           .toList();
@@ -823,10 +871,11 @@ class MapLovRepository {
     if (!isLive) return true;
     final photos = await _client!
         .from('profile_photos')
-        .select('id, is_primary')
+        .select('id, is_primary, moderation_status')
         .eq('user_id', currentUserId!)
         .order('display_order');
-    if (photos.length <= 1) return false;
+    final underReview = photo['moderation_status'] == 'under_review';
+    if (photos.length <= 1 && !underReview) return false;
     final wasPrimary = photo['is_primary'] == true;
     await _client!.from('profile_photos').delete().eq('id', photo['id']);
     await _client!.storage.from('profile-media').remove([
@@ -843,20 +892,16 @@ class MapLovRepository {
         await setPrimaryPhoto(remaining.first['id'] as String);
       }
     }
+    await completeProfileIfReady();
     return true;
   }
 
   Future<void> setPrimaryPhoto(String photoId) async {
     if (!isLive) return;
-    await _client!
-        .from('profile_photos')
-        .update({'is_primary': false})
-        .eq('user_id', currentUserId!);
-    await _client!
-        .from('profile_photos')
-        .update({'is_primary': true})
-        .eq('id', photoId)
-        .eq('user_id', currentUserId!);
+    await _client!.rpc(
+      'set_my_primary_photo',
+      params: {'photo_id_value': photoId},
+    );
   }
 
   Future<void> reorderProfilePhotos(List<Map<String, dynamic>> photos) async {
@@ -1048,6 +1093,13 @@ class MapLovRepository {
         .select('conversation_id')
         .eq('user_id', currentUserId!)
         .isFilter('left_at', null);
+    final hiddenMessageRows = await _client!
+        .from('message_deletions')
+        .select('message_id')
+        .eq('user_id', currentUserId!);
+    final hiddenMessageIds = hiddenMessageRows
+        .map((row) => row['message_id'] as String)
+        .toSet();
     final result = <ConversationItem>[];
     for (final membership in memberships) {
       final conversationId = membership['conversation_id'] as String;
@@ -1061,12 +1113,30 @@ class MapLovRepository {
       if (others.isEmpty) continue;
       final profile = await getProfile(others.first['user_id'] as String);
       if (profile == null) continue;
+      final clearRow = await _client!
+          .from('conversation_clears')
+          .select('cleared_at')
+          .eq('conversation_id', conversationId)
+          .eq('user_id', currentUserId!)
+          .maybeSingle();
+      final clearedAt = DateTime.tryParse(
+        clearRow?['cleared_at'] as String? ?? '',
+      );
       final latest = await _client!
           .from('messages')
-          .select('body, kind, created_at')
+          .select('id, body, kind, created_at')
           .eq('conversation_id', conversationId)
           .order('created_at', ascending: false)
-          .limit(1);
+          .limit(50);
+      latest.removeWhere((message) => hiddenMessageIds.contains(message['id']));
+      if (latest.length > 1) latest.removeRange(1, latest.length);
+      if (latest.isNotEmpty &&
+          clearedAt != null &&
+          !DateTime.parse(
+            latest.first['created_at'] as String,
+          ).isAfter(clearedAt)) {
+        latest.clear();
+      }
       final readRow = await _client!
           .from('conversation_reads')
           .select('last_read_at')
@@ -1080,8 +1150,14 @@ class MapLovRepository {
           .neq('sender_id', currentUserId!)
           .gt(
             'created_at',
-            readRow?['last_read_at'] as String? ?? '1970-01-01T00:00:00Z',
+            _latestTimestamp(
+              readRow?['last_read_at'] as String?,
+              clearRow?['cleared_at'] as String?,
+            ),
           );
+      unreadRows.removeWhere(
+        (message) => hiddenMessageIds.contains(message['id']),
+      );
       result.add(
         ConversationItem(
           id: conversationId,
@@ -1103,8 +1179,24 @@ class MapLovRepository {
   Stream<List<MapLovMessage>> watchMessages(String conversationId) {
     if (!isLive) {
       return Stream<List<MapLovMessage>>.multi((controller) {
-        controller.add(List.unmodifiable(_demoMessages));
-        final subscription = _demoMessageStream.stream.listen(controller.add);
+        List<MapLovMessage> visible(List<MapLovMessage> messages) {
+          final clearedAt = _demoConversationClearedAt[conversationId];
+          return List.unmodifiable(
+            messages
+                .where(
+                  (message) =>
+                      !_demoHiddenMessageIds.contains(message.id) &&
+                      (clearedAt == null ||
+                          message.createdAt.isAfter(clearedAt)),
+                )
+                .toList(),
+          );
+        }
+
+        controller.add(visible(_demoMessages));
+        final subscription = _demoMessageStream.stream.listen(
+          (messages) => controller.add(visible(messages)),
+        );
         controller.onCancel = subscription.cancel;
       });
     }
@@ -1114,6 +1206,15 @@ class MapLovRepository {
         .eq('conversation_id', conversationId)
         .order('created_at')
         .asyncMap((rows) async {
+          final clearRow = await _client!
+              .from('conversation_clears')
+              .select('cleared_at')
+              .eq('conversation_id', conversationId)
+              .eq('user_id', currentUserId!)
+              .maybeSingle();
+          final clearedAt = DateTime.tryParse(
+            clearRow?['cleared_at'] as String? ?? '',
+          );
           final otherReads = await _client!
               .from('conversation_reads')
               .select('last_read_at')
@@ -1124,19 +1225,51 @@ class MapLovRepository {
           final readAt = otherReads.isEmpty
               ? null
               : DateTime.tryParse(otherReads.first['last_read_at'] as String);
+          final hiddenRows = await _client!
+              .from('message_deletions')
+              .select('message_id')
+              .eq('user_id', currentUserId!);
+          final hiddenIds = hiddenRows
+              .map((row) => row['message_id'] as String)
+              .toSet();
           return Future.wait(
-            rows.map((row) => _messageFromRow(row, otherReadAt: readAt)),
+            rows
+                .where(
+                  (row) =>
+                      !hiddenIds.contains(row['id']) &&
+                      (clearedAt == null ||
+                          DateTime.parse(
+                            row['created_at'] as String,
+                          ).isAfter(clearedAt)),
+                )
+                .map((row) => _messageFromRow(row, otherReadAt: readAt)),
           );
         });
   }
 
-  Future<void> sendMessage(String conversationId, String body) async {
+  String _latestTimestamp(String? first, String? second) {
+    final firstDate = DateTime.tryParse(first ?? '');
+    final secondDate = DateTime.tryParse(second ?? '');
+    if (firstDate == null) return second ?? '1970-01-01T00:00:00Z';
+    if (secondDate == null) return first!;
+    return firstDate.isAfter(secondDate) ? first! : second!;
+  }
+
+  String createClientMessageId() => _uuid.v4();
+
+  Future<void> sendMessage(
+    String conversationId,
+    String body, {
+    String? clientMessageId,
+  }) async {
     final text = body.trim();
     if (text.isEmpty) return;
+    final requestId = clientMessageId ?? createClientMessageId();
     if (!isLive) {
+      if (_demoMessages.any((message) => message.id == requestId)) return;
       _demoMessages.add(
         MapLovMessage(
-          id: _uuid.v4(),
+          id: requestId,
           senderId: 'me',
           kind: 'text',
           body: text,
@@ -1146,12 +1279,17 @@ class MapLovRepository {
       _demoMessageStream.add(List.unmodifiable(_demoMessages));
       return;
     }
-    await _client!.from('messages').insert({
-      'conversation_id': conversationId,
-      'sender_id': currentUserId!,
-      'kind': 'text',
-      'body': text,
-    });
+    try {
+      await _client!.from('messages').insert({
+        'conversation_id': conversationId,
+        'sender_id': currentUserId!,
+        'kind': 'text',
+        'body': text,
+        'client_message_id': requestId,
+      });
+    } on PostgrestException catch (error) {
+      if (error.code != '23505') rethrow;
+    }
   }
 
   Future<void> sendMessageMedia({
@@ -1159,22 +1297,41 @@ class MapLovRepository {
     required Uint8List bytes,
     required String extension,
     required String kind,
+    String? fileName,
+    String? clientMessageId,
   }) async {
+    final requestId = clientMessageId ?? createClientMessageId();
     _validateMedia(
       bytes,
       extension,
-      allowed: kind == 'voice'
-          ? const {'m4a', 'aac', 'mp3', 'ogg'}
-          : const {'jpg', 'jpeg', 'png', 'webp'},
+      allowed: switch (kind) {
+        'voice' => const {'m4a', 'aac', 'mp3', 'ogg'},
+        'document' => const {
+          'pdf',
+          'doc',
+          'docx',
+          'txt',
+          'rtf',
+          'csv',
+          'xls',
+          'xlsx',
+          'ppt',
+          'pptx',
+          'zip',
+        },
+        _ => const {'jpg', 'jpeg', 'png', 'webp'},
+      },
       maxBytes: 25 * 1024 * 1024,
     );
     if (!isLive) {
+      if (_demoMessages.any((message) => message.id == requestId)) return;
       _demoMessages.add(
         MapLovMessage(
-          id: _uuid.v4(),
+          id: requestId,
           senderId: 'me',
           kind: kind,
-          body: kind == 'voice' ? 'Voice message' : 'Photo message',
+          body:
+              fileName ?? (kind == 'voice' ? 'Voice message' : 'Photo message'),
           mediaBytes: bytes,
           createdAt: DateTime.now(),
         ),
@@ -1182,14 +1339,26 @@ class MapLovRepository {
       _demoMessageStream.add(List.unmodifiable(_demoMessages));
       return;
     }
-    final path = '${currentUserId!}/$conversationId/${_uuid.v4()}.$extension';
-    await _client!.storage.from('chat-media').uploadBinary(path, bytes);
-    await _client!.from('messages').insert({
-      'conversation_id': conversationId,
-      'sender_id': currentUserId!,
-      'kind': kind,
-      'media_path': path,
-    });
+    final path = '${currentUserId!}/$conversationId/$requestId.$extension';
+    await _client!.storage
+        .from('chat-media')
+        .uploadBinary(
+          path,
+          bytes,
+          fileOptions: const FileOptions(upsert: true),
+        );
+    try {
+      await _client!.from('messages').insert({
+        'conversation_id': conversationId,
+        'sender_id': currentUserId!,
+        'kind': kind,
+        'body': fileName,
+        'media_path': path,
+        'client_message_id': requestId,
+      });
+    } on PostgrestException catch (error) {
+      if (error.code != '23505') rethrow;
+    }
   }
 
   Future<void> markConversationRead(String conversationId) async {
@@ -1204,25 +1373,55 @@ class MapLovRepository {
     });
   }
 
-  Future<void> deleteMessage(String messageId) async {
+  Future<void> deleteMessage(
+    String messageId, {
+    required bool forEveryone,
+  }) async {
     if (!isLive) {
       final index = _demoMessages.indexWhere(
         (message) => message.id == messageId,
       );
       if (index >= 0) {
-        final old = _demoMessages[index];
-        _demoMessages[index] = MapLovMessage(
-          id: old.id,
-          senderId: old.senderId,
-          kind: old.kind,
-          createdAt: old.createdAt,
-          deleted: true,
-        );
+        if (forEveryone) {
+          final old = _demoMessages[index];
+          _demoMessages[index] = MapLovMessage(
+            id: old.id,
+            senderId: old.senderId,
+            kind: old.kind,
+            createdAt: old.createdAt,
+            deleted: true,
+          );
+        } else {
+          _demoHiddenMessageIds.add(messageId);
+        }
         _demoMessageStream.add(List.unmodifiable(_demoMessages));
       }
       return;
     }
-    await _client!.rpc('delete_my_message', params: {'message_id': messageId});
+    await _client!.rpc(
+      'delete_my_message_with_scope',
+      params: {'target_message': messageId, 'delete_for_everyone': forEveryone},
+    );
+  }
+
+  Future<DateTime> clearConversation(
+    String conversationId, {
+    required bool forEveryone,
+  }) async {
+    final clearedAt = DateTime.now().toUtc();
+    if (!isLive) {
+      _demoConversationClearedAt[conversationId] = clearedAt;
+      _demoMessageStream.add(List.unmodifiable(_demoMessages));
+      return clearedAt;
+    }
+    final value = await _client!.rpc(
+      'clear_my_conversation_with_scope',
+      params: {
+        'target_conversation': conversationId,
+        'clear_for_everyone': forEveryone,
+      },
+    );
+    return DateTime.tryParse(value as String? ?? '') ?? clearedAt;
   }
 
   Future<List<MapLovPost>> posts() async {
@@ -1779,6 +1978,129 @@ class MapLovRepository {
     });
   }
 
+  /// Returns false when this account has already reported the same photo.
+  Future<bool> reportPhoto(String photoId) async {
+    if (!isLive) return _demoReportedPhotoIds.add(photoId);
+    try {
+      await report(
+        targetType: 'photo',
+        targetId: photoId,
+        reason: 'Inappropriate photo',
+        comment: 'Reported from the full-screen photo viewer.',
+      );
+      return true;
+    } on PostgrestException catch (error) {
+      if (error.code == '23505') return false;
+      rethrow;
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> moderatedPhotoQueue() async {
+    if (!isLive) return [];
+    final cases = List<Map<String, dynamic>>.from(
+      await _client!
+          .from('photo_moderation_cases')
+          .select()
+          .eq('status', 'under_review')
+          .order('opened_at'),
+    );
+    final result = <Map<String, dynamic>>[];
+    for (final moderationCase in cases) {
+      final photo = await _client!
+          .from('profile_photos')
+          .select('id, user_id, storage_path, moderation_status, hidden_at')
+          .eq('id', moderationCase['photo_id'])
+          .maybeSingle();
+      if (photo == null) continue;
+      final reports = List<Map<String, dynamic>>.from(
+        await _client!
+            .from('reports')
+            .select('id, reporter_id, reason, comment, status, created_at')
+            .eq('target_type', 'photo')
+            .eq('target_id', moderationCase['photo_id'])
+            .order('created_at'),
+      );
+      result.add({
+        ...moderationCase,
+        'photo': photo,
+        'url': await _signedUrl(
+          'profile-media',
+          photo['storage_path'] as String,
+        ),
+        'reports': reports,
+      });
+    }
+    return result;
+  }
+
+  Future<void> approveModeratedPhoto(String photoId, {String? notes}) async {
+    if (!isLive) return;
+    await _client!
+        .from('profile_photos')
+        .update({
+          'moderation_status': 'visible',
+          'hidden_at': null,
+          'moderation_notes': notes,
+        })
+        .eq('id', photoId);
+    await _client!
+        .from('photo_moderation_cases')
+        .update({
+          'status': 'approved',
+          'decided_at': DateTime.now().toUtc().toIso8601String(),
+          'decided_by': currentUserId!,
+          'decision_notes': notes,
+          'updated_at': DateTime.now().toUtc().toIso8601String(),
+        })
+        .eq('photo_id', photoId);
+    await _client!
+        .from('reports')
+        .update({
+          'status': 'dismissed',
+          'resolved_at': DateTime.now().toUtc().toIso8601String(),
+          'resolution_notes': notes ?? 'Photo approved by moderation.',
+        })
+        .eq('target_type', 'photo')
+        .eq('target_id', photoId)
+        .inFilter('status', ['open', 'under_review']);
+    await _client!.from('admin_actions').insert({
+      'admin_id': currentUserId!,
+      'action': 'photo_approved',
+      'target_type': 'photo',
+      'target_id': photoId,
+    });
+  }
+
+  Future<void> deleteModeratedPhoto(String photoId) async {
+    if (!isLive) return;
+    final photo = await _client!
+        .from('profile_photos')
+        .select('storage_path')
+        .eq('id', photoId)
+        .maybeSingle();
+    if (photo == null) return;
+    await _client!
+        .from('reports')
+        .update({
+          'status': 'resolved',
+          'resolved_at': DateTime.now().toUtc().toIso8601String(),
+          'resolution_notes': 'Photo permanently removed by moderation.',
+        })
+        .eq('target_type', 'photo')
+        .eq('target_id', photoId)
+        .inFilter('status', ['open', 'under_review']);
+    await _client!.from('profile_photos').delete().eq('id', photoId);
+    await _client!.storage.from('profile-media').remove([
+      photo['storage_path'] as String,
+    ]);
+    await _client!.from('admin_actions').insert({
+      'admin_id': currentUserId!,
+      'action': 'photo_removed',
+      'target_type': 'photo',
+      'target_id': photoId,
+    });
+  }
+
   Future<List<Map<String, dynamic>>> moderationReports() async {
     if (!isLive) return [];
     return List<Map<String, dynamic>>.from(
@@ -1967,6 +2289,18 @@ class MapLovRepository {
         .maybeSingle();
   }
 
+  Future<Map<String, dynamic>> exportMyData() async {
+    if (!isLive) {
+      return {
+        'generated_at': DateTime.now().toUtc().toIso8601String(),
+        'profile': {'id': 'demo', 'first_name': 'Demo user'},
+        'notice': 'Demo export. No server data was accessed.',
+      };
+    }
+    final value = await _client!.rpc('export_my_data');
+    return Map<String, dynamic>.from(value as Map);
+  }
+
   Future<SubscriptionInfo> subscriptionInfo() async {
     if (!isLive) return const SubscriptionInfo();
     final rows = await _client!
@@ -2085,6 +2419,15 @@ class MapLovRepository {
           .eq('id', id);
     } else if (type == 'photo') {
       await _client!.from('profile_photos').delete().eq('id', id);
+    } else if (type == 'message') {
+      await _client!
+          .from('messages')
+          .update({
+            'body': null,
+            'media_path': null,
+            'deleted_at': DateTime.now().toUtc().toIso8601String(),
+          })
+          .eq('id', id);
     }
     await _client!.from('admin_actions').insert({
       'admin_id': currentUserId!,
@@ -2096,10 +2439,20 @@ class MapLovRepository {
 
   Future<UserProfile> _profileFromRow(Map<String, dynamic> row) async {
     final id = row['id'] as String;
+    var isVip = false;
+    try {
+      isVip =
+          await _client!.rpc('is_vip_profile', params: {'target_user': id})
+              as bool? ??
+          false;
+    } on PostgrestException {
+      // Remains compatible while the additive subscription migration deploys.
+    }
     final photos = await _client!
         .from('profile_photos')
         .select('id, storage_path, is_primary')
         .eq('user_id', id)
+        .eq('moderation_status', 'visible')
         .order('is_primary', ascending: false)
         .order('display_order');
     final urls = <String>[];
@@ -2134,6 +2487,8 @@ class MapLovRepository {
       age: age,
       city: row['city'] as String? ?? '',
       country: row['country_name'] as String? ?? '',
+      originCountry: row['origin_country_name'] as String? ?? '',
+      originCity: row['origin_city'] as String? ?? '',
       compatibilityScore: 80,
       imagePath: urls.isEmpty
           ? 'assets/profile/profile_user_placeholder.png'
@@ -2153,12 +2508,15 @@ class MapLovRepository {
           false,
       bio: row['bio'] as String? ?? '',
       isVerified: row['is_verified'] as bool? ?? false,
+      isVip: isVip,
       gender: row['gender'] as String? ?? '',
       languages: List<String>.from(row['spoken_languages'] ?? const []),
       relationshipGoal: row['relationship_goal'] as String? ?? '',
       interests: List<String>.from(row['interest_slugs'] ?? const []),
       religion: row['religion'] as String? ?? '',
       bodyType: row['body_type'] as String? ?? '',
+      eyeColor: row['eye_color'] as String? ?? '',
+      hairColor: row['hair_color'] as String? ?? '',
       heightCm: row['height_cm'] as int?,
       lastActiveAt: lastActive,
     );
@@ -2175,6 +2533,8 @@ class MapLovRepository {
     age: value.age,
     city: value.city,
     country: value.country,
+    originCountry: value.originCountry,
+    originCity: value.originCity,
     compatibilityScore: compatibilityScore ?? value.compatibilityScore,
     imagePath: value.imagePath,
     photoUrls: value.photoUrls,
@@ -2186,12 +2546,15 @@ class MapLovRepository {
     isNew: value.isNew,
     bio: value.bio,
     isVerified: value.isVerified,
+    isVip: value.isVip,
     gender: value.gender,
     languages: value.languages,
     relationshipGoal: value.relationshipGoal,
     interests: value.interests,
     religion: value.religion,
     bodyType: value.bodyType,
+    eyeColor: value.eyeColor,
+    hairColor: value.hairColor,
     heightCm: value.heightCm,
     compatibilityBreakdown:
         compatibilityBreakdown ?? value.compatibilityBreakdown,

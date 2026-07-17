@@ -10,12 +10,14 @@ class EditProfileScreen extends StatefulWidget {
 class _EditProfileScreenState extends State<EditProfileScreen> {
   final name = TextEditingController(text: 'Jamie');
   final city = TextEditingController(text: 'Toronto');
+  final originCity = TextEditingController();
   final profession = TextEditingController(text: 'Product designer');
   final bio = TextEditingController();
   final birthDate = TextEditingController(text: '1997-01-01');
 
   String gender = 'Prefer not to say';
   String country = 'Canada';
+  String originCountry = 'Canada';
   String goal = 'Long-term relationship';
   String religion = 'Prefer not to say';
   String childrenPreference = 'Not sure yet';
@@ -29,6 +31,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   String incomeLevel = 'Prefer not to say';
   double height = 170;
   bool saving = false;
+  String? profilePhotoUrl;
 
   final Set<String> languages = {'English'};
   final Set<String> interests = {'Travel', 'Music', 'Hiking'};
@@ -71,14 +74,18 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     try {
       final values = await MapLovRepository.instance.myProfileDetails();
       if (values == null || !mounted) return;
+      final photos = await MapLovRepository.instance.myPhotos();
       setState(() {
         name.text = values['first_name'] as String? ?? name.text;
         city.text = values['city'] as String? ?? city.text;
+        originCity.text = values['origin_city'] as String? ?? originCity.text;
         profession.text = values['profession'] as String? ?? profession.text;
         bio.text = values['bio'] as String? ?? bio.text;
         birthDate.text = values['date_of_birth'] as String? ?? birthDate.text;
         gender = values['gender'] as String? ?? gender;
         country = values['country_name'] as String? ?? country;
+        originCountry =
+            values['origin_country_name'] as String? ?? originCountry;
         goal = values['relationship_goal'] as String? ?? goal;
         religion = values['religion'] as String? ?? religion;
         childrenPreference =
@@ -93,6 +100,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         educationLevel = values['education_level'] as String? ?? educationLevel;
         incomeLevel = values['income_level'] as String? ?? incomeLevel;
         height = (values['height_cm'] as num?)?.toDouble() ?? height;
+        profilePhotoUrl =
+            photos
+                    .where((photo) => photo['is_primary'] == true)
+                    .firstOrNull?['url']
+                as String? ??
+            photos.firstOrNull?['url'] as String?;
 
         final storedLanguages = values['spoken_languages'] as List<dynamic>?;
         if (storedLanguages != null && storedLanguages.isNotEmpty) {
@@ -116,6 +129,31 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     }
   }
 
+  Future<void> _managePhotos() async {
+    await Navigator.pushNamed(context, AppRoutes.managePhotos);
+    if (!mounted) return;
+    try {
+      final photos = await MapLovRepository.instance.myPhotos();
+      if (!mounted) return;
+      setState(() {
+        profilePhotoUrl =
+            photos
+                    .where((photo) => photo['is_primary'] == true)
+                    .firstOrNull?['url']
+                as String? ??
+            photos.firstOrNull?['url'] as String?;
+      });
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Unable to refresh the profile photo: $error'),
+          ),
+        );
+      }
+    }
+  }
+
   String _displayFromSlug(String value) => value
       .split('-')
       .map(
@@ -129,6 +167,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   void dispose() {
     name.dispose();
     city.dispose();
+    originCity.dispose();
     profession.dispose();
     bio.dispose();
     birthDate.dispose();
@@ -170,6 +209,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         'gender': gender,
         'city': city.text.trim(),
         'country_name': country,
+        'residence_city': city.text.trim(),
+        'residence_country_name': country,
+        'origin_city': originCity.text.trim(),
+        'origin_country_name': originCountry,
         'country_code': country == 'Canada' ? 'CA' : null,
         'profession': profession.text.trim(),
         'education_level': educationLevel,
@@ -236,18 +279,28 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     padding: const EdgeInsets.all(20),
     children: [
       Center(
-        child: CircleAvatar(
-          radius: 62,
-          backgroundImage: const AssetImage(
-            'assets/profile/profile_user_placeholder.png',
-          ),
-          child: Align(
-            alignment: Alignment.bottomRight,
-            child: IconButton.filled(
-              onPressed: () =>
-                  Navigator.pushNamed(context, AppRoutes.managePhotos),
-              icon: const Icon(Icons.camera_alt_outlined),
-            ),
+        child: SizedBox(
+          width: 124,
+          height: 124,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              ClipOval(
+                child: profilePhotoUrl == null
+                    ? Image.asset(
+                        'assets/profile/profile_user_placeholder.png',
+                        fit: BoxFit.cover,
+                      )
+                    : mediaImage(profilePhotoUrl!, fit: BoxFit.cover),
+              ),
+              Align(
+                alignment: Alignment.bottomRight,
+                child: IconButton.filled(
+                  onPressed: _managePhotos,
+                  icon: const Icon(Icons.camera_alt_outlined),
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -255,6 +308,16 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       _textField(name, 'First name', Icons.person_outline),
       const SizedBox(height: 12),
       _textField(city, 'City', Icons.location_city_outlined),
+      const SizedBox(height: 12),
+      _dropdown('Country of residence', country, _worldCountries, (value) {
+        country = value;
+      }),
+      const _SectionTitle('Origin'),
+      _dropdown('Country of origin', originCountry, _worldCountries, (value) {
+        originCountry = value;
+      }),
+      const SizedBox(height: 12),
+      _textField(originCity, 'City of origin', Icons.travel_explore_outlined),
       const SizedBox(height: 12),
       _textField(profession, 'Profession', Icons.work_outline),
       const SizedBox(height: 12),
@@ -298,14 +361,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           prefixIcon: Icon(Icons.calendar_month_outlined),
         ),
       ),
-      const SizedBox(height: 12),
-      _dropdown('Country', country, const [
-        'Canada',
-        'United States',
-        'France',
-        'United Kingdom',
-        'Other',
-      ], (value) => country = value),
       const SizedBox(height: 12),
       _dropdown(
         'Relationship goal',

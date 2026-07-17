@@ -11,7 +11,7 @@ class _PrivacyScreenState extends State<PrivacyScreen> {
   bool discoverable = true;
   bool approximateDistance = true;
   bool onlineStatus = false;
-  bool premium = false;
+  bool vip = false;
 
   @override
   void initState() {
@@ -28,7 +28,7 @@ class _PrivacyScreenState extends State<PrivacyScreen> {
       approximateDistance =
           profile?['show_approximate_distance'] as bool? ?? true;
       onlineStatus = profile?['show_online_status'] as bool? ?? false;
-      premium = subscription.isPremium;
+      vip = subscription.isVip;
     });
   }
 
@@ -43,10 +43,10 @@ class _PrivacyScreenState extends State<PrivacyScreen> {
       SwitchListTile(
         value: discoverable,
         onChanged: (value) {
-          if (!value && !premium) {
+          if (!value && !vip) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
-                content: Text('Invisible mode requires Premium Plus.'),
+                content: Text('Invisible navigation requires Premium VIP.'),
               ),
             );
             Navigator.pushNamed(context, AppRoutes.premium);
@@ -56,7 +56,9 @@ class _PrivacyScreenState extends State<PrivacyScreen> {
           unawaited(_save('is_discoverable', value));
         },
         title: const Text('Show my profile in Discover'),
-        subtitle: const Text('Allow eligible users to find your profile.'),
+        subtitle: const Text(
+          'VIP members can stay out of Discover. People can see your profile after you like them or send them a message.',
+        ),
       ),
       SwitchListTile(
         value: approximateDistance,

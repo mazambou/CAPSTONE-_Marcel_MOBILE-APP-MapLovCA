@@ -6,7 +6,7 @@ class BlockUserScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final selected = profile ?? mockProfiles.first;
+    final selected = profile ?? demoProfileOrUnavailable;
     return _AppPage(
       title: 'Block user',
       children: [

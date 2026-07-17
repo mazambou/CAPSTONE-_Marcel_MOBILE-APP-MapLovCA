@@ -1,9 +1,11 @@
 import 'dart:async';
-import 'dart:typed_data';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/material.dart' as material show Text, TextDirection;
+import 'package:flutter/services.dart';
 import 'package:audioplayers/audioplayers.dart';
+import 'package:file_selector/file_selector.dart' show XTypeGroup, openFile;
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
@@ -11,6 +13,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
 
 import 'data/mock_data.dart';
+import 'config/app_config.dart';
 import 'models/user_profile.dart';
 import 'routes/app_routes.dart';
 import 'services/auth_service.dart';
@@ -198,7 +201,11 @@ class MapLoveApp extends StatefulWidget {
 }
 
 class _MapLoveAppState extends State<MapLoveApp> {
-  final _navigatorKey = GlobalKey<NavigatorState>();
+  // Keeping a NavigatorObserver avoids reparenting a GlobalKey-owned
+  // Navigator when the MaterialApp rebuilds after a locale change. Flutter
+  // otherwise can leave inherited-widget dependents attached during route
+  // replacement (the `_dependents.isEmpty` assertion).
+  final _navigatorObserver = NavigatorObserver();
   StreamSubscription<MapLovAuthEvent>? _authSubscription;
 
   @override
@@ -208,7 +215,7 @@ class _MapLoveAppState extends State<MapLoveApp> {
     unawaited(PurchaseService.instance.initialize());
     _authSubscription = AuthService.instance.events.listen((event) {
       if (event == MapLovAuthEvent.passwordRecovery) {
-        _navigatorKey.currentState?.pushNamed(AppRoutes.resetPassword);
+        _navigatorObserver.navigator?.pushNamed(AppRoutes.resetPassword);
       }
     });
   }
@@ -224,7 +231,7 @@ class _MapLoveAppState extends State<MapLoveApp> {
     return AnimatedBuilder(
       animation: LocaleService.instance,
       builder: (context, _) => MaterialApp(
-        navigatorKey: _navigatorKey,
+        navigatorObservers: [_navigatorObserver],
         debugShowCheckedModeBanner: false,
         title: 'MapLov',
         locale: LocaleService.instance.locale,
@@ -250,6 +257,13 @@ class _MapLoveAppState extends State<MapLoveApp> {
               borderRadius: BorderRadius.circular(16),
               borderSide: BorderSide.none,
             ),
+          ),
+          materialTapTargetSize: MaterialTapTargetSize.padded,
+          filledButtonTheme: FilledButtonThemeData(
+            style: FilledButton.styleFrom(minimumSize: const Size(48, 48)),
+          ),
+          outlinedButtonTheme: OutlinedButtonThemeData(
+            style: OutlinedButton.styleFrom(minimumSize: const Size(48, 48)),
           ),
         ),
         initialRoute: AppRoutes.splash,
@@ -305,3 +319,38 @@ Widget mediaImage(
         width: width,
         height: height,
       );
+
+Future<XFile?> pickImageForUpload(
+  BuildContext context, {
+  int imageQuality = 88,
+  double? maxWidth = 2048,
+}) async {
+  final source = await showModalBottomSheet<ImageSource>(
+    context: context,
+    showDragHandle: true,
+    builder: (context) => SafeArea(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ListTile(
+            leading: const Icon(Icons.photo_camera_outlined),
+            title: const Text('Take a photo'),
+            onTap: () => Navigator.pop(context, ImageSource.camera),
+          ),
+          ListTile(
+            leading: const Icon(Icons.photo_library_outlined),
+            title: const Text('Choose from gallery'),
+            onTap: () => Navigator.pop(context, ImageSource.gallery),
+          ),
+        ],
+      ),
+    ),
+  );
+  if (source == null) return null;
+  return ImagePicker().pickImage(
+    source: source,
+    imageQuality: imageQuality,
+    maxWidth: maxWidth,
+    maxHeight: maxWidth,
+  );
+}

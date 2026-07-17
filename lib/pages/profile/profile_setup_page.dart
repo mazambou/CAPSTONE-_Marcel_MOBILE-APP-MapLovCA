@@ -8,19 +8,84 @@ class ProfileSetupScreen extends StatefulWidget {
 
 class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   final bio = TextEditingController();
+  final residenceCityOther = TextEditingController();
+  final originCityOther = TextEditingController();
   String gender = 'Prefer not to say';
+  String residenceCountry = 'Canada';
+  String residenceCity = 'Toronto';
+  String originCountry = 'Canada';
+  String originCity = 'Toronto';
   bool saving = false;
+  bool loadingProfile = true;
   late Future<List<Map<String, dynamic>>> photos;
 
   @override
   void initState() {
     super.initState();
     photos = MapLovRepository.instance.myPhotos();
+    unawaited(_loadGeography());
   }
+
+  Future<void> _loadGeography() async {
+    try {
+      final profile = await MapLovRepository.instance.myProfileDetails();
+      if (profile == null || !mounted) return;
+      final savedResidenceCountry =
+          profile['residence_country_name'] as String? ??
+          profile['country_name'] as String? ??
+          'Canada';
+      final savedResidenceCity =
+          profile['residence_city'] as String? ??
+          profile['city'] as String? ??
+          'Toronto';
+      setState(() {
+        residenceCountry = _worldCountries.contains(savedResidenceCountry)
+            ? savedResidenceCountry
+            : 'Canada';
+        residenceCity = _citySelection(
+          residenceCountry,
+          savedResidenceCity,
+          residenceCityOther,
+        );
+        final savedOriginCountry = profile['origin_country_name'] as String?;
+        if (savedOriginCountry != null &&
+            _worldCountries.contains(savedOriginCountry)) {
+          originCountry = savedOriginCountry;
+        }
+        final savedOriginCity = profile['origin_city'] as String?;
+        if (savedOriginCity != null) {
+          originCity = _citySelection(
+            originCountry,
+            savedOriginCity,
+            originCityOther,
+          );
+        }
+      });
+    } finally {
+      if (mounted) setState(() => loadingProfile = false);
+    }
+  }
+
+  String _citySelection(
+    String country,
+    String city,
+    TextEditingController other,
+  ) {
+    if ((_registrationCitiesByCountry[country] ?? const []).contains(city)) {
+      return city;
+    }
+    other.text = city;
+    return 'Other city';
+  }
+
+  String _cityValue(String selection, TextEditingController other) =>
+      selection == 'Other city' ? other.text.trim() : selection;
 
   @override
   void dispose() {
     bio.dispose();
+    residenceCityOther.dispose();
+    originCityOther.dispose();
     super.dispose();
   }
 
@@ -38,6 +103,12 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
         'gender': gender,
         'bio': bio.text.trim(),
         'spoken_languages': const ['English'],
+        'country_name': residenceCountry,
+        'city': _cityValue(residenceCity, residenceCityOther),
+        'residence_country_name': residenceCountry,
+        'residence_city': _cityValue(residenceCity, residenceCityOther),
+        'origin_country_name': originCountry,
+        'origin_city': _cityValue(originCity, originCityOther),
       });
       await MapLovRepository.instance.completeProfileIfReady();
       if (mounted) Navigator.pushNamed(context, AppRoutes.preferences);
@@ -99,8 +170,39 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       ),
       const _SectionTitle('About you'),
       const Text(
-        'Your name, birth date and location are already saved. You can add photos now or after registration.',
+        'Your name and birth date are already saved. Confirm your current residence, then tell MapLov where you are originally from.',
         style: TextStyle(color: AppColors.grayText),
+      ),
+      const SizedBox(height: 12),
+      const _SectionTitle('Current residence'),
+      _geographyFields(
+        country: residenceCountry,
+        city: residenceCity,
+        otherController: residenceCityOther,
+        countryLabel: 'Current country of residence',
+        cityLabel: 'Current city of residence',
+        onCountryChanged: (value) => setState(() {
+          residenceCountry = value;
+          residenceCity =
+              _registrationCitiesByCountry[value]?.first ?? 'Other city';
+          residenceCityOther.clear();
+        }),
+        onCityChanged: (value) => setState(() => residenceCity = value),
+      ),
+      const _SectionTitle('Your origin'),
+      _geographyFields(
+        country: originCountry,
+        city: originCity,
+        otherController: originCityOther,
+        countryLabel: 'Country of origin',
+        cityLabel: 'City of origin',
+        onCountryChanged: (value) => setState(() {
+          originCountry = value;
+          originCity =
+              _registrationCitiesByCountry[value]?.first ?? 'Other city';
+          originCityOther.clear();
+        }),
+        onCityChanged: (value) => setState(() => originCity = value),
       ),
       const SizedBox(height: 12),
       DropdownButtonFormField<String>(
@@ -124,10 +226,83 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       KeyedSubtree(
         key: const Key('profile_setup_continue'),
         child: _PrimaryButton(
-          saving ? 'Saving…' : 'Continue to preferences',
-          onPressed: saving ? () {} : _continue,
+          loadingProfile
+              ? 'Loading…'
+              : saving
+              ? 'Saving…'
+              : 'Continue to preferences',
+          onPressed: saving || loadingProfile ? () {} : _continue,
         ),
       ),
     ],
   );
+
+  Widget _geographyFields({
+    required String country,
+    required String city,
+    required TextEditingController otherController,
+    required String countryLabel,
+    required String cityLabel,
+    required ValueChanged<String> onCountryChanged,
+    required ValueChanged<String> onCityChanged,
+  }) {
+    final cities = [...?_registrationCitiesByCountry[country], 'Other city'];
+    return Column(
+      children: [
+        DropdownButtonFormField<String>(
+          key: ValueKey('${countryLabel}_$country'),
+          initialValue: country,
+          isExpanded: true,
+          menuMaxHeight: 360,
+          decoration: InputDecoration(
+            labelText: countryLabel,
+            prefixIcon: const Icon(Icons.public),
+          ),
+          items: _worldCountries
+              .map(
+                (value) => DropdownMenuItem(
+                  value: value,
+                  child: Text(value, overflow: TextOverflow.ellipsis),
+                ),
+              )
+              .toList(),
+          onChanged: saving
+              ? null
+              : (value) {
+                  if (value != null) onCountryChanged(value);
+                },
+        ),
+        const SizedBox(height: 12),
+        DropdownButtonFormField<String>(
+          key: ValueKey('${cityLabel}_${country}_$city'),
+          initialValue: cities.contains(city) ? city : 'Other city',
+          isExpanded: true,
+          decoration: InputDecoration(
+            labelText: cityLabel,
+            prefixIcon: const Icon(Icons.location_city_outlined),
+          ),
+          items: cities
+              .map(
+                (value) => DropdownMenuItem(value: value, child: Text(value)),
+              )
+              .toList(),
+          onChanged: saving
+              ? null
+              : (value) {
+                  if (value != null) onCityChanged(value);
+                },
+        ),
+        if (city == 'Other city') ...[
+          const SizedBox(height: 12),
+          TextField(
+            controller: otherController,
+            decoration: InputDecoration(
+              labelText: '$cityLabel name',
+              prefixIcon: const Icon(Icons.edit_location_alt_outlined),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
 }

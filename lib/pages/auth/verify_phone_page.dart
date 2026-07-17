@@ -221,25 +221,27 @@ class _VerifyPhoneScreenState extends State<VerifyPhoneScreen> {
           icon: const Icon(Icons.arrow_back),
           label: const Text('Back to dating preferences'),
         ),
-        const SizedBox(height: 12),
-        const Divider(),
-        const SizedBox(height: 8),
-        const Text(
-          'Temporary testing option: the phone will remain unverified.',
-          textAlign: TextAlign.center,
-          style: TextStyle(color: AppColors.grayText, fontSize: 12),
-        ),
-        TextButton(
-          key: const Key('defer_phone_verification'),
-          onPressed: _sending || _verifying || _deferring
-              ? null
-              : _continueForTesting,
-          child: Text(
-            _deferring
-                ? 'Continuing…'
-                : 'Continue without verification (testing)',
+        if (AppConfig.allowTestingBypass) ...[
+          const SizedBox(height: 12),
+          const Divider(),
+          const SizedBox(height: 8),
+          const Text(
+            'Temporary testing option: the phone will remain unverified.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: AppColors.grayText, fontSize: 12),
           ),
-        ),
+          TextButton(
+            key: const Key('defer_phone_verification'),
+            onPressed: _sending || _verifying || _deferring
+                ? null
+                : _continueForTesting,
+            child: Text(
+              _deferring
+                  ? 'Continuing…'
+                  : 'Continue without verification (testing)',
+            ),
+          ),
+        ],
       ],
     );
   }

@@ -1,5 +1,25 @@
 part of '../../app.dart';
 
+class RegistrationGateData {
+  const RegistrationGateData({
+    required this.dateOfBirth,
+    required this.acceptedDocuments,
+    required this.acceptedAt,
+  });
+
+  final DateTime dateOfBirth;
+  final Map<String, String> acceptedDocuments;
+  final DateTime acceptedAt;
+}
+
+const _legalDocumentVersions = <String, String>{
+  'terms_of_use': '2026-07-16',
+  'privacy_policy': '2026-07-16',
+  'community_guidelines': '2026-07-16',
+  'adult_eligibility': '2026-07-16',
+  'content_and_safety_rules': '2026-07-16',
+};
+
 class AgeGateScreen extends StatefulWidget {
   const AgeGateScreen({super.key});
 
@@ -8,8 +28,54 @@ class AgeGateScreen extends StatefulWidget {
 }
 
 class _AgeGateScreenState extends State<AgeGateScreen> {
-  bool confirmed = false;
+  final Set<String> acceptedDocuments = {};
   DateTime? dateOfBirth;
+
+  bool get _allAccepted =>
+      acceptedDocuments.length == _legalDocumentVersions.length;
+
+  void _openLegalDocument(String key) {
+    final (title, sections) = switch (key) {
+      'terms_of_use' => ('Terms of Use', _termsSections),
+      'privacy_policy' => ('Privacy Policy', _privacySections),
+      'community_guidelines' => ('Community Guidelines', _communitySections),
+      'adult_eligibility' => ('Adult eligibility', _childSafetySections),
+      _ => ('Content, reporting and safety rules', _communitySections),
+    };
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => _LegalDocumentScreen(title: title, sections: sections),
+      ),
+    );
+  }
+
+  Widget _acceptanceTile(String key, String prefix, String linkLabel) {
+    final checked = acceptedDocuments.contains(key);
+    return CheckboxListTile(
+      value: checked,
+      onChanged: (value) => setState(() {
+        if (value ?? false) {
+          acceptedDocuments.add(key);
+        } else {
+          acceptedDocuments.remove(key);
+        }
+      }),
+      activeColor: AppColors.coral,
+      contentPadding: EdgeInsets.zero,
+      controlAffinity: ListTileControlAffinity.leading,
+      title: Wrap(
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          Text(prefix),
+          TextButton(
+            onPressed: () => _openLegalDocument(key),
+            child: Text(linkLabel),
+          ),
+        ],
+      ),
+    );
+  }
 
   Future<void> _selectDateOfBirth() async {
     final now = DateTime.now();
@@ -65,22 +131,51 @@ class _AgeGateScreenState extends State<AgeGateScreen> {
           trailing: const Icon(Icons.chevron_right),
         ),
       ),
-      CheckboxListTile(
-        value: confirmed,
-        onChanged: (value) => setState(() => confirmed = value ?? false),
-        activeColor: AppColors.coral,
-        contentPadding: EdgeInsets.zero,
-        title: const Text('I confirm that I am 18 years of age or older.'),
+      const _SectionTitle('Agreements and MapLov rules'),
+      _acceptanceTile(
+        'terms_of_use',
+        'I have read and accept the ',
+        'Terms of Use',
+      ),
+      _acceptanceTile(
+        'privacy_policy',
+        'I have read and accept the ',
+        'Privacy Policy',
+      ),
+      _acceptanceTile(
+        'community_guidelines',
+        'I have read and accept the ',
+        'Community Guidelines',
+      ),
+      _acceptanceTile(
+        'adult_eligibility',
+        'I confirm that I am at least 18 and accept the ',
+        'adult eligibility rules',
+      ),
+      _acceptanceTile(
+        'content_and_safety_rules',
+        'I accept the ',
+        'content, photo, reporting and safety rules',
       ),
       const SizedBox(height: 16),
       SizedBox(
         width: double.infinity,
         child: FilledButton(
-          onPressed: confirmed && dateOfBirth != null
+          onPressed: _allAccepted && dateOfBirth != null
               ? () => Navigator.pushReplacementNamed(
                   context,
                   AppRoutes.register,
-                  arguments: dateOfBirth,
+                  arguments: RegistrationGateData(
+                    dateOfBirth: dateOfBirth!,
+                    acceptedDocuments: Map.unmodifiable(
+                      acceptedDocuments.fold(
+                        <String, String>{},
+                        (result, key) =>
+                            result..[key] = _legalDocumentVersions[key]!,
+                      ),
+                    ),
+                    acceptedAt: DateTime.now().toUtc(),
+                  ),
                 )
               : null,
           child: const Text('Continue'),

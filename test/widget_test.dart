@@ -3,8 +3,18 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:maplove/app.dart';
+import 'package:maplove/config/supabase_config.dart';
 
 void main() {
+  SupabaseConfig.forceUiOnlyForTesting = true;
+
+  test('legacy Elite and current VIP tiers share the public VIP identity', () {
+    expect(const SubscriptionInfo(tier: 'elite').isVip, isTrue);
+    expect(const SubscriptionInfo(tier: 'elite').displayName, 'VIP');
+    expect(const SubscriptionInfo(tier: 'vip').isVip, isTrue);
+    expect(const SubscriptionInfo(tier: 'plus').isVip, isFalse);
+  });
+
   testWidgets('shows splash then navigates to onboarding', (
     WidgetTester tester,
   ) async {
@@ -79,6 +89,25 @@ void main() {
     await tester.tap(find.byKey(const Key('select_birth_year')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('birth_year_list')), findsOneWidget);
+  });
+
+  testWidgets('age gate requires every versioned legal acceptance', (
+    tester,
+  ) async {
+    await tester.pumpWidget(const MaterialApp(home: AgeGateScreen()));
+    await tester.scrollUntilVisible(find.text('Continue'), 300);
+    final continueButton = find.widgetWithText(FilledButton, 'Continue');
+    expect(tester.widget<FilledButton>(continueButton).onPressed, isNull);
+    expect(find.text('Terms of Use', skipOffstage: false), findsOneWidget);
+    expect(find.text('Privacy Policy', skipOffstage: false), findsOneWidget);
+    expect(
+      find.text('Community Guidelines', skipOffstage: false),
+      findsOneWidget,
+    );
+    expect(
+      find.byType(CheckboxListTile, skipOffstage: false),
+      findsNWidgets(5),
+    );
   });
 
   testWidgets('registration passwords can be shown and hidden', (tester) async {
@@ -184,7 +213,7 @@ void main() {
     expect(find.text('Enter the 6-digit code sent by SMS.'), findsOneWidget);
   });
 
-  testWidgets('profile setup does not ask registration details twice', (
+  testWidgets('profile setup reuses residence and asks for origin', (
     tester,
   ) async {
     await tester.pumpWidget(const MaterialApp(home: ProfileSetupScreen()));
@@ -192,9 +221,13 @@ void main() {
 
     expect(find.text('First name'), findsNothing);
     expect(find.text('Date of birth'), findsNothing);
-    expect(find.text('City'), findsNothing);
-    expect(find.text('Country'), findsNothing);
-    expect(find.text('Gender'), findsOneWidget);
+    expect(find.text('Current residence', skipOffstage: false), findsOneWidget);
+    expect(find.text('Your origin', skipOffstage: false), findsOneWidget);
+    expect(
+      find.text('Current country of residence', skipOffstage: false),
+      findsOneWidget,
+    );
+    expect(find.text('Country of origin', skipOffstage: false), findsOneWidget);
   });
 
   testWidgets('profile setup can continue without uploading a photo', (
@@ -303,6 +336,13 @@ void main() {
 
     await tester.pumpWidget(const MaterialApp(home: FilterScreen()));
     expect(find.text('Search radius'), findsOneWidget);
+    expect(
+      find.byKey(
+        const ValueKey<String>('origin_country_Any country'),
+        skipOffstage: false,
+      ),
+      findsOneWidget,
+    );
 
     await tester.tap(find.byKey(const Key('location_mode_My country')));
     await tester.pumpAndSettle();
@@ -372,9 +412,73 @@ void main() {
       of: find.byKey(const Key('advanced_filter_tab')),
       matching: find.byType(ListView),
     );
+    await tester.drag(advancedList, const Offset(0, -1800));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('eye_color_blue')));
+    await tester.pumpAndSettle();
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('eye_color_blue')),
+        matching: find.byIcon(Icons.check),
+      ),
+      findsOneWidget,
+    );
+    await tester.tap(find.byKey(const Key('hair_color_brown')));
+    await tester.pumpAndSettle();
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('hair_color_brown')),
+        matching: find.byIcon(Icons.check),
+      ),
+      findsOneWidget,
+    );
     await tester.drag(advancedList, const Offset(0, -8000));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('advanced_show_results')), findsOneWidget);
+  });
+
+  testWidgets('Show Results applies filters and returns to discovery', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (context) => Scaffold(
+            body: FilledButton(
+              key: const Key('open_filters_for_result'),
+              onPressed: () => Navigator.push<DiscoveryFilters>(
+                context,
+                MaterialPageRoute(builder: (_) => const FilterScreen()),
+              ),
+              child: const Icon(Icons.tune),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.byKey(const Key('open_filters_for_result')));
+    await tester.pumpAndSettle();
+    final quickList = find.descendant(
+      of: find.byKey(const Key('quick_filter_tab')),
+      matching: find.byType(ListView),
+    );
+    await tester.dragUntilVisible(
+      find.byKey(const Key('quick_show_results')),
+      quickList,
+      const Offset(0, -300),
+    );
+    await tester.tap(find.byKey(const Key('quick_show_results')));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(FilterScreen), findsNothing);
+    expect(find.byKey(const Key('open_filters_for_result')), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets(
@@ -417,25 +521,296 @@ void main() {
     },
   );
 
-  testWidgets('premium comparison renders all plans on a wide viewport', (
+  testWidgets('chat reference layout keeps text messaging functional', (
     tester,
   ) async {
-    tester.view.physicalSize = const Size(1024, 1536);
+    tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
 
-    await tester.pumpWidget(const MaterialApp(home: PremiumScreen()));
+    await tester.pumpWidget(const MaterialApp(home: ChatScreen()));
     await tester.pumpAndSettle();
 
-    expect(find.text('Upgrade to Premium'), findsOneWidget);
-    expect(find.text('FREE'), findsOneWidget);
-    expect(find.text('PREMIUM\nPLUS'), findsOneWidget);
-    expect(find.text('PREMIUM\nELITE'), findsOneWidget);
-    expect(find.text('PREMIUM\nVIP'), findsOneWidget);
-    expect(find.text('MOST POPULAR'), findsOneWidget);
-    expect(find.text('NEW'), findsOneWidget);
+    expect(find.text('Today'), findsOneWidget);
+    expect(find.text('Compatibility'), findsNothing);
+    expect(find.byKey(const Key('chat_match_badge')), findsOneWidget);
+    expect(find.byIcon(Icons.phone_outlined), findsOneWidget);
+    expect(find.byIcon(Icons.videocam_outlined), findsOneWidget);
+    expect(
+      tester
+          .widget<ListView>(find.byKey(const Key('chat_message_list')))
+          .reverse,
+      isFalse,
+    );
+
+    await tester.enterText(
+      find.byKey(const Key('chat_message_field')),
+      'Reference chat test',
+    );
+    await tester.pump();
+    expect(find.byIcon(Icons.send), findsOneWidget);
+    expect(find.byKey(const Key('chat_voice_action')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('chat_primary_action')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Reference chat test'), findsOneWidget);
+    await tester.tap(find.text('Reference chat test'));
+    await tester.pumpAndSettle();
+    expect(find.text('Delete message?'), findsOneWidget);
+    await tester.tap(find.widgetWithText(TextButton, 'Delete for me'));
+    await tester.pumpAndSettle();
+    expect(find.text('Reference chat test'), findsNothing);
+
+    await tester.enterText(
+      find.byKey(const Key('chat_message_field')),
+      'Clearable message',
+    );
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('chat_primary_action')));
+    await tester.pumpAndSettle();
+    expect(find.text('Clearable message'), findsOneWidget);
+
+    await tester.tap(find.byIcon(Icons.more_vert));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Clear chat').last);
+    await tester.pumpAndSettle();
+    expect(find.text('Clear chat?'), findsOneWidget);
+    expect(
+      tester
+          .widget<FilledButton>(
+            find.widgetWithText(FilledButton, 'Clear for everyone'),
+          )
+          .onPressed,
+      isNull,
+    );
+    await tester.tap(find.widgetWithText(TextButton, 'Clear for me'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Clearable message'), findsNothing);
+    expect(find.text('Chat cleared.'), findsOneWidget);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('chat profile header opens the matching public profile', (
+    tester,
+  ) async {
+    const profile = UserProfile(
+      id: 'chat-profile-link-test',
+      name: 'Avery',
+      age: 31,
+      city: 'Ottawa',
+      compatibilityScore: 87,
+      imagePath: 'assets/avatars/story_02.png',
+      photoDisplayStyle: PhotoDisplayStyle.profileDetails,
+    );
+    await tester.pumpWidget(
+      const MaterialApp(home: ChatScreen(profile: profile)),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('87% Match'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('chat_profile_link')));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(PublicProfileScreen), findsOneWidget);
+    expect(find.text('Avery, 31'), findsWidgets);
+  });
+
+  testWidgets('emoji panel inserts at cursor and send ignores rapid taps', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(const MaterialApp(home: ChatScreen()));
+    await tester.pumpAndSettle();
+
+    final sendButton = tester.widget<IconButton>(
+      find.byKey(const Key('chat_primary_action')),
+    );
+    expect(sendButton.onPressed, isNull);
+
+    await tester.enterText(
+      find.byKey(const Key('chat_message_field')),
+      'Hello world',
+    );
+    final field = tester.widget<TextField>(
+      find.byKey(const Key('chat_message_field')),
+    );
+    field.controller!.selection = const TextSelection.collapsed(offset: 5);
+    await tester.tap(find.byKey(const Key('chat_emoji_action')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('chat_emoji_panel')), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('chat_emoji_Love_0')));
+    await tester.pump();
+    expect(field.controller!.text, 'Hello❤️ world');
+
+    await tester.tap(find.byKey(const Key('chat_primary_action')));
+    await tester.tap(find.byKey(const Key('chat_primary_action')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Hello❤️ world'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('chat attachment menu keeps photos and adds documents', (
+    tester,
+  ) async {
+    await tester.pumpWidget(const MaterialApp(home: ChatScreen()));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byIcon(Icons.attach_file));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Choose a photo'), findsOneWidget);
+    expect(find.text('Choose a document'), findsOneWidget);
+  });
+
+  testWidgets('detailed photo viewer toggles an uncluttered focus mode', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: PhotoViewerScreen(
+          profile: UserProfile(
+            id: 'focus-photo-test',
+            name: 'Morgan',
+            age: 29,
+            city: 'Toronto',
+            compatibilityScore: 75,
+            imagePath: 'assets/avatars/story_02.png',
+            photoDisplayStyle: PhotoDisplayStyle.profileDetails,
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('About me'), findsOneWidget);
+    await tester.tapAt(const Offset(195, 360));
+    await tester.pump();
+    expect(find.text('About me'), findsNothing);
+    expect(find.byIcon(Icons.chevron_left), findsOneWidget);
+    expect(find.byIcon(Icons.favorite_border), findsOneWidget);
+    expect(find.byIcon(Icons.chat_bubble_outline), findsOneWidget);
+    expect(find.byKey(const Key('super_like_love_icon')), findsOneWidget);
+    expect(find.byKey(const Key('report_current_photo')), findsOneWidget);
+
+    await tester.tapAt(const Offset(195, 360));
+    await tester.pump();
+    expect(find.text('About me'), findsOneWidget);
+  });
+
+  testWidgets('profile exposes the two photo display choices', (tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        routes: {
+          '/settings/photo-display': (_) => const PhotoDisplaySettingsScreen(),
+        },
+        home: const ProfileScreen(),
+      ),
+    );
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('profile_photo_display_button')),
+      300,
+    );
+    await tester.tap(find.byKey(const Key('profile_photo_display_button')));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const Key('photo_display_profile_details')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('photo_display_social')), findsOneWidget);
+  });
+
+  testWidgets('a profile photo can only be reported once per account', (
+    tester,
+  ) async {
+    const profile = UserProfile(
+      id: 'photo-report-profile',
+      name: 'Taylor',
+      age: 30,
+      city: 'Montréal',
+      compatibilityScore: 88,
+      imagePath: 'assets/avatars/story_02.png',
+      photoUrls: ['assets/avatars/story_02.png'],
+      photoIds: ['photo-report-once'],
+      photoDisplayStyle: PhotoDisplayStyle.profileDetails,
+    );
+    await tester.pumpWidget(
+      const MaterialApp(home: PhotoViewerScreen(profile: profile)),
+    );
+    await tester.pumpAndSettle();
+
+    Future<void> reportPhoto() async {
+      await tester.tap(find.byKey(const Key('report_current_photo')));
+      await tester.pumpAndSettle();
+      expect(find.text('Report this photo?'), findsOneWidget);
+      await tester.tap(find.widgetWithText(FilledButton, 'Report'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 350));
+    }
+
+    await reportPhoto();
+    expect(find.text('Photo reported for review.'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 5));
+    await tester.pumpAndSettle();
+    await reportPhoto();
+    expect(find.text('You have already reported this photo.'), findsOneWidget);
+  });
+
+  testWidgets(
+    'premium comparison renders Free, Plus and the consolidated VIP',
+    (tester) async {
+      tester.view.physicalSize = const Size(1024, 1536);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(const MaterialApp(home: PremiumScreen()));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Upgrade to Premium'), findsOneWidget);
+      expect(find.text('FREE'), findsOneWidget);
+      expect(find.text('PREMIUM\nPLUS'), findsOneWidget);
+      expect(find.text('PREMIUM\nVIP'), findsOneWidget);
+      expect(find.text('PREMIUM\nELITE'), findsNothing);
+      expect(find.text('KING'), findsOneWidget);
+      expect(find.text('Invisible navigation in Discover'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('a VIP account displays its public king badge', (tester) async {
+    const profile = UserProfile(
+      id: 'vip-profile',
+      name: 'Alex',
+      age: 30,
+      city: 'Toronto',
+      compatibilityScore: 90,
+      imagePath: 'assets/profile/profile_user_placeholder.png',
+      photoDisplayStyle: PhotoDisplayStyle.profileDetails,
+      isVip: true,
+    );
+    await tester.pumpWidget(
+      const MaterialApp(home: PublicProfileScreen(profile: profile)),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('VIP'), findsOneWidget);
   });
 
   testWidgets('edit profile exposes attributes used by discovery filters', (
@@ -467,7 +842,10 @@ void main() {
           .first,
     );
     expect(find.text('Religion'), findsOneWidget);
-    expect(find.text('Children preference'), findsOneWidget);
+    expect(
+      find.text('Children preference', skipOffstage: false),
+      findsOneWidget,
+    );
     expect(tester.takeException(), isNull);
   });
 
@@ -582,6 +960,16 @@ void main() {
     expect(filters.toDatabase()['location_mode'], 'specific_country');
   });
 
+  test('stored age preferences are normalized to the slider limits', () {
+    final reversed = DiscoveryFilters.fromDatabase({
+      'minimum_age': 95,
+      'maximum_age': 12,
+    });
+
+    expect(reversed.minimumAge, 80);
+    expect(reversed.maximumAge, 80);
+  });
+
   test('demo likes are persistent and create a mutual match', () async {
     const profileId = '00000000-0000-4000-8000-000000000001';
     final first = await MapLovRepository.instance.toggleProfileLike(profileId);
@@ -646,15 +1034,36 @@ void main() {
     expect(find.text('2 shared interests.'), findsOneWidget);
   });
 
-  testWidgets('photo manager exposes main-photo and ordering controls', (
+  testWidgets('photo manager keeps clean thumbnails until a long press', (
     tester,
   ) async {
     await tester.pumpWidget(const MaterialApp(home: ManagePhotosScreen()));
     await tester.pumpAndSettle();
 
-    expect(find.text('Main'), findsOneWidget);
-    expect(find.text('Set main'), findsWidgets);
-    expect(find.byTooltip('Move later'), findsWidgets);
+    expect(find.text('Main'), findsNothing);
+    expect(find.text('Set main'), findsNothing);
+    expect(find.byTooltip('Move later'), findsNothing);
+    expect(find.byTooltip('Move earlier'), findsNothing);
+    expect(find.byTooltip('Delete photo'), findsNothing);
+
+    final firstPhoto = find
+        .byWidgetPredicate(
+          (widget) =>
+              widget is GestureDetector &&
+              widget.key is ValueKey<String> &&
+              (widget.key! as ValueKey<String>).value.startsWith(
+                'managed_photo_',
+              ),
+        )
+        .first;
+    expect(firstPhoto, findsOneWidget);
+    final photoKey =
+        tester.widget<GestureDetector>(firstPhoto).key! as ValueKey<String>;
+    final photoId = photoKey.value.replaceFirst('managed_photo_', '');
+    await tester.longPress(firstPhoto);
+    await tester.pump();
+
+    expect(find.byKey(Key('delete_managed_photo_$photoId')), findsOneWidget);
   });
 
   test('French translations are centralized', () {
@@ -690,6 +1099,31 @@ void main() {
     await tester.pump();
     expect(find.text('Settings'), findsOneWidget);
     expect(find.text('Privacy'), findsOneWidget);
+  });
+
+  testWidgets('legal documents, data export and help content are actionable', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 1200);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(const MaterialApp(home: LegalScreen()));
+    await tester.tap(find.text('Community Guidelines'));
+    await tester.pumpAndSettle();
+    expect(find.text('Respect and consent'), findsOneWidget);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump();
+    await tester.pumpWidget(
+      MaterialApp(key: UniqueKey(), home: const HelpCenterScreen()),
+    );
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('help_search')), 'delete');
+    await tester.pump();
+    expect(find.text('Exporting or deleting your data'), findsOneWidget);
+    expect(find.text('Creating and verifying an account'), findsNothing);
   });
 
   test(

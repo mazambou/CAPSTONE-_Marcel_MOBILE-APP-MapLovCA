@@ -4,7 +4,7 @@ class NewMatchScreen extends StatelessWidget {
   const NewMatchScreen({super.key, this.profile});
 
   final UserProfile? profile;
-  UserProfile get _match => profile ?? mockProfiles.first;
+  UserProfile get _match => profile ?? demoProfileOrUnavailable;
 
   Future<void> _openChat(BuildContext context) async {
     try {

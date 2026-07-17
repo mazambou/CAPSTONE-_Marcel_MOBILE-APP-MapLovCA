@@ -28,7 +28,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final selectedProfile = widget.profile ?? mockProfiles.first;
+    final selectedProfile = widget.profile ?? demoProfileOrUnavailable;
     return _AppPage(
       title: '${selectedProfile.name}, ${selectedProfile.age}',
       children: [
@@ -59,12 +59,20 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
         Row(
           children: [
             Expanded(
-              child: Text(
-                '${selectedProfile.name}, ${selectedProfile.age}',
-                style: const TextStyle(
-                  fontSize: 26,
-                  fontWeight: FontWeight.w800,
-                ),
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 6,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  Text(
+                    '${selectedProfile.name}, ${selectedProfile.age}',
+                    style: const TextStyle(
+                      fontSize: 26,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  if (selectedProfile.isVip) const _VipBadge(),
+                ],
               ),
             ),
             ActionChip(
@@ -85,9 +93,14 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
           ],
         ),
         Text(
-          '${selectedProfile.city}, Canada',
+          '${selectedProfile.city}, ${selectedProfile.country}',
           style: const TextStyle(color: AppColors.grayText),
         ),
+        if (selectedProfile.originCountry.isNotEmpty)
+          Text(
+            'Originally from ${selectedProfile.originCity.isEmpty ? '' : '${selectedProfile.originCity}, '}${selectedProfile.originCountry}',
+            style: const TextStyle(color: AppColors.grayText),
+          ),
         const SizedBox(height: 12),
         SizedBox(
           width: double.infinity,

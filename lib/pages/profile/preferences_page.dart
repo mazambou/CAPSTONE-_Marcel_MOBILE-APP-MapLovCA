@@ -22,6 +22,8 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
   bool requiredGoal = false;
   bool loading = true;
   bool saving = false;
+  List<String> savedOriginCountries = const [];
+  List<String> savedOriginCities = const [];
 
   @override
   void initState() {
@@ -52,6 +54,8 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
       requiredGender = saved.requiredGenders;
       requiredLanguage = saved.requiredLanguages;
       requiredGoal = saved.requiredRelationshipGoal;
+      savedOriginCountries = saved.originCountries;
+      savedOriginCities = saved.originCities;
       loading = false;
     });
   }
@@ -97,6 +101,8 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
           personalities: personality == 'Any personality'
               ? const []
               : [personality],
+          originCountries: savedOriginCountries,
+          originCities: savedOriginCities,
           requiredGenders: requiredGender,
           requiredLocation: true,
           requiredLanguages: requiredLanguage,

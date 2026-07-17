@@ -18,6 +18,7 @@ class ReportUserScreen extends StatefulWidget {
 class _ReportUserScreenState extends State<ReportUserScreen> {
   String reason = 'Fake profile';
   final comment = TextEditingController();
+  bool blockAfterReporting = false;
 
   @override
   void dispose() {
@@ -27,13 +28,16 @@ class _ReportUserScreenState extends State<ReportUserScreen> {
 
   Future<void> _submit() async {
     final target =
-        widget.targetId ?? widget.profile?.id ?? mockProfiles.first.id;
+        widget.targetId ?? widget.profile?.id ?? demoProfileOrUnavailable.id;
     await MapLovRepository.instance.report(
       targetType: widget.targetType,
       targetId: target,
       reason: reason,
       comment: comment.text.trim().isEmpty ? null : comment.text.trim(),
     );
+    if (blockAfterReporting && widget.profile != null) {
+      await MapLovRepository.instance.blockUser(widget.profile!.id);
+    }
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Report submitted for review.')),
@@ -70,6 +74,10 @@ class _ReportUserScreenState extends State<ReportUserScreen> {
                     'Fake profile',
                     'Inappropriate content',
                     'Spam or scam',
+                    'Suspected minor',
+                    'Child sexual exploitation',
+                    'Non-consensual intimate content',
+                    'Threat or immediate danger',
                     'Other',
                   ]
                   .map(
@@ -83,6 +91,27 @@ class _ReportUserScreenState extends State<ReportUserScreen> {
         controller: comment,
         maxLines: 4,
         decoration: const InputDecoration(labelText: 'Optional comment'),
+      ),
+      if (widget.profile != null)
+        CheckboxListTile(
+          value: blockAfterReporting,
+          onChanged: (value) =>
+              setState(() => blockAfterReporting = value ?? false),
+          contentPadding: EdgeInsets.zero,
+          title: const Text('Block this member after reporting'),
+          subtitle: const Text(
+            'You will no longer see each other or exchange messages.',
+          ),
+        ),
+      const Card(
+        color: AppColors.palePink,
+        child: ListTile(
+          leading: Icon(Icons.emergency_outlined, color: AppColors.error),
+          title: Text('Immediate danger'),
+          subtitle: Text(
+            'Contact local emergency services. An in-app report is not an emergency service.',
+          ),
+        ),
       ),
       const SizedBox(height: 20),
       _PrimaryButton('Submit report', onPressed: _submit),

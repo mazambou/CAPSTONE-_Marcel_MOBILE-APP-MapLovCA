@@ -11,11 +11,27 @@ class PhotoDisplaySettingsScreen extends StatefulWidget {
 class _PhotoDisplaySettingsScreenState
     extends State<PhotoDisplaySettingsScreen> {
   late PhotoDisplayStyle selectedStyle;
+  bool loading = false;
 
   @override
   void initState() {
     super.initState();
     selectedStyle = currentUserPhotoDisplayStyle;
+    unawaited(_loadPreference());
+  }
+
+  Future<void> _loadPreference() async {
+    final userId = MapLovRepository.instance.currentUserId;
+    if (userId == null || !MapLovRepository.instance.isLive) return;
+    setState(() => loading = true);
+    try {
+      final profile = await MapLovRepository.instance.getProfile(userId);
+      if (profile != null && mounted) {
+        setState(() => selectedStyle = profile.photoDisplayStyle);
+      }
+    } finally {
+      if (mounted) setState(() => loading = false);
+    }
   }
 
   Future<void> _savePreference() async {
@@ -32,6 +48,7 @@ class _PhotoDisplaySettingsScreenState
   Widget build(BuildContext context) => _AppPage(
     title: 'Photo display',
     children: [
+      if (loading) const LinearProgressIndicator(),
       const Text(
         'Choose how other MapLov members will see your profile photos. You can change this preference at any time.',
         style: TextStyle(color: AppColors.grayText),

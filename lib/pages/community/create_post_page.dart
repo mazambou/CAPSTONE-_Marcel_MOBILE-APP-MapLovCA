@@ -21,7 +21,11 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   }
 
   Future<void> _pickImage() async {
-    final selected = await ImagePicker().pickMultiImage(imageQuality: 85);
+    final selected = await ImagePicker().pickMultiImage(
+      imageQuality: 82,
+      maxWidth: 2048,
+      maxHeight: 2048,
+    );
     if (selected.isEmpty) return;
     images
       ..clear()

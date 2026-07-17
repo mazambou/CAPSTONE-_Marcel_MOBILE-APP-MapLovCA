@@ -5,9 +5,28 @@ class CompatibilityDetailsScreen extends StatelessWidget {
 
   final UserProfile? profile;
 
+  Future<void> _openChat(BuildContext context, UserProfile selected) async {
+    try {
+      final id = await MapLovRepository.instance.startConversation(selected.id);
+      if (!context.mounted) return;
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ChatScreen(conversationId: id, profile: selected),
+        ),
+      );
+    } catch (error) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Unable to start conversation: $error')),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final selected = profile ?? mockProfiles.first;
+    final selected = profile ?? demoProfileOrUnavailable;
     final details = selected.compatibilityBreakdown;
     final score = selected.compatibilityScore;
     double value(String key, double fallback) =>
@@ -70,7 +89,7 @@ class CompatibilityDetailsScreen extends StatelessWidget {
         const SizedBox(height: 22),
         _PrimaryButton(
           'Send a message',
-          onPressed: () => Navigator.pushNamed(context, AppRoutes.chat),
+          onPressed: () => _openChat(context, selected),
         ),
       ],
     );

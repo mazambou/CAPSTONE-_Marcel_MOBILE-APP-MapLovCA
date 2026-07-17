@@ -12,7 +12,11 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   late String selectedTab;
   final Set<String> likedProfiles = {};
-  List<UserProfile> _profiles = List.of(mockProfiles);
+  List<UserProfile> _profiles = AuthService.instance.isConfigured
+      ? []
+      : AppConfig.allowDemoData
+      ? List.of(mockProfiles)
+      : [];
   DiscoveryFilters _filters = const DiscoveryFilters();
   bool _loading = false;
 
@@ -400,6 +404,10 @@ class _DiscoverGridCard extends StatelessWidget {
                               color: AppColors.deepPink,
                               size: 18,
                             ),
+                            if (profile.isVip) ...[
+                              const SizedBox(width: 5),
+                              const _VipBadge(compact: true),
+                            ],
                           ],
                         ),
                       ),

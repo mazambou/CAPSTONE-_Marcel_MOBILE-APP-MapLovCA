@@ -2,16 +2,17 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../config/app_config.dart';
+import '../config/supabase_config.dart';
 
 class PremiumProductIds {
   const PremiumProductIds._();
   static const plusMonthly = 'maplov_plus_monthly';
   static const eliteMonthly = 'maplov_elite_monthly';
   static const vipMonthly = 'maplov_vip_monthly';
-  static const all = {plusMonthly, eliteMonthly, vipMonthly};
+  // The former Elite store product now activates the public VIP plan.
+  // The legacy VIP identifier remains accepted by the verifier for restores.
+  static const all = {plusMonthly, eliteMonthly};
 }
 
 class PurchaseService extends ChangeNotifier {
@@ -92,11 +93,11 @@ class PurchaseService extends ChangeNotifier {
   }
 
   Future<void> _verifyOnServer(PurchaseDetails purchase) async {
-    if (!AppConfig.hasSupabaseConfiguration ||
-        Supabase.instance.client.auth.currentUser == null) {
+    final client = SupabaseConfig.client;
+    if (client?.auth.currentUser == null) {
       throw StateError('Sign in and configure Supabase before purchasing.');
     }
-    final response = await Supabase.instance.client.functions.invoke(
+    final response = await client!.functions.invoke(
       'verify-store-purchase',
       body: {
         'productId': purchase.productID,

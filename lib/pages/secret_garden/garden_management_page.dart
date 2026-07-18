@@ -16,18 +16,27 @@ class _GardenManagementScreenState extends State<GardenManagementScreen> {
     _reload();
   }
 
-  void _reload() => albums = MapLovRepository.instance.gardenAlbums();
+  void _reload() {
+    albums = MapLovRepository.instance.gardenAlbums();
+  }
 
-  Future<void> _create() async {
-    final controller = TextEditingController();
-    final title = await showDialog<String>(
+  Future<String?> _requestAlbumTitle({
+    required String dialogTitle,
+    required String actionLabel,
+    String initialValue = '',
+  }) async {
+    var draft = initialValue;
+    return showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Create private album'),
-        content: TextField(
-          controller: controller,
+        title: Text(dialogTitle),
+        content: TextFormField(
+          initialValue: initialValue,
           autofocus: true,
           decoration: const InputDecoration(labelText: 'Album name'),
+          textInputAction: TextInputAction.done,
+          onChanged: (value) => draft = value,
+          onFieldSubmitted: (value) => Navigator.pop(context, value.trim()),
         ),
         actions: [
           TextButton(
@@ -35,13 +44,19 @@ class _GardenManagementScreenState extends State<GardenManagementScreen> {
             child: const Text('Cancel'),
           ),
           FilledButton(
-            onPressed: () => Navigator.pop(context, controller.text.trim()),
-            child: const Text('Create'),
+            onPressed: () => Navigator.pop(context, draft.trim()),
+            child: Text(actionLabel),
           ),
         ],
       ),
     );
-    controller.dispose();
+  }
+
+  Future<void> _create() async {
+    final title = await _requestAlbumTitle(
+      dialogTitle: 'Create private album',
+      actionLabel: 'Create',
+    );
     if (title == null || title.isEmpty) return;
     setState(() => creatingAlbum = true);
     try {
@@ -86,25 +101,11 @@ class _GardenManagementScreenState extends State<GardenManagementScreen> {
   ).showSnackBar(SnackBar(content: Text(message)));
 
   Future<void> _rename(GardenAlbumItem album) async {
-    final controller = TextEditingController(text: album.title);
-    final title = await showDialog<String>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Rename album'),
-        content: TextField(controller: controller),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, controller.text.trim()),
-            child: const Text('Save'),
-          ),
-        ],
-      ),
+    final title = await _requestAlbumTitle(
+      dialogTitle: 'Rename album',
+      actionLabel: 'Save',
+      initialValue: album.title,
     );
-    controller.dispose();
     if (title == null || title.isEmpty) return;
     await MapLovRepository.instance.renameGardenAlbum(album.id, title);
     if (mounted) setState(_reload);
@@ -232,8 +233,10 @@ class _GardenManagementScreenState extends State<GardenManagementScreen> {
                           : () => Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (_) =>
-                                    GardenViewerScreen(album: album),
+                                builder: (_) => GardenViewerScreen(
+                                  album: album,
+                                  canManageAlbum: true,
+                                ),
                               ),
                             ),
                     ),

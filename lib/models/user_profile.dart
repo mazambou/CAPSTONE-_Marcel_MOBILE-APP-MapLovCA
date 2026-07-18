@@ -36,6 +36,7 @@ class UserProfile {
     this.photoLikeCounts = const [],
     this.photoSuperLikeCounts = const [],
     this.photoCommentCounts = const [],
+    this.photoCreatedAts = const [],
     this.isVerified = false,
     this.isVip = false,
     this.gender = '',
@@ -73,6 +74,7 @@ class UserProfile {
   final List<int> photoLikeCounts;
   final List<int> photoSuperLikeCounts;
   final List<int> photoCommentCounts;
+  final List<DateTime?> photoCreatedAts;
   final bool isVerified;
   final bool isVip;
   final String gender;
@@ -95,6 +97,8 @@ class UserProfile {
       index < photoSuperLikeCounts.length ? photoSuperLikeCounts[index] : 0;
   int photoCommentCount(int index) =>
       index < photoCommentCounts.length ? photoCommentCounts[index] : 0;
+  DateTime? photoCreatedAt(int index) =>
+      index < photoCreatedAts.length ? photoCreatedAts[index] : createdAt;
 
   int get engagementScore {
     var highest = 0;
@@ -111,4 +115,20 @@ class UserProfile {
 
   bool get hasNetworkImage =>
       imagePath.startsWith('http://') || imagePath.startsWith('https://');
+}
+
+class PopularPhotoEntry {
+  const PopularPhotoEntry({required this.profile, required this.photoIndex});
+
+  final UserProfile profile;
+  final int photoIndex;
+
+  String get photoUrl => profile.photoUrls.isEmpty
+      ? profile.imagePath
+      : profile.photoUrls[photoIndex];
+  String get stableId => profile.photoIds.length > photoIndex
+      ? profile.photoIds[photoIndex]
+      : '${profile.id}-$photoIndex';
+  int get likeCount => profile.photoLikeCount(photoIndex);
+  DateTime? get createdAt => profile.photoCreatedAt(photoIndex);
 }

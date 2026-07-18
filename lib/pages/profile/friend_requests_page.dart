@@ -14,12 +14,34 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen> {
     _reload();
   }
 
-  void _reload() =>
-      requests = MapLovRepository.instance.friendships(status: 'pending');
+  void _reload() {
+    requests = MapLovRepository.instance.friendships(status: 'pending');
+  }
 
   Future<void> _respond(FriendshipItem item, bool accept) async {
-    await MapLovRepository.instance.respondToFriendRequest(item.id, accept);
-    if (mounted) setState(_reload);
+    try {
+      await MapLovRepository.instance.respondToFriendRequest(item.id, accept);
+      if (mounted) setState(() => _reload());
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Unable to update friend request: $error')),
+        );
+      }
+    }
+  }
+
+  Future<void> _cancel(FriendshipItem item) async {
+    try {
+      await MapLovRepository.instance.removeFriendship(item.id, cancel: true);
+      if (mounted) setState(() => _reload());
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Unable to cancel friend request: $error')),
+        );
+      }
+    }
   }
 
   @override
@@ -41,65 +63,111 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen> {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
+          if (snapshot.hasError) {
+            return Center(
+              child: FilledButton.icon(
+                onPressed: () => setState(() => _reload()),
+                icon: const Icon(Icons.refresh),
+                label: const Text('Retry friend requests'),
+              ),
+            );
+          }
           final all = snapshot.data ?? const <FriendshipItem>[];
+          final received = all.where((item) => !item.sentByMe).toList();
+          final sent = all.where((item) => item.sentByMe).toList();
           return TabBarView(
             children: [
-              ListView(
-                children: all
-                    .where((item) => !item.sentByMe)
-                    .map(
-                      (item) => ListTile(
-                        leading: CircleAvatar(
-                          backgroundImage: profileImageProvider(item.profile),
-                        ),
-                        title: Text(item.profile.name),
-                        subtitle: const Text('Wants to connect'),
-                        trailing: Wrap(
-                          children: [
-                            IconButton(
-                              onPressed: () => _respond(item, true),
-                              icon: const Icon(
-                                Icons.check,
-                                color: AppColors.success,
+              received.isEmpty
+                  ? const _EmptyFriendState(
+                      icon: Icons.mark_email_read_outlined,
+                      message: 'No received friend requests.',
+                    )
+                  : ListView(
+                      children: received
+                          .map(
+                            (item) => ListTile(
+                              onTap: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => PublicProfileScreen(
+                                    profile: item.profile,
+                                  ),
+                                ),
+                              ),
+                              leading: CircleAvatar(
+                                backgroundImage: profileImageProvider(
+                                  item.profile,
+                                ),
+                              ),
+                              title: Text(item.profile.name),
+                              subtitle: const Text('Wants to connect'),
+                              trailing: Wrap(
+                                children: [
+                                  IconButton(
+                                    tooltip: 'Accept request',
+                                    onPressed: () => _respond(item, true),
+                                    icon: const Icon(
+                                      Icons.check,
+                                      color: AppColors.success,
+                                    ),
+                                  ),
+                                  IconButton(
+                                    tooltip: 'Decline request',
+                                    onPressed: () => _respond(item, false),
+                                    icon: const Icon(Icons.close),
+                                  ),
+                                ],
                               ),
                             ),
-                            IconButton(
-                              onPressed: () => _respond(item, false),
-                              icon: const Icon(Icons.close),
+                          )
+                          .toList(),
+                    ),
+              sent.isEmpty
+                  ? const _EmptyFriendState(
+                      icon: Icons.outbox_outlined,
+                      message: 'No sent friend requests.',
+                    )
+                  : ListView(
+                      children: sent
+                          .map(
+                            (item) => ListTile(
+                              leading: CircleAvatar(
+                                backgroundImage: profileImageProvider(
+                                  item.profile,
+                                ),
+                              ),
+                              title: Text(item.profile.name),
+                              trailing: TextButton(
+                                onPressed: () => _cancel(item),
+                                child: const Text('Cancel'),
+                              ),
                             ),
-                          ],
-                        ),
-                      ),
-                    )
-                    .toList(),
-              ),
-              ListView(
-                children: all
-                    .where((item) => item.sentByMe)
-                    .map(
-                      (item) => ListTile(
-                        leading: CircleAvatar(
-                          backgroundImage: profileImageProvider(item.profile),
-                        ),
-                        title: Text(item.profile.name),
-                        trailing: TextButton(
-                          onPressed: () async {
-                            await MapLovRepository.instance.removeFriendship(
-                              item.id,
-                              cancel: true,
-                            );
-                            if (mounted) setState(_reload);
-                          },
-                          child: const Text('Cancel'),
-                        ),
-                      ),
-                    )
-                    .toList(),
-              ),
+                          )
+                          .toList(),
+                    ),
             ],
           );
         },
       ),
+    ),
+  );
+}
+
+class _EmptyFriendState extends StatelessWidget {
+  const _EmptyFriendState({required this.icon, required this.message});
+
+  final IconData icon;
+  final String message;
+
+  @override
+  Widget build(BuildContext context) => Center(
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 56, color: AppColors.softPink),
+        const SizedBox(height: 12),
+        Text(message, style: const TextStyle(color: AppColors.grayText)),
+      ],
     ),
   );
 }

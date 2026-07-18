@@ -1,8 +1,13 @@
 part of '../../app.dart';
 
 class GardenViewerScreen extends StatefulWidget {
-  const GardenViewerScreen({super.key, this.album});
+  const GardenViewerScreen({
+    super.key,
+    this.album,
+    this.canManageAlbum = false,
+  });
   final GardenAlbumItem? album;
+  final bool canManageAlbum;
 
   @override
   State<GardenViewerScreen> createState() => _GardenViewerScreenState();
@@ -10,6 +15,9 @@ class GardenViewerScreen extends StatefulWidget {
 
 class _GardenViewerScreenState extends State<GardenViewerScreen> {
   late Future<List<Map<String, dynamic>>> managedPhotos;
+  bool uploading = false;
+  int uploadedCount = 0;
+  int uploadTotal = 0;
 
   GardenAlbumItem get selected =>
       widget.album ??
@@ -20,6 +28,7 @@ class _GardenViewerScreenState extends State<GardenViewerScreen> {
       );
 
   bool get canManage =>
+      widget.canManageAlbum ||
       MapLovRepository.instance.currentUserId == selected.ownerId;
 
   @override
@@ -37,6 +46,57 @@ class _GardenViewerScreenState extends State<GardenViewerScreen> {
       setState(() {
         managedPhotos = MapLovRepository.instance.gardenPhotos(selected.id);
       });
+    }
+  }
+
+  void _reloadPhotos() {
+    if (!mounted) return;
+    setState(() {
+      managedPhotos = MapLovRepository.instance.gardenPhotos(selected.id);
+    });
+  }
+
+  Future<void> _addPhotos() async {
+    if (uploading) return;
+    List<XFile> photos;
+    try {
+      photos = await pickImagesForUpload(
+        context,
+        imageQuality: 88,
+        maxWidth: 2048,
+      );
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Unable to open the gallery: $error')),
+        );
+      }
+      return;
+    }
+    if (photos.isEmpty || !mounted) return;
+    setState(() {
+      uploading = true;
+      uploadedCount = 0;
+      uploadTotal = photos.length;
+    });
+    try {
+      for (final photo in photos) {
+        await MapLovRepository.instance.uploadGardenPhoto(
+          albumId: selected.id,
+          bytes: await photo.readAsBytes(),
+          extension: photo.name.split('.').last.toLowerCase(),
+        );
+        if (mounted) setState(() => uploadedCount++);
+      }
+      _reloadPhotos();
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Unable to add the private photo: $error')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => uploading = false);
     }
   }
 
@@ -142,6 +202,30 @@ class _GardenViewerScreenState extends State<GardenViewerScreen> {
                               .toList(),
                         ),
                 ),
+                if (canManage)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: FilledButton.icon(
+                        key: const Key('add_secret_garden_photos'),
+                        onPressed: uploading ? null : _addPhotos,
+                        icon: uploading
+                            ? const SizedBox.square(
+                                dimension: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Icon(Icons.add_photo_alternate_outlined),
+                        label: Text(
+                          uploading
+                              ? 'Uploading $uploadedCount of $uploadTotal…'
+                              : 'Add photos',
+                        ),
+                      ),
+                    ),
+                  ),
                 const Padding(
                   padding: EdgeInsets.all(16),
                   child: Text(

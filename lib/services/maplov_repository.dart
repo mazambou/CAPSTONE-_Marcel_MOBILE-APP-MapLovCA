@@ -335,7 +335,12 @@ class MapLovRepository {
   final StreamController<List<MapLovMessage>> _demoMessageStream =
       StreamController<List<MapLovMessage>>.broadcast();
   final Set<String> _demoBlockedIds = {};
-  final Set<String> _demoFriendIds = {};
+  final Set<String> _demoFriendIds = mockProfiles
+      .take(1)
+      .map((profile) => profile.id)
+      .toSet();
+  final Set<String> _demoOutgoingFriendRequestIds = {};
+  final Set<String> _demoIncomingFriendRequestIds = {};
   final Set<String> _demoLikedIds = {};
   final Set<String> _demoReciprocalLikeIds = {mockProfiles.first.id};
   final Set<String> _demoPhotoLikedProfileIds = {};
@@ -413,8 +418,16 @@ class MapLovRepository {
                 as List<dynamic>;
         final result = <UserProfile>[];
         for (final raw in nearby.cast<Map<String, dynamic>>()) {
-          final profile = await _profileFromRow(raw);
-          if (profile.photoUrls.isNotEmpty) result.add(profile);
+          final id = raw['id'] as String?;
+          if (id == null) continue;
+          final fullProfile = await getProfile(id);
+          if (fullProfile == null || fullProfile.photoUrls.isEmpty) continue;
+          result.add(
+            _copyProfile(
+              fullProfile,
+              distanceKm: (raw['distance_km'] as num?)?.round(),
+            ),
+          );
         }
         final enriched = await Future.wait(result.map(_enrichCompatibility));
         return enriched
@@ -1050,19 +1063,40 @@ class MapLovRepository {
 
   Future<List<FriendshipItem>> friendships({String? status}) async {
     if (!isLive) {
-      final source = _demoFriendIds.isEmpty
-          ? mockProfiles.take(3)
-          : mockProfiles.where((p) => _demoFriendIds.contains(p.id));
-      return source
-          .map(
-            (p) => FriendshipItem(
-              id: p.id,
-              profile: p,
-              status: status ?? 'accepted',
-              sentByMe: false,
-            ),
-          )
-          .toList();
+      final accepted = _demoFriendIds.map(
+        (id) => FriendshipItem(
+          id: id,
+          profile:
+              mockProfiles.where((profile) => profile.id == id).firstOrNull ??
+              demoProfileOrUnavailable,
+          status: 'accepted',
+          sentByMe: false,
+        ),
+      );
+      final outgoing = _demoOutgoingFriendRequestIds.map(
+        (id) => FriendshipItem(
+          id: id,
+          profile:
+              mockProfiles.where((profile) => profile.id == id).firstOrNull ??
+              demoProfileOrUnavailable,
+          status: 'pending',
+          sentByMe: true,
+        ),
+      );
+      final incoming = _demoIncomingFriendRequestIds.map(
+        (id) => FriendshipItem(
+          id: id,
+          profile:
+              mockProfiles.where((profile) => profile.id == id).firstOrNull ??
+              demoProfileOrUnavailable,
+          status: 'pending',
+          sentByMe: false,
+        ),
+      );
+      final all = [...accepted, ...outgoing, ...incoming];
+      return status == null
+          ? all
+          : all.where((item) => item.status == status).toList();
     }
     var query = _client!.from('friendships').select();
     if (status != null) query = query.eq('status', status);
@@ -1089,7 +1123,10 @@ class MapLovRepository {
 
   Future<void> sendFriendRequest(String userId) async {
     if (!isLive) {
-      _demoFriendIds.add(userId);
+      if (!_demoFriendIds.contains(userId) &&
+          !_demoIncomingFriendRequestIds.contains(userId)) {
+        _demoOutgoingFriendRequestIds.add(userId);
+      }
       return;
     }
     await _client!.from('friendships').insert({
@@ -1099,19 +1136,30 @@ class MapLovRepository {
   }
 
   Future<void> respondToFriendRequest(String id, bool accept) async {
-    if (!isLive) return;
+    if (!isLive) {
+      if (_demoIncomingFriendRequestIds.remove(id) && accept) {
+        _demoFriendIds.add(id);
+      }
+      return;
+    }
     await _client!
         .from('friendships')
         .update({
           'status': accept ? 'accepted' : 'declined',
           'responded_at': DateTime.now().toUtc().toIso8601String(),
         })
-        .eq('id', id);
+        .eq('id', id)
+        .eq('addressee_id', currentUserId!);
   }
 
   Future<void> removeFriendship(String id, {bool cancel = false}) async {
     if (!isLive) {
-      _demoFriendIds.remove(id);
+      if (cancel) {
+        _demoOutgoingFriendRequestIds.remove(id);
+      } else {
+        _demoFriendIds.remove(id);
+        _demoIncomingFriendRequestIds.remove(id);
+      }
       return;
     }
     if (cancel) {
@@ -1122,6 +1170,65 @@ class MapLovRepository {
     } else {
       await _client!.from('friendships').delete().eq('id', id);
     }
+  }
+
+  Future<FriendshipItem?> friendshipWith(
+    String userId, {
+    UserProfile? profile,
+  }) async {
+    if (!isLive) {
+      final resolvedProfile =
+          profile ??
+          mockProfiles
+              .where((candidate) => candidate.id == userId)
+              .firstOrNull ??
+          demoProfileOrUnavailable;
+      if (_demoFriendIds.contains(userId)) {
+        return FriendshipItem(
+          id: userId,
+          profile: resolvedProfile,
+          status: 'accepted',
+          sentByMe: false,
+        );
+      }
+      if (_demoOutgoingFriendRequestIds.contains(userId)) {
+        return FriendshipItem(
+          id: userId,
+          profile: resolvedProfile,
+          status: 'pending',
+          sentByMe: true,
+        );
+      }
+      if (_demoIncomingFriendRequestIds.contains(userId)) {
+        return FriendshipItem(
+          id: userId,
+          profile: resolvedProfile,
+          status: 'pending',
+          sentByMe: false,
+        );
+      }
+      return null;
+    }
+    final me = currentUserId!;
+    final row = await _client!
+        .from('friendships')
+        .select()
+        .or(
+          'and(requester_id.eq.$me,addressee_id.eq.$userId),and(requester_id.eq.$userId,addressee_id.eq.$me)',
+        )
+        .inFilter('status', const ['pending', 'accepted'])
+        .order('updated_at', ascending: false)
+        .limit(1)
+        .maybeSingle();
+    if (row == null) return null;
+    final resolvedProfile = profile ?? await getProfile(userId);
+    if (resolvedProfile == null) return null;
+    return FriendshipItem(
+      id: row['id'] as String,
+      profile: resolvedProfile,
+      status: row['status'] as String,
+      sentByMe: row['requester_id'] == me,
+    );
   }
 
   Future<String> startConversation(String userId) async {
@@ -1773,13 +1880,28 @@ class MapLovRepository {
     if (normalizedTitle.isEmpty) {
       throw ArgumentError.value(title, 'title', 'Album name is required.');
     }
+    final requestStartedAt = DateTime.now().toUtc().subtract(
+      const Duration(seconds: 5),
+    );
     try {
-      return await _client!.rpc(
-            'create_my_garden_album',
-            params: {'album_title': normalizedTitle},
-          )
-          as String;
+      final result = await _client!.rpc(
+        'create_my_garden_album',
+        params: {'album_title': normalizedTitle},
+      );
+      if (result is String && result.isNotEmpty) return result;
+
+      final created = await _confirmRecentGardenAlbum(
+        title: normalizedTitle,
+        createdAfter: requestStartedAt,
+      );
+      if (created != null) return created;
+      throw StateError('The private album was created without an identifier.');
     } on PostgrestException catch (error) {
+      final created = await _confirmRecentGardenAlbum(
+        title: normalizedTitle,
+        createdAfter: requestStartedAt,
+      );
+      if (created != null) return created;
       if (error.code != 'PGRST202' && error.code != '42883') rethrow;
       final row = await _client!
           .from('garden_albums')
@@ -1787,6 +1909,32 @@ class MapLovRepository {
           .select('id')
           .single();
       return row['id'] as String;
+    } catch (_) {
+      final created = await _confirmRecentGardenAlbum(
+        title: normalizedTitle,
+        createdAfter: requestStartedAt,
+      );
+      if (created != null) return created;
+      rethrow;
+    }
+  }
+
+  Future<String?> _confirmRecentGardenAlbum({
+    required String title,
+    required DateTime createdAfter,
+  }) async {
+    try {
+      final rows = await _client!
+          .from('garden_albums')
+          .select('id')
+          .eq('owner_id', currentUserId!)
+          .eq('title', title)
+          .gte('created_at', createdAfter.toIso8601String())
+          .order('created_at', ascending: false)
+          .limit(1);
+      return rows.isEmpty ? null : rows.first['id'] as String;
+    } catch (_) {
+      return null;
     }
   }
 
@@ -1807,7 +1955,19 @@ class MapLovRepository {
         .select('id')
         .eq('album_id', albumId);
     final path = '${currentUserId!}/$albumId/${_uuid.v4()}.$extension';
-    await _client!.storage.from('secret-garden').uploadBinary(path, bytes);
+    final contentType = switch (extension) {
+      'jpg' || 'jpeg' => 'image/jpeg',
+      'png' => 'image/png',
+      'webp' => 'image/webp',
+      _ => throw ArgumentError.value(extension, 'extension'),
+    };
+    await _client!.storage
+        .from('secret-garden')
+        .uploadBinary(
+          path,
+          bytes,
+          fileOptions: FileOptions(contentType: contentType, upsert: false),
+        );
     try {
       await _client!.from('garden_photos').insert({
         'album_id': albumId,
@@ -2523,7 +2683,7 @@ class MapLovRepository {
     final photos = await _client!
         .from('profile_photos')
         .select(
-          'id, storage_path, is_primary, photo_likes(count), '
+          'id, storage_path, is_primary, created_at, photo_likes(count), '
           'photo_super_likes(count), photo_comments(count)',
         )
         .eq('user_id', id)
@@ -2535,11 +2695,15 @@ class MapLovRepository {
     final likeCounts = <int>[];
     final superLikeCounts = <int>[];
     final commentCounts = <int>[];
+    final photoCreatedAts = <DateTime?>[];
     for (final photo in photos) {
       photoIds.add(photo['id'] as String);
       likeCounts.add(_embeddedCount(photo['photo_likes']));
       superLikeCounts.add(_embeddedCount(photo['photo_super_likes']));
       commentCounts.add(_embeddedCount(photo['photo_comments']));
+      photoCreatedAts.add(
+        DateTime.tryParse(photo['created_at'] as String? ?? ''),
+      );
       urls.add(
         await _signedUrl('profile-media', photo['storage_path'] as String),
       );
@@ -2585,6 +2749,7 @@ class MapLovRepository {
       photoLikeCounts: likeCounts,
       photoSuperLikeCounts: superLikeCounts,
       photoCommentCounts: commentCounts,
+      photoCreatedAts: photoCreatedAts,
       photoDisplayStyle: style,
       profession: row['profession'] as String? ?? 'MapLov member',
       distanceKm: ((row['distance_km'] as num?)?.round() ?? 5),
@@ -2621,6 +2786,7 @@ class MapLovRepository {
     int? compatibilityScore,
     Map<String, dynamic>? compatibilityBreakdown,
     bool? likedByMe,
+    int? distanceKm,
   }) => UserProfile(
     id: value.id,
     name: value.name,
@@ -2636,9 +2802,10 @@ class MapLovRepository {
     photoLikeCounts: value.photoLikeCounts,
     photoSuperLikeCounts: value.photoSuperLikeCounts,
     photoCommentCounts: value.photoCommentCounts,
+    photoCreatedAts: value.photoCreatedAts,
     photoDisplayStyle: value.photoDisplayStyle,
     profession: value.profession,
-    distanceKm: value.distanceKm,
+    distanceKm: distanceKm ?? value.distanceKm,
     isOnline: value.isOnline,
     isNew: value.isNew,
     bio: value.bio,

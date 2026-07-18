@@ -17,7 +17,8 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   String originCity = 'Toronto';
   bool saving = false;
   bool loadingProfile = true;
-  bool originLocked = false;
+  bool originCountryLocked = false;
+  bool originCityLocked = false;
   late Future<List<Map<String, dynamic>>> photos;
 
   @override
@@ -52,15 +53,16 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
         if (savedOriginCountry != null &&
             _worldCountries.contains(savedOriginCountry)) {
           originCountry = savedOriginCountry;
-          originLocked = true;
+          originCountryLocked = true;
         }
         final savedOriginCity = profile['origin_city'] as String?;
-        if (savedOriginCity != null) {
+        if (savedOriginCity != null && savedOriginCity.trim().isNotEmpty) {
           originCity = _citySelection(
             originCountry,
             savedOriginCity,
             originCityOther,
           );
+          originCityLocked = true;
         }
       });
     } finally {
@@ -206,7 +208,8 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
           originCityOther.clear();
         }),
         onCityChanged: (value) => setState(() => originCity = value),
-        countryReadOnly: originLocked,
+        countryReadOnly: originCountryLocked,
+        cityReadOnly: originCityLocked,
       ),
       const SizedBox(height: 12),
       DropdownButtonFormField<String>(
@@ -250,6 +253,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     required ValueChanged<String> onCountryChanged,
     required ValueChanged<String> onCityChanged,
     bool countryReadOnly = false,
+    bool cityReadOnly = false,
   }) {
     final cities = [...?_registrationCitiesByCountry[country], 'Other city'];
     return Column(
@@ -290,13 +294,16 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
           decoration: InputDecoration(
             labelText: cityLabel,
             prefixIcon: const Icon(Icons.location_city_outlined),
+            helperText: cityReadOnly
+                ? 'City of origin can only be chosen once.'
+                : null,
           ),
           items: cities
               .map(
                 (value) => DropdownMenuItem(value: value, child: Text(value)),
               )
               .toList(),
-          onChanged: saving
+          onChanged: saving || cityReadOnly
               ? null
               : (value) {
                   if (value != null) onCityChanged(value);
@@ -306,6 +313,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
           const SizedBox(height: 12),
           TextField(
             controller: otherController,
+            enabled: !saving && !cityReadOnly,
             decoration: InputDecoration(
               labelText: '$cityLabel name',
               prefixIcon: const Icon(Icons.edit_location_alt_outlined),

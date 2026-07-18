@@ -9,7 +9,7 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   late String selectedTab;
   final Set<String> likedProfiles = {};
   List<UserProfile> _profiles = AuthService.instance.isConfigured
@@ -19,19 +19,50 @@ class _HomeScreenState extends State<HomeScreen> {
       : [];
   DiscoveryFilters _filters = const DiscoveryFilters();
   bool _loading = false;
+  MapLovLocationFailure? _locationFailure;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     selectedTab = widget.initialTab;
     unawaited(_loadProfiles());
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed &&
+        selectedTab == 'Nearby' &&
+        _locationFailure != null &&
+        !_loading) {
+      unawaited(_loadProfiles());
+    }
   }
 
   Future<void> _loadProfiles() async {
     if (mounted) setState(() => _loading = true);
     try {
-      if (selectedTab == 'Nearby') {
-        await LocationService.instance.updateMyLocation();
+      if (selectedTab == 'Nearby' && MapLovRepository.instance.isLive) {
+        try {
+          await LocationService.instance.updateMyLocation();
+          _locationFailure = null;
+        } on MapLovLocationFailure catch (error) {
+          if (mounted) {
+            setState(() {
+              _locationFailure = error;
+              _profiles = const [];
+            });
+          }
+          return;
+        }
+      } else {
+        _locationFailure = null;
       }
       final profiles = await MapLovRepository.instance.discoverProfiles(
         tab: selectedTab,
@@ -56,6 +87,16 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  Future<void> _resolveLocationFailure() async {
+    final failure = _locationFailure;
+    if (failure == null) return;
+    if (failure.requiresSettings) {
+      await LocationService.instance.openRequiredSettings(failure);
+      return;
+    }
+    await _loadProfiles();
+  }
+
   Future<void> _openFilters() async {
     final result = await Navigator.pushNamed(context, AppRoutes.filters);
     if (result is DiscoveryFilters) {
@@ -74,6 +115,40 @@ class _HomeScreenState extends State<HomeScreen> {
     };
   }
 
+  List<PopularPhotoEntry> get popularPhotos {
+    final entries = <PopularPhotoEntry>[];
+    for (final profile in visibleProfiles) {
+      final photoCount = profile.photoUrls.isEmpty
+          ? 1
+          : profile.photoUrls.length;
+      var bestIndex = 0;
+      for (var index = 1; index < photoCount; index++) {
+        final likes = profile.photoLikeCount(index);
+        final bestLikes = profile.photoLikeCount(bestIndex);
+        final createdAt = profile.photoCreatedAt(index);
+        final bestCreatedAt = profile.photoCreatedAt(bestIndex);
+        if (likes > bestLikes ||
+            (likes == bestLikes &&
+                createdAt != null &&
+                (bestCreatedAt == null || createdAt.isAfter(bestCreatedAt)))) {
+          bestIndex = index;
+        }
+      }
+      entries.add(PopularPhotoEntry(profile: profile, photoIndex: bestIndex));
+    }
+    entries.sort((a, b) {
+      final likes = b.likeCount.compareTo(a.likeCount);
+      if (likes != 0) return likes;
+      final recent = (b.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0))
+          .compareTo(a.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0));
+      if (recent != 0) return recent;
+      return b.profile.compatibilityScore.compareTo(
+        a.profile.compatibilityScore,
+      );
+    });
+    return entries;
+  }
+
   Future<void> _openPhoto(UserProfile profile) async {
     if (!await _requireProfilePhotos(context, minimum: 1) || !mounted) return;
     Navigator.push(
@@ -88,6 +163,23 @@ class _HomeScreenState extends State<HomeScreen> {
       context,
       MaterialPageRoute(builder: (_) => PublicProfileScreen(profile: profile)),
     );
+  }
+
+  Future<void> _openPopularPhoto(
+    List<PopularPhotoEntry> photos,
+    int initialIndex,
+  ) async {
+    if (!await _requireProfilePhotos(context, minimum: 1) || !mounted) return;
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => PhotoViewerScreen(
+          popularPhotos: photos,
+          popularInitialIndex: initialIndex,
+        ),
+      ),
+    );
+    if (mounted) await _loadProfiles();
   }
 
   Future<void> _toggleLike(UserProfile profile) async {
@@ -143,14 +235,28 @@ class _HomeScreenState extends State<HomeScreen> {
             _DiscoverTabs(
               selectedTab: selectedTab,
               onSelected: (tab) {
-                setState(() => selectedTab = tab);
+                setState(() {
+                  selectedTab = tab;
+                  if (tab != 'Nearby') _locationFailure = null;
+                });
                 unawaited(_loadProfiles());
               },
             ),
             const Divider(height: 1),
             if (_loading) const LinearProgressIndicator(minHeight: 2),
+            if (selectedTab == 'Discover' && popularPhotos.isNotEmpty)
+              _PopularPhotosStrip(
+                key: const Key('popular_photos_strip'),
+                photos: popularPhotos,
+                onOpen: _openPopularPhoto,
+              ),
             Expanded(
-              child: profiles.isEmpty
+              child: selectedTab == 'Nearby' && _locationFailure != null
+                  ? _NearbyLocationAccessState(
+                      failure: _locationFailure!,
+                      onResolve: () => unawaited(_resolveLocationFailure()),
+                    )
+                  : profiles.isEmpty
                   ? const _EmptyDiscoverState()
                   : GridView.builder(
                       key: Key('discover_grid_$selectedTab'),
@@ -179,6 +285,347 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
       bottomNavigationBar: const _MapLovNavigationBar(selectedIndex: 0),
+    );
+  }
+}
+
+class _NearbyLocationAccessState extends StatelessWidget {
+  const _NearbyLocationAccessState({
+    required this.failure,
+    required this.onResolve,
+  });
+
+  final MapLovLocationFailure failure;
+  final VoidCallback onResolve;
+
+  @override
+  Widget build(BuildContext context) {
+    final disabled =
+        failure.reason == MapLovLocationFailureReason.serviceDisabled;
+    final permanentlyDenied =
+        failure.reason == MapLovLocationFailureReason.deniedForever;
+    final message = disabled
+        ? 'Turn on device location to discover members near you.'
+        : permanentlyDenied
+        ? 'Location access is blocked. Open MapLov settings and allow location while using the app.'
+        : 'MapLov needs location access to show nearby members. Your exact position is never displayed.';
+    final action = failure.requiresSettings ? 'Open settings' : 'Try again';
+    return Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.location_off_outlined,
+              size: 64,
+              color: AppColors.softPink,
+            ),
+            const SizedBox(height: 14),
+            const Text(
+              'Location access needed',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: AppColors.grayText),
+            ),
+            const SizedBox(height: 18),
+            FilledButton.icon(
+              key: const Key('nearby_location_action'),
+              onPressed: onResolve,
+              icon: Icon(
+                failure.requiresSettings
+                    ? Icons.settings_outlined
+                    : Icons.my_location,
+              ),
+              label: Text(action),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PopularPhotosStrip extends StatefulWidget {
+  const _PopularPhotosStrip({
+    super.key,
+    required this.photos,
+    required this.onOpen,
+  });
+
+  final List<PopularPhotoEntry> photos;
+  final Future<void> Function(List<PopularPhotoEntry>, int) onOpen;
+
+  @override
+  State<_PopularPhotosStrip> createState() => _PopularPhotosStripState();
+}
+
+class _PopularPhotosStripState extends State<_PopularPhotosStrip> {
+  static const _itemExtent = 94.0;
+  final ScrollController _controller = ScrollController();
+  Timer? _autoScroll;
+  Timer? _resumeTimer;
+  int _visibleCount = 20;
+  bool _paused = false;
+  bool _expanded = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _autoScroll = Timer.periodic(const Duration(seconds: 3), (_) => _advance());
+  }
+
+  @override
+  void dispose() {
+    _autoScroll?.cancel();
+    _resumeTimer?.cancel();
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _advance() {
+    if (_paused ||
+        !_controller.hasClients ||
+        !mounted ||
+        MediaQuery.disableAnimationsOf(context)) {
+      return;
+    }
+    final max = _controller.position.maxScrollExtent;
+    if (max <= 0) return;
+    final next = _controller.offset + _itemExtent;
+    if (next >= max) {
+      _controller.jumpTo(0);
+      return;
+    }
+    unawaited(
+      _controller.animateTo(
+        next,
+        duration: const Duration(milliseconds: 480),
+        curve: Curves.easeInOutCubic,
+      ),
+    );
+  }
+
+  void _pause() {
+    _resumeTimer?.cancel();
+    _paused = true;
+  }
+
+  void _resumeLater() {
+    _resumeTimer?.cancel();
+    _resumeTimer = Timer(const Duration(seconds: 2), () {
+      if (mounted) _paused = false;
+    });
+  }
+
+  bool _onScroll(ScrollNotification notification) {
+    if (notification is ScrollStartNotification &&
+        notification.dragDetails != null) {
+      _pause();
+    }
+    if (notification is ScrollEndNotification) {
+      _resumeLater();
+      if (_controller.hasClients &&
+          _controller.position.extentAfter < _itemExtent * 3 &&
+          _visibleCount < widget.photos.length) {
+        setState(() {
+          _visibleCount = (_visibleCount + 20).clamp(0, widget.photos.length);
+        });
+      }
+    }
+    return false;
+  }
+
+  Future<void> _open(int index) async {
+    _pause();
+    final selectedId = widget.photos[index].stableId;
+    await widget.onOpen(widget.photos, index);
+    if (!mounted || !_controller.hasClients) return;
+    final updatedIndex = widget.photos.indexWhere(
+      (entry) => entry.stableId == selectedId,
+    );
+    final returnIndex = updatedIndex < 0 ? index : updatedIndex;
+    final target = (returnIndex * _itemExtent).clamp(
+      0.0,
+      _controller.position.maxScrollExtent,
+    );
+    await _controller.animateTo(
+      target,
+      duration: const Duration(milliseconds: 280),
+      curve: Curves.easeOutCubic,
+    );
+    _resumeLater();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final count = _visibleCount.clamp(0, widget.photos.length);
+    return Container(
+      color: AppColors.white,
+      padding: EdgeInsets.only(top: 6, bottom: _expanded ? 10 : 6),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(left: 14, right: 6),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.local_fire_department,
+                  color: AppColors.deepPink,
+                ),
+                const SizedBox(width: 7),
+                const Expanded(
+                  child: Text(
+                    'Most liked photos',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900),
+                  ),
+                ),
+                IconButton(
+                  key: const Key('popular_photos_toggle'),
+                  visualDensity: VisualDensity.compact,
+                  tooltip: _expanded
+                      ? 'Hide most liked photos'
+                      : 'Show most liked photos',
+                  onPressed: () => setState(() {
+                    _expanded = !_expanded;
+                    if (!_expanded) _pause();
+                    if (_expanded) _resumeLater();
+                  }),
+                  icon: Icon(
+                    Icons.view_carousel_outlined,
+                    size: 22,
+                    color: _expanded ? AppColors.deepPink : AppColors.grayText,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (_expanded) ...[
+            const SizedBox(height: 4),
+            Listener(
+              onPointerDown: (_) => _pause(),
+              onPointerUp: (_) => _resumeLater(),
+              onPointerCancel: (_) => _resumeLater(),
+              child: SizedBox(
+                height: 94,
+                child: NotificationListener<ScrollNotification>(
+                  onNotification: _onScroll,
+                  child: ListView.builder(
+                    key: const Key('popular_photos_list'),
+                    controller: _controller,
+                    scrollDirection: Axis.horizontal,
+                    physics: const BouncingScrollPhysics(),
+                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                    itemCount: count,
+                    itemExtent: _itemExtent,
+                    itemBuilder: (context, index) {
+                      final entry = widget.photos[index];
+                      return Semantics(
+                        button: true,
+                        label:
+                            '${entry.profile.name}, ${entry.likeCount} likes, photo ${index + 1} of ${widget.photos.length}',
+                        child: GestureDetector(
+                          key: Key('popular_photo_${entry.stableId}'),
+                          onTap: () => unawaited(_open(index)),
+                          child: Padding(
+                            padding: const EdgeInsets.only(right: 8),
+                            child: Stack(
+                              fit: StackFit.expand,
+                              children: [
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(16),
+                                  child: mediaImage(entry.photoUrl),
+                                ),
+                                const DecoratedBox(
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.all(
+                                      Radius.circular(16),
+                                    ),
+                                    gradient: LinearGradient(
+                                      begin: Alignment.topCenter,
+                                      end: Alignment.bottomCenter,
+                                      colors: [
+                                        Colors.transparent,
+                                        Color(0xB8000000),
+                                      ],
+                                      stops: [.45, 1],
+                                    ),
+                                  ),
+                                ),
+                                Positioned(
+                                  left: 7,
+                                  right: 7,
+                                  bottom: 6,
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        entry.profile.name,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w800,
+                                        ),
+                                      ),
+                                      Row(
+                                        children: [
+                                          const Icon(
+                                            Icons.favorite,
+                                            color: AppColors.softPink,
+                                            size: 13,
+                                          ),
+                                          const SizedBox(width: 3),
+                                          Text(
+                                            '${entry.likeCount}',
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                          ),
+                                          const Spacer(),
+                                          if (entry.profile.isNew)
+                                            const Text(
+                                              'NEW',
+                                              style: TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 8,
+                                                fontWeight: FontWeight.w900,
+                                              ),
+                                            )
+                                          else if (entry.profile.isVip)
+                                            const Icon(
+                                              Icons.workspace_premium,
+                                              color: Color(0xFFFFD86B),
+                                              size: 13,
+                                            ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
     );
   }
 }

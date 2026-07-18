@@ -66,6 +66,16 @@ class MapLovLocalizations {
 
   static const _french = <String, String>{
     'Discover': 'Découvrir',
+    'Most liked photos': 'Photos les plus aimées',
+    'Location access needed': 'Accès à la localisation requis',
+    'Open settings': 'Ouvrir les paramètres',
+    'Try again': 'Réessayer',
+    'Turn on device location to discover members near you.':
+        'Activez la localisation de l’appareil pour découvrir les membres à proximité.',
+    'Location access is blocked. Open MapLov settings and allow location while using the app.':
+        'L’accès à la localisation est bloqué. Ouvrez les paramètres de MapLov et autorisez la localisation pendant l’utilisation.',
+    'MapLov needs location access to show nearby members. Your exact position is never displayed.':
+        'MapLov a besoin de la localisation pour afficher les membres à proximité. Votre position exacte n’est jamais affichée.',
     'Messages': 'Messages',
     'Online': 'En ligne',
     'Offline': 'Hors ligne',

@@ -6,14 +6,32 @@ class PhotoViewerScreen extends StatelessWidget {
     this.profile,
     this.initialIndex = 0,
     this.displayStyleOverride,
+    this.popularPhotos = const [],
+    this.popularInitialIndex = 0,
+    this.singlePhotoIndex,
+    this.onPreviousPhoto,
+    this.onNextPhoto,
+    this.navigationLabel,
   });
 
   final UserProfile? profile;
   final int initialIndex;
   final PhotoDisplayStyle? displayStyleOverride;
+  final List<PopularPhotoEntry> popularPhotos;
+  final int popularInitialIndex;
+  final int? singlePhotoIndex;
+  final VoidCallback? onPreviousPhoto;
+  final VoidCallback? onNextPhoto;
+  final String? navigationLabel;
 
   @override
   Widget build(BuildContext context) {
+    if (popularPhotos.isNotEmpty) {
+      return _PopularPhotoViewer(
+        photos: popularPhotos,
+        initialIndex: popularInitialIndex,
+      );
+    }
     final selectedProfile = profile ?? demoProfileOrUnavailable;
     final displayStyle =
         displayStyleOverride ?? selectedProfile.photoDisplayStyle;
@@ -22,12 +40,85 @@ class PhotoViewerScreen extends StatelessWidget {
       PhotoDisplayStyle.social => _SocialPhotoViewer(
         profile: selectedProfile,
         initialIndex: initialIndex,
+        singlePhotoIndex: singlePhotoIndex,
+        onPreviousPhoto: onPreviousPhoto,
+        onNextPhoto: onNextPhoto,
+        navigationLabel: navigationLabel,
       ),
       PhotoDisplayStyle.profileDetails => _DetailedPhotoViewer(
         profile: selectedProfile,
         initialIndex: initialIndex,
+        singlePhotoIndex: singlePhotoIndex,
+        onPreviousPhoto: onPreviousPhoto,
+        onNextPhoto: onNextPhoto,
+        navigationLabel: navigationLabel,
       ),
     };
+  }
+}
+
+class _PopularPhotoViewer extends StatefulWidget {
+  const _PopularPhotoViewer({required this.photos, required this.initialIndex});
+
+  final List<PopularPhotoEntry> photos;
+  final int initialIndex;
+
+  @override
+  State<_PopularPhotoViewer> createState() => _PopularPhotoViewerState();
+}
+
+class _PopularPhotoViewerState extends State<_PopularPhotoViewer> {
+  late int _currentIndex;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentIndex = widget.initialIndex.clamp(0, widget.photos.length - 1);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _precacheNeighbours();
+  }
+
+  void _precacheNeighbours() {
+    if (widget.photos.length < 2) return;
+    for (final offset in const [-1, 1]) {
+      final index =
+          (_currentIndex + offset + widget.photos.length) %
+          widget.photos.length;
+      final path = widget.photos[index].photoUrl;
+      final provider = path.startsWith('http')
+          ? NetworkImage(path)
+          : AssetImage(path) as ImageProvider<Object>;
+      unawaited(precacheImage(provider, context));
+    }
+  }
+
+  void _move(int offset) {
+    setState(() {
+      _currentIndex =
+          (_currentIndex + offset + widget.photos.length) %
+          widget.photos.length;
+    });
+    _precacheNeighbours();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final entry = widget.photos[_currentIndex];
+    return KeyedSubtree(
+      key: ValueKey('popular_viewer_${entry.stableId}'),
+      child: PhotoViewerScreen(
+        profile: entry.profile,
+        initialIndex: entry.photoIndex,
+        singlePhotoIndex: entry.photoIndex,
+        onPreviousPhoto: () => _move(-1),
+        onNextPhoto: () => _move(1),
+        navigationLabel: '${_currentIndex + 1}/${widget.photos.length}',
+      ),
+    );
   }
 }
 
@@ -91,10 +182,18 @@ class _DetailedPhotoViewer extends StatefulWidget {
   const _DetailedPhotoViewer({
     required this.profile,
     required this.initialIndex,
+    this.singlePhotoIndex,
+    this.onPreviousPhoto,
+    this.onNextPhoto,
+    this.navigationLabel,
   });
 
   final UserProfile profile;
   final int initialIndex;
+  final int? singlePhotoIndex;
+  final VoidCallback? onPreviousPhoto;
+  final VoidCallback? onNextPhoto;
+  final String? navigationLabel;
 
   @override
   State<_DetailedPhotoViewer> createState() => _DetailedPhotoViewerState();
@@ -112,10 +211,15 @@ class _DetailedPhotoViewerState extends State<_DetailedPhotoViewer> {
   void initState() {
     super.initState();
     _profile = widget.profile;
-    _photos = _profile.photoUrls.isNotEmpty
-        ? List.of(_profile.photoUrls)
+    final allPhotos = _profile.photoUrls.isNotEmpty
+        ? _profile.photoUrls
         : [_profile.imagePath];
-    _currentIndex = widget.initialIndex.clamp(0, _photos.length - 1);
+    _photos = widget.singlePhotoIndex == null
+        ? List.of(allPhotos)
+        : [allPhotos[widget.singlePhotoIndex!.clamp(0, allPhotos.length - 1)]];
+    _currentIndex = widget.singlePhotoIndex == null
+        ? widget.initialIndex.clamp(0, _photos.length - 1)
+        : 0;
     _profileLiked = _profile.likedByMe;
     _pageController = PageController(initialPage: _currentIndex);
   }
@@ -127,6 +231,10 @@ class _DetailedPhotoViewerState extends State<_DetailedPhotoViewer> {
   }
 
   void _showPreviousPhoto() {
+    if (widget.onPreviousPhoto != null) {
+      widget.onPreviousPhoto!();
+      return;
+    }
     final nextIndex = _currentIndex == 0
         ? _photos.length - 1
         : _currentIndex - 1;
@@ -138,6 +246,10 @@ class _DetailedPhotoViewerState extends State<_DetailedPhotoViewer> {
   }
 
   void _showNextPhoto() {
+    if (widget.onNextPhoto != null) {
+      widget.onNextPhoto!();
+      return;
+    }
     final nextIndex = (_currentIndex + 1) % _photos.length;
     _pageController.animateToPage(
       nextIndex,
@@ -175,7 +287,7 @@ class _DetailedPhotoViewerState extends State<_DetailedPhotoViewer> {
   Future<void> _reportCurrentPhoto() => _confirmPhotoReport(
     context,
     profile: _profile,
-    photoIndex: _currentIndex,
+    photoIndex: widget.singlePhotoIndex ?? _currentIndex,
   );
 
   @override
@@ -223,7 +335,8 @@ class _DetailedPhotoViewerState extends State<_DetailedPhotoViewer> {
                         children: [
                           _PhotoBadge(
                             icon: Icons.photo_library_outlined,
-                            label: '${_photos.length} photos',
+                            label:
+                                '${_profile.photoUrls.isEmpty ? 1 : _profile.photoUrls.length} photos',
                           ),
                           const _PhotoBadge(
                             icon: Icons.circle,
@@ -253,7 +366,9 @@ class _DetailedPhotoViewerState extends State<_DetailedPhotoViewer> {
                     alignment: Alignment.centerLeft,
                     child: _PhotoBadge(
                       icon: Icons.info_outline,
-                      label: '${_currentIndex + 1}/${_photos.length}',
+                      label:
+                          widget.navigationLabel ??
+                          '${_currentIndex + 1}/${_photos.length}',
                     ),
                   ),
                   if (!_focusMode) ...[
@@ -278,10 +393,21 @@ class _DetailedPhotoViewerState extends State<_DetailedPhotoViewer> {
 }
 
 class _SocialPhotoViewer extends StatefulWidget {
-  const _SocialPhotoViewer({required this.profile, required this.initialIndex});
+  const _SocialPhotoViewer({
+    required this.profile,
+    required this.initialIndex,
+    this.singlePhotoIndex,
+    this.onPreviousPhoto,
+    this.onNextPhoto,
+    this.navigationLabel,
+  });
 
   final UserProfile profile;
   final int initialIndex;
+  final int? singlePhotoIndex;
+  final VoidCallback? onPreviousPhoto;
+  final VoidCallback? onNextPhoto;
+  final String? navigationLabel;
 
   @override
   State<_SocialPhotoViewer> createState() => _SocialPhotoViewerState();
@@ -301,22 +427,33 @@ class _SocialPhotoViewerState extends State<_SocialPhotoViewer> {
   @override
   void initState() {
     super.initState();
-    _photos = widget.profile.photoUrls.isNotEmpty
-        ? List.of(widget.profile.photoUrls)
+    final allPhotos = widget.profile.photoUrls.isNotEmpty
+        ? widget.profile.photoUrls
         : [widget.profile.imagePath];
-    _currentIndex = widget.initialIndex.clamp(0, _photos.length - 1);
+    _photos = widget.singlePhotoIndex == null
+        ? List.of(allPhotos)
+        : [allPhotos[widget.singlePhotoIndex!.clamp(0, allPhotos.length - 1)]];
+    _currentIndex = widget.singlePhotoIndex == null
+        ? widget.initialIndex.clamp(0, _photos.length - 1)
+        : 0;
     _profileLiked = widget.profile.likedByMe;
-    _likeCounts = List.generate(_photos.length, widget.profile.photoLikeCount);
+    _likeCounts = List.generate(
+      _photos.length,
+      (index) => widget.profile.photoLikeCount(_sourcePhotoIndex(index)),
+    );
     _superLikeCounts = List.generate(
       _photos.length,
-      widget.profile.photoSuperLikeCount,
+      (index) => widget.profile.photoSuperLikeCount(_sourcePhotoIndex(index)),
     );
     _commentCounts = List.generate(
       _photos.length,
-      widget.profile.photoCommentCount,
+      (index) => widget.profile.photoCommentCount(_sourcePhotoIndex(index)),
     );
     _pageController = PageController(initialPage: _currentIndex);
   }
+
+  int _sourcePhotoIndex(int localIndex) =>
+      widget.singlePhotoIndex ?? localIndex;
 
   @override
   void dispose() {
@@ -334,11 +471,12 @@ class _SocialPhotoViewerState extends State<_SocialPhotoViewer> {
   }
 
   Future<void> _toggleLike() async {
-    final photoId = widget.profile.photoIds.length > _currentIndex
-        ? widget.profile.photoIds[_currentIndex]
+    final sourceIndex = _sourcePhotoIndex(_currentIndex);
+    final photoId = widget.profile.photoIds.length > sourceIndex
+        ? widget.profile.photoIds[sourceIndex]
         : MapLovRepository.instance.isLive
         ? null
-        : 'demo-photo-${widget.profile.id}-$_currentIndex';
+        : 'demo-photo-${widget.profile.id}-$sourceIndex';
     if (photoId == null) return;
     try {
       final result = await MapLovRepository.instance.togglePhotoLike(
@@ -375,9 +513,10 @@ class _SocialPhotoViewerState extends State<_SocialPhotoViewer> {
   }
 
   Future<void> _toggleSuperLike() async {
-    final photoId = widget.profile.photoIds.length > _currentIndex
-        ? widget.profile.photoIds[_currentIndex]
-        : 'demo-photo-${widget.profile.id}-$_currentIndex';
+    final sourceIndex = _sourcePhotoIndex(_currentIndex);
+    final photoId = widget.profile.photoIds.length > sourceIndex
+        ? widget.profile.photoIds[sourceIndex]
+        : 'demo-photo-${widget.profile.id}-$sourceIndex';
     try {
       final active = await MapLovRepository.instance.togglePhotoSuperLike(
         photoId,
@@ -398,8 +537,9 @@ class _SocialPhotoViewerState extends State<_SocialPhotoViewer> {
   }
 
   Future<void> _openComments() async {
-    final photoId = widget.profile.photoIds.length > _currentIndex
-        ? widget.profile.photoIds[_currentIndex]
+    final sourceIndex = _sourcePhotoIndex(_currentIndex);
+    final photoId = widget.profile.photoIds.length > sourceIndex
+        ? widget.profile.photoIds[sourceIndex]
         : 'demo-photo';
     await showModalBottomSheet<void>(
       context: context,
@@ -419,7 +559,7 @@ class _SocialPhotoViewerState extends State<_SocialPhotoViewer> {
   Future<void> _reportCurrentPhoto() => _confirmPhotoReport(
     context,
     profile: widget.profile,
-    photoIndex: _currentIndex,
+    photoIndex: _sourcePhotoIndex(_currentIndex),
   );
 
   @override
@@ -462,7 +602,8 @@ class _SocialPhotoViewerState extends State<_SocialPhotoViewer> {
                       children: [
                         _PhotoBadge(
                           icon: Icons.photo_library_outlined,
-                          label: '${_photos.length} photos',
+                          label:
+                              '${widget.profile.photoUrls.isEmpty ? 1 : widget.profile.photoUrls.length} photos',
                         ),
                         const _PhotoBadge(
                           icon: Icons.circle,
@@ -502,18 +643,24 @@ class _SocialPhotoViewerState extends State<_SocialPhotoViewer> {
                     children: [
                       _RoundOverlayButton(
                         icon: Icons.chevron_left,
-                        onPressed: () => _goToPhoto(_currentIndex - 1),
+                        onPressed:
+                            widget.onPreviousPhoto ??
+                            () => _goToPhoto(_currentIndex - 1),
                         size: 52,
                       ),
                       const SizedBox(width: 16),
                       _PhotoBadge(
                         icon: Icons.photo_outlined,
-                        label: '${_currentIndex + 1}/${_photos.length}',
+                        label:
+                            widget.navigationLabel ??
+                            '${_currentIndex + 1}/${_photos.length}',
                       ),
                       const SizedBox(width: 16),
                       _RoundOverlayButton(
                         icon: Icons.chevron_right,
-                        onPressed: () => _goToPhoto(_currentIndex + 1),
+                        onPressed:
+                            widget.onNextPhoto ??
+                            () => _goToPhoto(_currentIndex + 1),
                         size: 52,
                       ),
                     ],

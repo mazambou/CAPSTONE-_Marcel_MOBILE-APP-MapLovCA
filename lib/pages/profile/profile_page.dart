@@ -64,16 +64,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     await _load();
   }
 
-  void _openMyPhotos(int index) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) =>
-            PhotoViewerScreen(profile: profile, initialIndex: index),
-      ),
-    );
-  }
-
   Future<bool> _requirePremium({bool vip = false}) async {
     final info = await MapLovRepository.instance.subscriptionInfo();
     final allowed = vip ? info.isVip : info.isPremium;
@@ -283,38 +273,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
           onTap: _choosePhotoDisplay,
         ),
       ),
-      const SizedBox(height: 10),
-      if (profile.photoUrls.isEmpty && AuthService.instance.isConfigured)
-        Card(
-          child: ListTile(
-            leading: const Icon(Icons.photo_library_outlined),
-            title: const Text('No profile photos yet'),
-            subtitle: const Text('Add photos to unlock profile interactions.'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: _managePhotos,
-          ),
-        )
-      else
-        SizedBox(
-          height: 100,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            itemCount: profile.photoUrls.isEmpty
-                ? mockProfiles.length
-                : profile.photoUrls.length,
-            separatorBuilder: (_, _) => const SizedBox(width: 8),
-            itemBuilder: (_, i) => GestureDetector(
-              key: Key('my_profile_photo_$i'),
-              onTap: () => _openMyPhotos(i),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(14),
-                child: profile.photoUrls.isEmpty
-                    ? profileImage(mockProfiles[i], width: 100)
-                    : mediaImage(profile.photoUrls[i], width: 100),
-              ),
-            ),
-          ),
-        ),
       const _QuickCard(
         'Secret Garden',
         Icons.lock_outline,

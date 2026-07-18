@@ -11,6 +11,8 @@ class PublicProfileScreen extends StatefulWidget {
 
 class _PublicProfileScreenState extends State<PublicProfileScreen> {
   late bool liked = widget.profile?.likedByMe ?? false;
+  FriendshipItem? friendship;
+  bool friendshipLoading = true;
 
   @override
   void initState() {
@@ -19,11 +21,138 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
     if (id != null && id.isNotEmpty) {
       unawaited(MapLovRepository.instance.recordProfileView(id));
     }
+    unawaited(_loadFriendship());
   }
 
   Future<void> _toggleLike(UserProfile profile) async {
     final result = await _toggleProfileLikeFromDetails(context, profile);
     if (result != null && mounted) setState(() => liked = result.liked);
+  }
+
+  Future<void> _loadFriendship() async {
+    final profile = widget.profile ?? demoProfileOrUnavailable;
+    try {
+      final loaded = await MapLovRepository.instance.friendshipWith(
+        profile.id,
+        profile: profile,
+      );
+      if (mounted) setState(() => friendship = loaded);
+    } catch (_) {
+      if (mounted) setState(() => friendship = null);
+    } finally {
+      if (mounted) setState(() => friendshipLoading = false);
+    }
+  }
+
+  Future<bool> _confirmRemoveFriend(UserProfile profile) async =>
+      await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text('Remove ${profile.name} from friends?'),
+          content: const Text(
+            'You can send a new friend request later if you change your mind.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Remove friend'),
+            ),
+          ],
+        ),
+      ) ??
+      false;
+
+  Future<bool?> _chooseRequestResponse(UserProfile profile) => showDialog<bool>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: Text('Friend request from ${profile.name}'),
+      content: const Text('Would you like to accept this request?'),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        TextButton(
+          onPressed: () => Navigator.pop(context, false),
+          child: const Text('Decline'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(context, true),
+          child: const Text('Accept'),
+        ),
+      ],
+    ),
+  );
+
+  Future<void> _friendAction(UserProfile profile) async {
+    if (friendshipLoading) return;
+    setState(() => friendshipLoading = true);
+    try {
+      final current = friendship;
+      String confirmation;
+      if (current == null) {
+        await MapLovRepository.instance.sendFriendRequest(profile.id);
+        confirmation = 'Friend request sent.';
+      } else if (current.status == 'accepted') {
+        if (!await _confirmRemoveFriend(profile)) return;
+        await MapLovRepository.instance.removeFriendship(current.id);
+        confirmation = 'Friend removed.';
+      } else if (current.sentByMe) {
+        await MapLovRepository.instance.removeFriendship(
+          current.id,
+          cancel: true,
+        );
+        confirmation = 'Friend request cancelled.';
+      } else {
+        final accept = await _chooseRequestResponse(profile);
+        if (accept == null) return;
+        await MapLovRepository.instance.respondToFriendRequest(
+          current.id,
+          accept,
+        );
+        confirmation = accept
+            ? 'Friend request accepted.'
+            : 'Friend request declined.';
+      }
+      if (!mounted) return;
+      friendship = await MapLovRepository.instance.friendshipWith(
+        profile.id,
+        profile: profile,
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(confirmation)));
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Unable to update friendship: $error')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => friendshipLoading = false);
+    }
+  }
+
+  String get _friendActionLabel {
+    final current = friendship;
+    if (current == null) return 'Add friend';
+    if (current.status == 'accepted') return 'Remove friend';
+    return current.sentByMe ? 'Cancel request' : 'Respond';
+  }
+
+  IconData get _friendActionIcon {
+    final current = friendship;
+    if (current == null) return Icons.person_add_alt;
+    if (current.status == 'accepted') return Icons.person_remove_outlined;
+    return current.sentByMe
+        ? Icons.cancel_schedule_send_outlined
+        : Icons.how_to_reg;
   }
 
   @override
@@ -180,28 +309,19 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
           children: [
             Expanded(
               child: OutlinedButton.icon(
-                onPressed: () async {
-                  try {
-                    await MapLovRepository.instance.sendFriendRequest(
-                      selectedProfile.id,
-                    );
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Friend request sent.')),
-                      );
-                    }
-                  } catch (error) {
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('Unable to send request: $error'),
-                        ),
-                      );
-                    }
-                  }
-                },
-                icon: const Icon(Icons.person_add_alt),
-                label: const Text('Add friend'),
+                key: const Key('public_profile_friend_action'),
+                onPressed: friendshipLoading
+                    ? null
+                    : () => _friendAction(selectedProfile),
+                icon: friendshipLoading
+                    ? const SizedBox.square(
+                        dimension: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : Icon(_friendActionIcon),
+                label: Text(
+                  friendshipLoading ? 'Loading…' : _friendActionLabel,
+                ),
               ),
             ),
             const SizedBox(width: 12),

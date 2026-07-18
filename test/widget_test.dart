@@ -4,6 +4,9 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:maplove/app.dart';
 import 'package:maplove/config/supabase_config.dart';
+import 'package:maplove/routes/app_routes.dart';
+import 'package:maplove/services/location_service.dart';
+import 'package:maplove/services/maplov_repository.dart';
 
 void main() {
   SupabaseConfig.forceUiOnlyForTesting = true;
@@ -49,6 +52,30 @@ void main() {
     );
     expect(profile.engagementScore, 17);
   });
+
+  test(
+    'Nearby distinguishes retryable and settings-only location failures',
+    () {
+      expect(
+        const MapLovLocationFailure(
+          MapLovLocationFailureReason.denied,
+        ).requiresSettings,
+        isFalse,
+      );
+      expect(
+        const MapLovLocationFailure(
+          MapLovLocationFailureReason.deniedForever,
+        ).requiresSettings,
+        isTrue,
+      );
+      expect(
+        const MapLovLocationFailure(
+          MapLovLocationFailureReason.serviceDisabled,
+        ).requiresSettings,
+        isTrue,
+      );
+    },
+  );
 
   testWidgets('shows splash then navigates to onboarding', (
     WidgetTester tester,
@@ -187,7 +214,13 @@ void main() {
       find.byKey(const ValueKey('registration_city_dropdown_Canada')),
       findsOneWidget,
     );
-    expect(find.text('Toronto'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('registration_city_dropdown_Canada')),
+        matching: find.text('Toronto'),
+      ),
+      findsOneWidget,
+    );
 
     final phoneIndicator = tester.widget<DropdownButton<String>>(
       find.descendant(
@@ -270,6 +303,36 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('Country of origin', skipOffstage: false), findsOneWidget);
+    expect(find.text('City of origin', skipOffstage: false), findsOneWidget);
+  });
+
+  testWidgets('registration saves country and city of origin together', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 1400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      MaterialApp(home: RegisterScreen(dateOfBirth: DateTime(1990, 1, 1))),
+    );
+
+    final originCountry = tester.widget<DropdownButton<String>>(
+      find.descendant(
+        of: find.byKey(const Key('registration_origin_country_dropdown')),
+        matching: find.byType(DropdownButton<String>),
+      ),
+    );
+    originCountry.onChanged!('France');
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('registration_origin_city_dropdown_France')),
+      findsOneWidget,
+    );
+    expect(find.text('City of origin'), findsOneWidget);
+    expect(find.text('Paris'), findsOneWidget);
   });
 
   testWidgets('profile setup can continue without uploading a photo', (
@@ -310,6 +373,53 @@ void main() {
     expect(find.byIcon(Icons.info_outline), findsOneWidget);
   });
 
+  testWidgets(
+    'most-liked strip opens the owner display and arrows follow strip order',
+    (tester) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(const MaterialApp(home: HomeScreen()));
+      await tester.pump();
+
+      expect(find.byKey(const Key('popular_photos_strip')), findsOneWidget);
+      expect(find.text('Most liked photos'), findsOneWidget);
+      expect(find.byKey(const Key('popular_photos_list')), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('popular_photos_toggle')));
+      await tester.pump();
+      expect(find.byKey(const Key('popular_photos_list')), findsNothing);
+      expect(find.text('Most liked photos'), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('popular_photos_toggle')));
+      await tester.pump();
+      expect(find.byKey(const Key('popular_photos_list')), findsOneWidget);
+
+      await tester.tap(
+        find.byKey(
+          const Key('popular_photo_00000000-0000-4000-8000-000000000002-0'),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 350));
+
+      expect(find.byType(PhotoViewerScreen), findsNWidgets(2));
+      expect(find.text('Alex, 30'), findsWidgets);
+      expect(find.byKey(const Key('social_photo_comment')), findsOneWidget);
+
+      await tester.tap(find.byIcon(Icons.chevron_right));
+      await tester.pump();
+      expect(find.text('Taylor, 29'), findsWidgets);
+
+      await tester.tap(find.byIcon(Icons.chevron_right));
+      await tester.pump();
+      expect(find.text('Sophie, 27'), findsWidgets);
+      expect(find.byIcon(Icons.info_outline), findsOneWidget);
+    },
+  );
+
   testWidgets('opens a public profile from the person name', (tester) async {
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1;
@@ -344,11 +454,52 @@ void main() {
       find.byKey(const Key('secret_garden_album')),
       250,
     );
+    await tester.drag(find.byType(Scrollable).first, const Offset(0, -120));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('secret_garden_album')));
     await tester.pumpAndSettle();
 
     expect(find.byType(SecretGardenScreen), findsOneWidget);
     expect(find.text('Request access'), findsOneWidget);
+  });
+
+  testWidgets('creates a Secret Garden album without breaking dialog state', (
+    tester,
+  ) async {
+    await tester.pumpWidget(const MaterialApp(home: GardenManagementScreen()));
+    await tester.pumpAndSettle();
+
+    await tester.tap(
+      find.widgetWithText(OutlinedButton, 'Create private album'),
+    );
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'Private memories');
+    await tester.tap(find.widgetWithText(FilledButton, 'Create'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Create private album'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('owner can add photos from inside a Secret Garden album', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: GardenViewerScreen(
+          album: GardenAlbumItem(
+            id: 'owner-garden',
+            ownerId: 'owner',
+            title: 'Private memories',
+          ),
+          canManageAlbum: true,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('add_secret_garden_photos')), findsOneWidget);
+    expect(find.text('Add photos'), findsOneWidget);
   });
 
   testWidgets('shows personal community actions only on My Profile', (
@@ -482,6 +633,7 @@ void main() {
   testWidgets('Show Results applies filters and returns to discovery', (
     tester,
   ) async {
+    DiscoveryFilters? appliedFilters;
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -493,10 +645,12 @@ void main() {
           builder: (context) => Scaffold(
             body: FilledButton(
               key: const Key('open_filters_for_result'),
-              onPressed: () => Navigator.push<DiscoveryFilters>(
-                context,
-                MaterialPageRoute(builder: (_) => const FilterScreen()),
-              ),
+              onPressed: () async {
+                appliedFilters = await Navigator.push<DiscoveryFilters>(
+                  context,
+                  MaterialPageRoute(builder: (_) => const FilterScreen()),
+                );
+              },
               child: const Icon(Icons.tune),
             ),
           ),
@@ -510,6 +664,28 @@ void main() {
       of: find.byKey(const Key('quick_filter_tab')),
       matching: find.byType(ListView),
     );
+    final quickScrollable = find
+        .descendant(
+          of: find.byKey(const Key('quick_filter_tab')),
+          matching: find.byType(Scrollable),
+        )
+        .first;
+    await tester.scrollUntilVisible(
+      find.byKey(
+        const ValueKey<String>('origin_country_Any country'),
+        skipOffstage: false,
+      ),
+      250,
+      scrollable: quickScrollable,
+    );
+    final originDropdown = tester.widget<DropdownButtonFormField<String>>(
+      find.byKey(
+        const ValueKey<String>('origin_country_Any country'),
+        skipOffstage: false,
+      ),
+    );
+    originDropdown.onChanged!('Cameroon');
+    await tester.pumpAndSettle();
     await tester.dragUntilVisible(
       find.byKey(const Key('quick_show_results')),
       quickList,
@@ -520,7 +696,20 @@ void main() {
 
     expect(find.byType(FilterScreen), findsNothing);
     expect(find.byKey(const Key('open_filters_for_result')), findsOneWidget);
+    expect(appliedFilters?.originCountries, const ['Cameroon']);
     expect(tester.takeException(), isNull);
+  });
+
+  test('country-of-origin filtering matches complete profile data', () async {
+    final profiles = await MapLovRepository.instance.discoverProfiles(
+      filters: const DiscoveryFilters(originCountries: ['Cameroon']),
+    );
+
+    expect(profiles.map((profile) => profile.name), contains('Sophie'));
+    expect(
+      profiles.every((profile) => profile.originCountry == 'Cameroon'),
+      isTrue,
+    );
   });
 
   testWidgets(
@@ -865,6 +1054,39 @@ void main() {
     expect(find.text('VIP'), findsOneWidget);
   });
 
+  testWidgets('public profile can send and cancel a friend request', (
+    tester,
+  ) async {
+    const profile = UserProfile(
+      id: 'friend-action-target',
+      name: 'Friend target',
+      age: 31,
+      city: 'Toronto',
+      compatibilityScore: 82,
+      imagePath: 'assets/profile/profile_user_placeholder.png',
+      photoDisplayStyle: PhotoDisplayStyle.profileDetails,
+    );
+    await tester.pumpWidget(
+      const MaterialApp(home: PublicProfileScreen(profile: profile)),
+    );
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('public_profile_friend_action')),
+      300,
+    );
+
+    expect(find.text('Add friend'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('public_profile_friend_action')));
+    await tester.pumpAndSettle();
+    expect(find.text('Cancel request'), findsOneWidget);
+
+    await tester.pump(const Duration(seconds: 5));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('public_profile_friend_action')));
+    await tester.pumpAndSettle();
+    expect(find.text('Add friend'), findsOneWidget);
+  });
+
   testWidgets('edit profile exposes attributes used by discovery filters', (
     tester,
   ) async {
@@ -899,6 +1121,33 @@ void main() {
       findsOneWidget,
     );
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('city of origin is read-only after account creation', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 1000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(const MaterialApp(home: EditProfileScreen()));
+    await tester.pumpAndSettle();
+    final cityOfOriginFinder = find.byWidgetPredicate(
+      (widget) =>
+          widget is TextField &&
+          widget.decoration?.labelText == 'City of origin',
+    );
+    final basicList = find.byKey(const Key('edit_profile_basic_tab'));
+    await tester.scrollUntilVisible(
+      cityOfOriginFinder,
+      250,
+      scrollable: find
+          .descendant(of: basicList, matching: find.byType(Scrollable))
+          .first,
+    );
+    final cityOfOrigin = tester.widget<TextField>(cityOfOriginFinder);
+    expect(cityOfOrigin.enabled, isFalse);
   });
 
   testWidgets(
@@ -958,21 +1207,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets(
-    'profile exposes album management without removing photo previews',
-    (tester) async {
-      await tester.pumpWidget(const MaterialApp(home: ProfileScreen()));
-      await tester.scrollUntilVisible(
-        find.byKey(const Key('manage_album_button')),
-        250,
-      );
-
-      expect(find.byKey(const Key('manage_album_button')), findsOneWidget);
-      expect(find.text('Photos'), findsOneWidget);
-    },
-  );
-
-  testWidgets('my photo opens the current account instead of a mock profile', (
+  testWidgets('profile photos stay inside the album until it is opened', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(390, 1200);
@@ -980,13 +1215,24 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
 
-    await tester.pumpWidget(const MaterialApp(home: ProfileScreen()));
-    await tester.tap(find.byKey(const Key('my_profile_photo_0')));
+    await tester.pumpWidget(
+      MaterialApp(
+        routes: {AppRoutes.managePhotos: (_) => const ManagePhotosScreen()},
+        home: const ProfileScreen(),
+      ),
+    );
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('manage_album_button')),
+      250,
+    );
+
+    expect(find.byKey(const Key('my_profile_photo_0')), findsNothing);
+    expect(find.byKey(const Key('manage_album_button')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('manage_album_button')));
     await tester.pumpAndSettle();
 
-    expect(find.byType(PhotoViewerScreen), findsOneWidget);
-    expect(find.text('Jamie, 29'), findsOneWidget);
-    expect(find.text('Sophie, 27'), findsNothing);
+    expect(find.byType(ManagePhotosScreen), findsOneWidget);
   });
 
   test('discovery preferences keep all V1 criteria', () {

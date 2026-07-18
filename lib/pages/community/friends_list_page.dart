@@ -17,8 +17,42 @@ class _FriendsListScreenState extends State<FriendsListScreen> {
     _reload();
   }
 
-  void _reload() =>
-      items = MapLovRepository.instance.friendships(status: 'accepted');
+  void _reload() {
+    items = MapLovRepository.instance.friendships(status: 'accepted');
+  }
+
+  Future<void> _remove(FriendshipItem item) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Remove ${item.profile.name} from friends?'),
+        content: const Text(
+          'You can send a new friend request later if you change your mind.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Remove friend'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      await MapLovRepository.instance.removeFriendship(item.id);
+      if (mounted) setState(() => _reload());
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Unable to remove friend: $error')),
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) => _AppPage(
@@ -39,9 +73,30 @@ class _FriendsListScreenState extends State<FriendsListScreen> {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
-          final friends = (snapshot.data ?? const <FriendshipItem>[]).where(
-            (item) => item.profile.name.toLowerCase().contains(query),
-          );
+          if (snapshot.hasError) {
+            return Card(
+              child: ListTile(
+                leading: const Icon(Icons.error_outline),
+                title: const Text('Unable to load friends'),
+                trailing: IconButton(
+                  onPressed: () => setState(() => _reload()),
+                  icon: const Icon(Icons.refresh),
+                ),
+              ),
+            );
+          }
+          final friends = (snapshot.data ?? const <FriendshipItem>[])
+              .where((item) => item.profile.name.toLowerCase().contains(query))
+              .toList();
+          if (friends.isEmpty) {
+            return const Padding(
+              padding: EdgeInsets.symmetric(vertical: 40),
+              child: _EmptyFriendState(
+                icon: Icons.group_off_outlined,
+                message: 'No friends found.',
+              ),
+            );
+          }
           return Column(
             children: friends
                 .map(
@@ -103,10 +158,7 @@ class _FriendsListScreenState extends State<FriendsListScreen> {
                               );
                             }
                           } else if (value == 'remove') {
-                            await MapLovRepository.instance.removeFriendship(
-                              item.id,
-                            );
-                            if (mounted) setState(_reload);
+                            await _remove(item);
                           } else if (context.mounted) {
                             Navigator.push(
                               context,

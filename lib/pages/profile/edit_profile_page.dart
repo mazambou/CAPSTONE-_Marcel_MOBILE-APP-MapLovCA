@@ -209,7 +209,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         'gender': gender,
         'city': city.text.trim(),
         'residence_city': city.text.trim(),
-        'origin_city': originCity.text.trim(),
         'profession': profession.text.trim(),
         'education_level': educationLevel,
         'height_cm': height.round(),
@@ -323,7 +322,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         helperText: 'Country of origin is chosen once during registration.',
       ),
       const SizedBox(height: 12),
-      _textField(originCity, 'City of origin', Icons.travel_explore_outlined),
+      _textField(
+        originCity,
+        'City of origin',
+        Icons.travel_explore_outlined,
+        enabled: false,
+        helperText: 'City of origin is chosen once during registration.',
+      ),
       const SizedBox(height: 12),
       _textField(profession, 'Profession', Icons.work_outline),
       const SizedBox(height: 12),
@@ -544,10 +549,17 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   Widget _textField(
     TextEditingController controller,
     String label,
-    IconData icon,
-  ) => TextField(
+    IconData icon, {
+    bool enabled = true,
+    String? helperText,
+  }) => TextField(
     controller: controller,
-    decoration: InputDecoration(labelText: label, prefixIcon: Icon(icon)),
+    enabled: enabled,
+    decoration: InputDecoration(
+      labelText: label,
+      prefixIcon: Icon(icon),
+      helperText: helperText,
+    ),
   );
 
   Widget _dropdown(

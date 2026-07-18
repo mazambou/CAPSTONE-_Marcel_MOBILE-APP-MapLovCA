@@ -15,6 +15,41 @@ void main() {
     expect(const SubscriptionInfo(tier: 'plus').isVip, isFalse);
   });
 
+  test('New Account visibility follows the 7/7/14 day rollout', () {
+    final now = DateTime.utc(2026, 7, 17);
+    bool visible(int days, String tier, {bool owner = false}) =>
+        newAccountVisibleToTier(
+          createdAt: now.subtract(Duration(days: days)),
+          viewerTier: tier,
+          isOwner: owner,
+          now: now,
+        );
+
+    expect(visible(2, 'free'), isFalse);
+    expect(visible(2, 'plus'), isFalse);
+    expect(visible(2, 'vip'), isTrue);
+    expect(visible(9, 'free'), isFalse);
+    expect(visible(9, 'plus'), isTrue);
+    expect(visible(16, 'free'), isTrue);
+    expect(visible(2, 'free', owner: true), isTrue);
+  });
+
+  test('photo engagement combines likes, Super Likes and comments', () {
+    const profile = UserProfile(
+      name: 'Engagement',
+      age: 25,
+      city: 'Toronto',
+      compatibilityScore: 80,
+      imagePath: 'assets/profile/profile_user_placeholder.png',
+      photoUrls: ['one', 'two'],
+      photoLikeCounts: [10, 4],
+      photoSuperLikeCounts: [2, 8],
+      photoCommentCounts: [3, 5],
+      photoDisplayStyle: PhotoDisplayStyle.social,
+    );
+    expect(profile.engagementScore, 17);
+  });
+
   testWidgets('shows splash then navigates to onboarding', (
     WidgetTester tester,
   ) async {
@@ -124,7 +159,7 @@ void main() {
     expect(tester.widget<TextField>(password).obscureText, isFalse);
   });
 
-  testWidgets('registration country controls the city dropdown', (
+  testWidgets('phone country controls the locked residence dropdown', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(390, 1400);
@@ -147,13 +182,20 @@ void main() {
       ),
     );
     expect(countryDropdown.items!.length, greaterThanOrEqualTo(190));
+    expect(countryDropdown.onChanged, isNull);
     expect(
       find.byKey(const ValueKey('registration_city_dropdown_Canada')),
       findsOneWidget,
     );
     expect(find.text('Toronto'), findsOneWidget);
 
-    countryDropdown.onChanged!('France');
+    final phoneIndicator = tester.widget<DropdownButton<String>>(
+      find.descendant(
+        of: find.byKey(const Key('phone_country_indicator')),
+        matching: find.byType(DropdownButton<String>),
+      ),
+    );
+    phoneIndicator.onChanged!('France');
     await tester.pumpAndSettle();
 
     expect(
@@ -161,16 +203,16 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('Paris'), findsOneWidget);
-    final phoneIndicator = tester.widget<DropdownButton<String>>(
+    final frenchPhoneIndicator = tester.widget<DropdownButton<String>>(
       find.descendant(
         of: find.byKey(const Key('phone_country_indicator')),
         matching: find.byType(DropdownButton<String>),
       ),
     );
-    expect(phoneIndicator.value, 'France');
+    expect(frenchPhoneIndicator.value, 'France');
     expect(find.text('+33'), findsOneWidget);
 
-    phoneIndicator.onChanged!('Cameroon');
+    frenchPhoneIndicator.onChanged!('Cameroon');
     await tester.pumpAndSettle();
     final synchronizedCountry = tester.widget<DropdownButton<String>>(
       find.descendant(
@@ -500,6 +542,9 @@ void main() {
               compatibilityScore: 75,
               imagePath: 'assets/avatars/story_02.png',
               photoDisplayStyle: PhotoDisplayStyle.social,
+              photoLikeCounts: [24],
+              photoSuperLikeCounts: [3],
+              photoCommentCounts: [2],
             ),
             displayStyleOverride: PhotoDisplayStyle.social,
           ),
@@ -509,6 +554,11 @@ void main() {
       expect(find.byKey(const Key('social_photo_like')), findsOneWidget);
       expect(find.byKey(const Key('social_photo_comment')), findsOneWidget);
       expect(find.byKey(const Key('social_photo_super_like')), findsOneWidget);
+      expect(
+        find.byKey(const Key('photo_comment_count_badge')),
+        findsOneWidget,
+      );
+      expect(find.text('2 Comments'), findsOneWidget);
       expect(find.byIcon(Icons.share), findsNothing);
 
       await tester.tap(find.byKey(const Key('social_photo_like')));
@@ -791,6 +841,8 @@ void main() {
       expect(find.text('PREMIUM\nELITE'), findsNothing);
       expect(find.text('KING'), findsOneWidget);
       expect(find.text('Invisible navigation in Discover'), findsOneWidget);
+      expect(find.text(r'$19.99'), findsOneWidget);
+      expect(find.text(r'$29.99'), findsOneWidget);
       expect(tester.takeException(), isNull);
     },
   );

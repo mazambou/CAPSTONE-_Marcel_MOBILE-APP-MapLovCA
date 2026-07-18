@@ -9,6 +9,7 @@ class GardenManagementScreen extends StatefulWidget {
 class _GardenManagementScreenState extends State<GardenManagementScreen> {
   late Future<List<GardenAlbumItem>> albums;
   bool creatingAlbum = false;
+  String? uploadingAlbumId;
   @override
   void initState() {
     super.initState();
@@ -54,23 +55,29 @@ class _GardenManagementScreenState extends State<GardenManagementScreen> {
   }
 
   Future<void> _addPhoto(GardenAlbumItem album) async {
-    XFile? image;
+    if (uploadingAlbumId != null) return;
+    List<XFile> images;
     try {
-      image = await pickImageForUpload(context, imageQuality: 88);
+      images = await pickImagesForUpload(context, imageQuality: 88);
     } catch (error) {
       if (mounted) _showError('Unable to open the camera or gallery: $error');
       return;
     }
-    if (image == null) return;
+    if (images.isEmpty) return;
+    setState(() => uploadingAlbumId = album.id);
     try {
-      await MapLovRepository.instance.uploadGardenPhoto(
-        albumId: album.id,
-        bytes: await image.readAsBytes(),
-        extension: image.name.split('.').last.toLowerCase(),
-      );
+      for (final image in images) {
+        await MapLovRepository.instance.uploadGardenPhoto(
+          albumId: album.id,
+          bytes: await image.readAsBytes(),
+          extension: image.name.split('.').last.toLowerCase(),
+        );
+      }
       if (mounted) setState(_reload);
     } catch (error) {
       if (mounted) _showError('Unable to add the private photo: $error');
+    } finally {
+      if (mounted) setState(() => uploadingAlbumId = null);
     }
   }
 
@@ -201,7 +208,7 @@ class _GardenManagementScreenState extends State<GardenManagementScreen> {
                         itemBuilder: (_) => const [
                           PopupMenuItem(
                             value: 'photo',
-                            child: Text('Add photo'),
+                            child: Text('Add photos'),
                           ),
                           PopupMenuItem(value: 'rename', child: Text('Rename')),
                           PopupMenuItem(
@@ -220,12 +227,15 @@ class _GardenManagementScreenState extends State<GardenManagementScreen> {
                           }
                         },
                       ),
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => GardenViewerScreen(album: album),
-                        ),
-                      ),
+                      onTap: uploadingAlbumId == album.id
+                          ? null
+                          : () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) =>
+                                    GardenViewerScreen(album: album),
+                              ),
+                            ),
                     ),
                   ),
                 )

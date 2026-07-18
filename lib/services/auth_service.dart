@@ -25,6 +25,8 @@ class AuthService {
   static const _rememberSessionKey = 'maplov_remember_session';
   static const _pendingPhoneKey = 'maplov_pending_phone';
   static const _pendingPhoneEmailKey = 'maplov_pending_phone_email';
+  static const _pendingPhoneCountryKey = 'maplov_pending_phone_country';
+  static const _pendingPhoneCallingCodeKey = 'maplov_pending_calling_code';
 
   String? _pendingPhoneCache;
   String? _pendingPhoneEmailCache;
@@ -177,8 +179,10 @@ class AuthService {
     required String fullName,
     required String email,
     required String phone,
+    required String callingCode,
     required String password,
     required String country,
+    required String originCountry,
     required String city,
     required DateTime dateOfBirth,
     required Map<String, String> acceptedDocuments,
@@ -191,6 +195,8 @@ class AuthService {
     final preferences = await SharedPreferences.getInstance();
     await preferences.setString(_pendingPhoneKey, normalizedPhone);
     await preferences.setString(_pendingPhoneEmailKey, normalizedEmail);
+    await preferences.setString(_pendingPhoneCountryKey, country.trim());
+    await preferences.setString(_pendingPhoneCallingCodeKey, callingCode);
 
     final client = _client;
     if (client == null) {
@@ -204,8 +210,11 @@ class AuthService {
       data: {
         'first_name': fullName.trim(),
         'phone_number': normalizedPhone,
+        'phone_country_name': country.trim(),
+        'phone_calling_code': callingCode,
         'country_code': _countryCode(country),
         'country_name': country.trim(),
+        'origin_country_name': originCountry.trim(),
         'city': city.trim(),
         'date_of_birth': _dateOnly(dateOfBirth),
         'accepted_legal_documents': acceptedDocuments,
@@ -286,6 +295,21 @@ class AuthService {
       type: OtpType.phoneChange,
     );
     await client.auth.refreshSession();
+    final preferences = await SharedPreferences.getInstance();
+    final country =
+        client.auth.currentUser?.userMetadata?['phone_country_name']
+            as String? ??
+        preferences.getString(_pendingPhoneCountryKey);
+    final callingCode =
+        client.auth.currentUser?.userMetadata?['phone_calling_code']
+            as String? ??
+        preferences.getString(_pendingPhoneCallingCodeKey);
+    if (country != null && callingCode != null) {
+      await client.rpc(
+        'sync_my_residence_from_verified_phone',
+        params: {'residence_country': country, 'calling_code': callingCode},
+      );
+    }
   }
 
   Future<void> deferPhoneVerificationForTesting() async {
@@ -317,6 +341,11 @@ class AuthService {
   Future<void> signOut({bool allDevices = false}) async {
     final client = _client;
     if (client != null) {
+      try {
+        await client.rpc('set_my_presence', params: {'online': false});
+      } on PostgrestException {
+        // Presence support is additive; sign-out must remain available.
+      }
       await client.auth.signOut(
         scope: allDevices ? SignOutScope.global : SignOutScope.local,
       );

@@ -200,28 +200,61 @@ class MapLoveApp extends StatefulWidget {
   State<MapLoveApp> createState() => _MapLoveAppState();
 }
 
-class _MapLoveAppState extends State<MapLoveApp> {
+class _MapLoveAppState extends State<MapLoveApp> with WidgetsBindingObserver {
   // Keeping a NavigatorObserver avoids reparenting a GlobalKey-owned
   // Navigator when the MaterialApp rebuilds after a locale change. Flutter
   // otherwise can leave inherited-widget dependents attached during route
   // replacement (the `_dependents.isEmpty` assertion).
   final _navigatorObserver = NavigatorObserver();
   StreamSubscription<MapLovAuthEvent>? _authSubscription;
+  Timer? _presenceHeartbeat;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     unawaited(LocaleService.instance.load());
     unawaited(PurchaseService.instance.initialize());
     _authSubscription = AuthService.instance.events.listen((event) {
+      if (event == MapLovAuthEvent.signedIn) {
+        _startPresence();
+      } else if (event == MapLovAuthEvent.signedOut) {
+        _presenceHeartbeat?.cancel();
+      }
       if (event == MapLovAuthEvent.passwordRecovery) {
         _navigatorObserver.navigator?.pushNamed(AppRoutes.resetPassword);
       }
     });
+    if (AuthService.instance.hasActiveSession) _startPresence();
+  }
+
+  void _startPresence() {
+    _presenceHeartbeat?.cancel();
+    unawaited(MapLovRepository.instance.setPresence(true));
+    _presenceHeartbeat = Timer.periodic(
+      const Duration(minutes: 1),
+      (_) => unawaited(MapLovRepository.instance.setPresence(true)),
+    );
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (!AuthService.instance.hasActiveSession) return;
+    if (state == AppLifecycleState.resumed) {
+      _startPresence();
+    } else if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.detached ||
+        state == AppLifecycleState.hidden) {
+      _presenceHeartbeat?.cancel();
+      unawaited(MapLovRepository.instance.setPresence(false));
+    }
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _presenceHeartbeat?.cancel();
+    unawaited(MapLovRepository.instance.setPresence(false));
     _authSubscription?.cancel();
     super.dispose();
   }
@@ -353,4 +386,50 @@ Future<XFile?> pickImageForUpload(
     maxWidth: maxWidth,
     maxHeight: maxWidth,
   );
+}
+
+Future<List<XFile>> pickImagesForUpload(
+  BuildContext context, {
+  int imageQuality = 88,
+  double? maxWidth = 2048,
+}) async {
+  final source = await showModalBottomSheet<ImageSource>(
+    context: context,
+    showDragHandle: true,
+    builder: (context) => SafeArea(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ListTile(
+            leading: const Icon(Icons.photo_camera_outlined),
+            title: const Text('Take a photo'),
+            onTap: () => Navigator.pop(context, ImageSource.camera),
+          ),
+          ListTile(
+            key: const Key('choose_multiple_photos'),
+            leading: const Icon(Icons.photo_library_outlined),
+            title: const Text('Choose multiple photos'),
+            subtitle: const Text('Select all the photos to upload at once'),
+            onTap: () => Navigator.pop(context, ImageSource.gallery),
+          ),
+        ],
+      ),
+    ),
+  );
+  if (source == null) return const [];
+  final picker = ImagePicker();
+  if (source == ImageSource.gallery) {
+    return picker.pickMultiImage(
+      imageQuality: imageQuality,
+      maxWidth: maxWidth,
+      maxHeight: maxWidth,
+    );
+  }
+  final image = await picker.pickImage(
+    source: source,
+    imageQuality: imageQuality,
+    maxWidth: maxWidth,
+    maxHeight: maxWidth,
+  );
+  return image == null ? const [] : [image];
 }

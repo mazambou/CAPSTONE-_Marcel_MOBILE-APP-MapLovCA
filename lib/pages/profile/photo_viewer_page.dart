@@ -294,7 +294,9 @@ class _SocialPhotoViewerState extends State<_SocialPhotoViewer> {
   bool _liked = false;
   bool _superLiked = false;
   late bool _profileLiked;
-  int _likeCount = 24;
+  late final List<int> _likeCounts;
+  late final List<int> _superLikeCounts;
+  late final List<int> _commentCounts;
 
   @override
   void initState() {
@@ -304,6 +306,15 @@ class _SocialPhotoViewerState extends State<_SocialPhotoViewer> {
         : [widget.profile.imagePath];
     _currentIndex = widget.initialIndex.clamp(0, _photos.length - 1);
     _profileLiked = widget.profile.likedByMe;
+    _likeCounts = List.generate(_photos.length, widget.profile.photoLikeCount);
+    _superLikeCounts = List.generate(
+      _photos.length,
+      widget.profile.photoSuperLikeCount,
+    );
+    _commentCounts = List.generate(
+      _photos.length,
+      widget.profile.photoCommentCount,
+    );
     _pageController = PageController(initialPage: _currentIndex);
   }
 
@@ -338,7 +349,7 @@ class _SocialPhotoViewerState extends State<_SocialPhotoViewer> {
       if (!mounted) return;
       setState(() {
         _liked = result.liked;
-        _likeCount += result.liked ? 1 : -1;
+        _likeCounts[_currentIndex] += result.liked ? 1 : -1;
       });
       if (result.matched) {
         await Navigator.push(
@@ -363,23 +374,46 @@ class _SocialPhotoViewerState extends State<_SocialPhotoViewer> {
     }
   }
 
-  void _toggleSuperLike() {
-    setState(() => _superLiked = !_superLiked);
+  Future<void> _toggleSuperLike() async {
+    final photoId = widget.profile.photoIds.length > _currentIndex
+        ? widget.profile.photoIds[_currentIndex]
+        : 'demo-photo-${widget.profile.id}-$_currentIndex';
+    try {
+      final active = await MapLovRepository.instance.togglePhotoSuperLike(
+        photoId,
+        currentlySuperLiked: _superLiked,
+      );
+      if (!mounted) return;
+      setState(() {
+        _superLiked = active;
+        _superLikeCounts[_currentIndex] += active ? 1 : -1;
+      });
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Unable to update this Super Like: $error')),
+        );
+      }
+    }
   }
 
-  void _openComments() {
-    showModalBottomSheet<void>(
+  Future<void> _openComments() async {
+    final photoId = widget.profile.photoIds.length > _currentIndex
+        ? widget.profile.photoIds[_currentIndex]
+        : 'demo-photo';
+    await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       backgroundColor: const Color(0xFF19171C),
       showDragHandle: true,
-      builder: (context) => _PhotoCommentsSheet(
-        profile: widget.profile,
-        photoId: widget.profile.photoIds.length > _currentIndex
-            ? widget.profile.photoIds[_currentIndex]
-            : 'demo-photo',
-      ),
+      builder: (context) =>
+          _PhotoCommentsSheet(profile: widget.profile, photoId: photoId),
     );
+    if (!mounted) return;
+    final comments = await MapLovRepository.instance.photoComments(photoId);
+    if (mounted) {
+      setState(() => _commentCounts[_currentIndex] = comments.length);
+    }
   }
 
   Future<void> _reportCurrentPhoto() => _confirmPhotoReport(
@@ -398,7 +432,11 @@ class _SocialPhotoViewerState extends State<_SocialPhotoViewer> {
           PageView.builder(
             controller: _pageController,
             itemCount: _photos.length,
-            onPageChanged: (index) => setState(() => _currentIndex = index),
+            onPageChanged: (index) => setState(() {
+              _currentIndex = index;
+              _liked = false;
+              _superLiked = false;
+            }),
             itemBuilder: (context, index) => mediaImage(
               _photos[index],
               fit: BoxFit.cover,
@@ -440,10 +478,12 @@ class _SocialPhotoViewerState extends State<_SocialPhotoViewer> {
                     child: _SocialPhotoActions(
                       liked: _liked,
                       superLiked: _superLiked,
-                      likeCount: _likeCount,
+                      likeCount: _likeCounts[_currentIndex],
+                      superLikeCount: _superLikeCounts[_currentIndex],
+                      commentCount: _commentCounts[_currentIndex],
                       onLike: _toggleLike,
-                      onComment: _openComments,
-                      onSuperLike: _toggleSuperLike,
+                      onComment: () => unawaited(_openComments()),
+                      onSuperLike: () => unawaited(_toggleSuperLike()),
                     ),
                   ),
                   const Spacer(),
@@ -493,6 +533,8 @@ class _SocialPhotoActions extends StatelessWidget {
     required this.liked,
     required this.superLiked,
     required this.likeCount,
+    required this.commentCount,
+    required this.superLikeCount,
     required this.onLike,
     required this.onComment,
     required this.onSuperLike,
@@ -501,6 +543,8 @@ class _SocialPhotoActions extends StatelessWidget {
   final bool liked;
   final bool superLiked;
   final int likeCount;
+  final int commentCount;
+  final int superLikeCount;
   final VoidCallback onLike;
   final VoidCallback onComment;
   final VoidCallback onSuperLike;
@@ -521,7 +565,8 @@ class _SocialPhotoActions extends StatelessWidget {
         _SocialSideAction(
           key: const Key('social_photo_comment'),
           icon: Icons.mode_comment_outlined,
-          label: 'Comment',
+          label: '$commentCount Comments',
+          badgeCount: commentCount,
           color: Colors.white,
           onPressed: onComment,
         ),
@@ -533,7 +578,9 @@ class _SocialPhotoActions extends StatelessWidget {
             active: superLiked,
             size: 31,
           ),
-          label: superLiked ? 'Super Liked' : 'Super Like',
+          label: superLiked
+              ? '$superLikeCount Super Liked'
+              : '$superLikeCount Super Likes',
           color: Colors.white,
           onPressed: onSuperLike,
         ),
@@ -547,6 +594,7 @@ class _SocialSideAction extends StatelessWidget {
     super.key,
     this.icon,
     this.iconWidget,
+    this.badgeCount,
     required this.label,
     required this.color,
     required this.onPressed,
@@ -554,6 +602,7 @@ class _SocialSideAction extends StatelessWidget {
 
   final IconData? icon;
   final Widget? iconWidget;
+  final int? badgeCount;
   final String label;
   final Color color;
   final VoidCallback onPressed;
@@ -573,7 +622,17 @@ class _SocialSideAction extends StatelessWidget {
               child: SizedBox(
                 width: 54,
                 height: 54,
-                child: iconWidget ?? Icon(icon, color: color, size: 29),
+                child: Center(
+                  child: badgeCount == null
+                      ? (iconWidget ?? Icon(icon, color: color, size: 29))
+                      : Badge(
+                          key: const Key('photo_comment_count_badge'),
+                          label: Text('$badgeCount'),
+                          isLabelVisible: badgeCount! > 0,
+                          child:
+                              iconWidget ?? Icon(icon, color: color, size: 29),
+                        ),
+                ),
               ),
             ),
           ),

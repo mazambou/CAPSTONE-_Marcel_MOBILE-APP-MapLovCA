@@ -20,6 +20,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _confirmPasswordController = TextEditingController();
   final _customCityController = TextEditingController();
   String _country = 'Canada';
+  String _originCountry = 'Canada';
   String _city = 'Toronto';
   bool _isLoading = false;
   String? _errorText;
@@ -74,8 +75,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
         fullName: _fullNameController.text,
         email: _emailController.text,
         phone: _phoneNumber,
+        callingCode: _countryCallingCodes[_country]!,
         password: _passwordController.text,
         country: _country,
+        originCountry: _originCountry,
         city: _selectedCity,
         dateOfBirth: widget.effectiveDateOfBirth!,
         acceptedDocuments:
@@ -241,8 +244,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
             isExpanded: true,
             menuMaxHeight: 360,
             decoration: const InputDecoration(
-              labelText: 'Country',
+              labelText: 'Country of residence (from phone)',
               prefixIcon: Icon(Icons.public),
+              helperText: 'Change the phone country code to update residence.',
             ),
             items: _worldCountries
                 .map(
@@ -252,13 +256,32 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ),
                 )
                 .toList(),
-            onChanged: _isLoading
-                ? null
-                : (value) {
-                    if (value == null) return;
-                    _selectCountry(value);
-                  },
+            onChanged: null,
           ),
+        ),
+        const SizedBox(height: 12),
+        DropdownButtonFormField<String>(
+          key: const Key('registration_origin_country_dropdown'),
+          initialValue: _originCountry,
+          isExpanded: true,
+          menuMaxHeight: 360,
+          decoration: const InputDecoration(
+            labelText: 'Country of origin',
+            prefixIcon: Icon(Icons.travel_explore_outlined),
+            helperText: 'This choice is permanent after account creation.',
+          ),
+          items: _worldCountries
+              .map(
+                (country) => DropdownMenuItem(
+                  value: country,
+                  child: Text(country, overflow: TextOverflow.ellipsis),
+                ),
+              )
+              .toList(),
+          onChanged: _isLoading
+              ? null
+              : (value) =>
+                    setState(() => _originCountry = value ?? _originCountry),
         ),
         DropdownButtonFormField<String>(
           key: ValueKey('registration_city_dropdown_$_country'),

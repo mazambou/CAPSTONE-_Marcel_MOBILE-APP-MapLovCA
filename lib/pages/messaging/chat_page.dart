@@ -1053,7 +1053,7 @@ class _ChatMessageBubble extends StatelessWidget {
         color: mine ? null : const Color(0xFFF5F5F5),
         gradient: mine
             ? const LinearGradient(
-                colors: [Color(0xFFFF5A5F), Color(0xFFFF85A2)],
+                colors: [Color(0xFFFFE9EE), Color(0xFFFFF4F6)],
               )
             : null,
         borderRadius: BorderRadius.only(
@@ -1062,7 +1062,9 @@ class _ChatMessageBubble extends StatelessWidget {
           bottomLeft: Radius.circular(mine ? 20 : 5),
           bottomRight: Radius.circular(mine ? 5 : 20),
         ),
-        border: mine ? null : Border.all(color: const Color(0xFFE9E9ED)),
+        border: Border.all(
+          color: mine ? const Color(0xFFFFCAD5) : const Color(0xFFE9E9ED),
+        ),
         boxShadow: const [
           BoxShadow(
             color: Color(0x10000000),
@@ -1082,9 +1084,7 @@ class _ChatMessageBubble extends StatelessWidget {
             style: TextStyle(
               fontSize: 16,
               height: 1.25,
-              color: deleted
-                  ? (mine ? Colors.white70 : AppColors.grayText)
-                  : (mine ? Colors.white : AppColors.darkText),
+              color: deleted ? AppColors.grayText : AppColors.darkText,
               fontStyle: deleted ? FontStyle.italic : FontStyle.normal,
             ),
           ),
@@ -1112,19 +1112,14 @@ class _MessageMeta extends StatelessWidget {
     children: [
       Text(
         DateFormat.jm().format(time.toLocal()),
-        style: TextStyle(
-          fontSize: 11,
-          color: mine ? Colors.white70 : AppColors.grayText,
-        ),
+        style: TextStyle(fontSize: 11, color: AppColors.grayText),
       ),
       if (mine) ...[
         const SizedBox(width: 4),
         Icon(
           Icons.done_all,
           size: 16,
-          color: mine
-              ? Colors.white
-              : (read ? const Color(0xFF1687FF) : AppColors.grayText),
+          color: read ? const Color(0xFF1687FF) : AppColors.grayText,
         ),
       ],
     ],

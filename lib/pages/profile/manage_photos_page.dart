@@ -11,6 +11,8 @@ class _ManagePhotosScreenState extends State<ManagePhotosScreen> {
   late Future<List<Map<String, dynamic>>> _photos;
   final Set<String> _deleteControls = {};
   bool _uploading = false;
+  int _uploadedCount = 0;
+  int _uploadTotal = 0;
 
   @override
   void initState() {
@@ -32,9 +34,9 @@ class _ManagePhotosScreenState extends State<ManagePhotosScreen> {
 
   Future<void> _addPhoto() async {
     if (_uploading) return;
-    XFile? photo;
+    List<XFile> photos;
     try {
-      photo = await pickImageForUpload(
+      photos = await pickImagesForUpload(
         context,
         imageQuality: 88,
         maxWidth: 2048,
@@ -43,14 +45,21 @@ class _ManagePhotosScreenState extends State<ManagePhotosScreen> {
       if (mounted) _showError('Unable to open the camera or gallery: $error');
       return;
     }
-    if (photo == null) return;
-    setState(() => _uploading = true);
+    if (photos.isEmpty) return;
+    setState(() {
+      _uploading = true;
+      _uploadedCount = 0;
+      _uploadTotal = photos.length;
+    });
     try {
-      final bytes = await photo.readAsBytes();
-      await MapLovRepository.instance.uploadProfilePhoto(
-        bytes: bytes,
-        extension: photo.name.split('.').last.toLowerCase(),
-      );
+      for (final photo in photos) {
+        final bytes = await photo.readAsBytes();
+        await MapLovRepository.instance.uploadProfilePhoto(
+          bytes: bytes,
+          extension: photo.name.split('.').last.toLowerCase(),
+        );
+        if (mounted) setState(() => _uploadedCount++);
+      }
       _refreshPhotos();
     } catch (error) {
       if (mounted) _showError('Photo upload failed: $error');
@@ -230,7 +239,11 @@ class _ManagePhotosScreenState extends State<ManagePhotosScreen> {
                           color: AppColors.coral,
                         ),
                       const SizedBox(height: 8),
-                      Text(_uploading ? 'Uploading…' : 'Add photo'),
+                      Text(
+                        _uploading
+                            ? 'Uploading $_uploadedCount/$_uploadTotal…'
+                            : 'Add photos',
+                      ),
                     ],
                   ),
                 ),

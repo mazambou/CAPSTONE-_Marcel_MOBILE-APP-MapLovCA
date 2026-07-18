@@ -339,6 +339,7 @@ class MapLovRepository {
   final Set<String> _demoLikedIds = {};
   final Set<String> _demoReciprocalLikeIds = {mockProfiles.first.id};
   final Set<String> _demoPhotoLikedProfileIds = {};
+  final Set<String> _demoSuperLikedPhotoIds = {};
   final Set<String> _demoReciprocalPhotoLikeIds = {mockProfiles.first.id};
   final Set<String> _demoReportedPhotoIds = {};
   final Set<String> _demoReadConversations = {};
@@ -360,25 +361,37 @@ class MapLovRepository {
   String? get currentUserId => _client?.auth.currentUser?.id;
   bool get isLive => _client != null && currentUserId != null;
 
+  Future<void> setPresence(bool online) async {
+    if (!isLive) return;
+    try {
+      await _client!.rpc('set_my_presence', params: {'online': online});
+    } on PostgrestException {
+      // Compatibility fallback until the additive presence migration deploys.
+      await _client!
+          .from('profiles')
+          .update({'last_active_at': DateTime.now().toUtc().toIso8601String()})
+          .eq('id', currentUserId!);
+    }
+  }
+
   Future<List<UserProfile>> discoverProfiles({
     String tab = 'Discover',
     DiscoveryFilters filters = const DiscoveryFilters(),
   }) async {
     if (!isLive) {
       if (_client != null) return const [];
-      final profiles =
-          mockProfiles.where((profile) {
-            if (_demoBlockedIds.contains(profile.id)) return false;
-            if (!_profileMatchesFilters(profile, filters)) return false;
-            if (tab == 'Nearby' && profile.distanceKm > 10) return false;
-            if (tab == 'Online' && !profile.isOnline) return false;
-            if (tab == 'New' && !profile.isNew) return false;
-            return true;
-          }).toList()..sort(
-            (a, b) => b.compatibilityScore.compareTo(a.compatibilityScore),
-          );
+      final profiles = mockProfiles.where((profile) {
+        if (_demoBlockedIds.contains(profile.id)) return false;
+        if (!_profileMatchesFilters(profile, filters)) return false;
+        if (tab == 'Nearby' && profile.distanceKm > 10) return false;
+        if (tab == 'Online' && !profile.isOnline) return false;
+        if (tab == 'New' && !profile.isNew) return false;
+        return true;
+      }).toList()..sort(_compareDiscoverProfiles);
       return profiles;
     }
+
+    final viewerTier = (await subscriptionInfo()).tier;
 
     try {
       await _client!.rpc('refresh_my_compatibility_scores');
@@ -405,11 +418,13 @@ class MapLovRepository {
         }
         final enriched = await Future.wait(result.map(_enrichCompatibility));
         return enriched
-            .where((p) => _profileMatchesFilters(p, filters))
+            .where(
+              (profile) =>
+                  _profileMatchesFilters(profile, filters) &&
+                  _newAccountVisibleToViewer(profile, viewerTier),
+            )
             .toList()
-          ..sort(
-            (a, b) => b.compatibilityScore.compareTo(a.compatibilityScore),
-          );
+          ..sort(_compareDiscoverProfiles);
       } on PostgrestException {
         // A new account may not have shared its position yet. Continue with
         // discovery instead of making the page unusable.
@@ -419,13 +434,14 @@ class MapLovRepository {
     final rows = await _client!
         .from('profiles')
         .select()
-        .neq('id', currentUserId!)
         .eq('status', 'active')
         .eq('is_discoverable', true)
         .limit(100);
     final profiles = <UserProfile>[];
     for (final row in rows) {
       final profile = await _profileFromRow(row);
+      if (profile.id == currentUserId && !profile.isNew) continue;
+      if (!_newAccountVisibleToViewer(profile, viewerTier)) continue;
       if (profile.photoUrls.isEmpty) continue;
       if (profile.age < filters.minimumAge ||
           profile.age > filters.maximumAge) {
@@ -437,10 +453,26 @@ class MapLovRepository {
       if (!_profileMatchesFilters(enriched, filters)) continue;
       profiles.add(enriched);
     }
-    profiles.sort(
-      (a, b) => b.compatibilityScore.compareTo(a.compatibilityScore),
-    );
+    profiles.sort(_compareDiscoverProfiles);
     return profiles;
+  }
+
+  bool _newAccountVisibleToViewer(UserProfile profile, String viewerTier) {
+    if (!profile.isNew || profile.id == currentUserId) return true;
+    final createdAt = profile.createdAt;
+    if (createdAt == null) return true;
+    return newAccountVisibleToTier(
+      createdAt: createdAt,
+      viewerTier: viewerTier,
+      isOwner: profile.id == currentUserId,
+    );
+  }
+
+  int _compareDiscoverProfiles(UserProfile a, UserProfile b) {
+    if (a.isNew != b.isNew) return a.isNew ? -1 : 1;
+    final engagement = b.engagementScore.compareTo(a.engagementScore);
+    if (engagement != 0) return engagement;
+    return b.compatibilityScore.compareTo(a.compatibilityScore);
   }
 
   bool _profileMatchesFilters(UserProfile profile, DiscoveryFilters filters) {
@@ -954,6 +986,33 @@ class MapLovRepository {
       final isMatched = await _hasMatchWith(profileId);
       return ProfileLikeResult(liked: true, matched: !wasMatched && isMatched);
     }
+  }
+
+  Future<bool> togglePhotoSuperLike(
+    String photoId, {
+    required bool currentlySuperLiked,
+  }) async {
+    if (!isLive) {
+      if (currentlySuperLiked) {
+        _demoSuperLikedPhotoIds.remove(photoId);
+        return false;
+      }
+      _demoSuperLikedPhotoIds.add(photoId);
+      return true;
+    }
+    if (currentlySuperLiked) {
+      await _client!
+          .from('photo_super_likes')
+          .delete()
+          .eq('photo_id', photoId)
+          .eq('user_id', currentUserId!);
+      return false;
+    }
+    await _client!.from('photo_super_likes').insert({
+      'photo_id': photoId,
+      'user_id': currentUserId!,
+    });
+    return true;
   }
 
   Future<List<Map<String, String>>> photoComments(String photoId) async {
@@ -1710,12 +1769,25 @@ class MapLovRepository {
 
   Future<String> createGardenAlbum(String title) async {
     if (!isLive) return 'demo-garden';
-    final row = await _client!
-        .from('garden_albums')
-        .insert({'owner_id': currentUserId!, 'title': title.trim()})
-        .select('id')
-        .single();
-    return row['id'] as String;
+    final normalizedTitle = title.trim();
+    if (normalizedTitle.isEmpty) {
+      throw ArgumentError.value(title, 'title', 'Album name is required.');
+    }
+    try {
+      return await _client!.rpc(
+            'create_my_garden_album',
+            params: {'album_title': normalizedTitle},
+          )
+          as String;
+    } on PostgrestException catch (error) {
+      if (error.code != 'PGRST202' && error.code != '42883') rethrow;
+      final row = await _client!
+          .from('garden_albums')
+          .insert({'owner_id': currentUserId!, 'title': normalizedTitle})
+          .select('id')
+          .single();
+      return row['id'] as String;
+    }
   }
 
   Future<void> uploadGardenPhoto({
@@ -2450,15 +2522,24 @@ class MapLovRepository {
     }
     final photos = await _client!
         .from('profile_photos')
-        .select('id, storage_path, is_primary')
+        .select(
+          'id, storage_path, is_primary, photo_likes(count), '
+          'photo_super_likes(count), photo_comments(count)',
+        )
         .eq('user_id', id)
         .eq('moderation_status', 'visible')
         .order('is_primary', ascending: false)
         .order('display_order');
     final urls = <String>[];
     final photoIds = <String>[];
+    final likeCounts = <int>[];
+    final superLikeCounts = <int>[];
+    final commentCounts = <int>[];
     for (final photo in photos) {
       photoIds.add(photo['id'] as String);
+      likeCounts.add(_embeddedCount(photo['photo_likes']));
+      superLikeCounts.add(_embeddedCount(photo['photo_super_likes']));
+      commentCounts.add(_embeddedCount(photo['photo_comments']));
       urls.add(
         await _signedUrl('profile-media', photo['storage_path'] as String),
       );
@@ -2481,6 +2562,12 @@ class MapLovRepository {
     final lastActive = DateTime.tryParse(
       row['last_active_at'] as String? ?? '',
     );
+    final createdAt = DateTime.tryParse(row['created_at'] as String? ?? '');
+    final presenceIsFresh =
+        lastActive != null && now.difference(lastActive).inMinutes < 3;
+    final presenceFlag = row['is_online'] as bool? ?? false;
+    final showOnline =
+        row['show_online_status'] as bool? ?? row.containsKey('is_online');
     return UserProfile(
       id: id,
       name: row['first_name'] as String? ?? 'MapLov member',
@@ -2495,17 +2582,15 @@ class MapLovRepository {
           : urls.first,
       photoUrls: urls,
       photoIds: photoIds,
+      photoLikeCounts: likeCounts,
+      photoSuperLikeCounts: superLikeCounts,
+      photoCommentCounts: commentCounts,
       photoDisplayStyle: style,
       profession: row['profession'] as String? ?? 'MapLov member',
       distanceKm: ((row['distance_km'] as num?)?.round() ?? 5),
-      isOnline:
-          row['is_online'] as bool? ??
-          (lastActive != null && now.difference(lastActive).inMinutes < 5),
+      isOnline: showOnline && presenceFlag && presenceIsFresh,
       isNew:
-          DateTime.tryParse(
-            row['created_at'] as String? ?? '',
-          )?.isAfter(now.subtract(const Duration(days: 14))) ??
-          false,
+          createdAt?.isAfter(now.subtract(const Duration(days: 28))) ?? false,
       bio: row['bio'] as String? ?? '',
       isVerified: row['is_verified'] as bool? ?? false,
       isVip: isVip,
@@ -2519,7 +2604,16 @@ class MapLovRepository {
       hairColor: row['hair_color'] as String? ?? '',
       heightCm: row['height_cm'] as int?,
       lastActiveAt: lastActive,
+      createdAt: createdAt,
     );
+  }
+
+  int _embeddedCount(dynamic value) {
+    if (value is List && value.isNotEmpty) {
+      final count = value.first is Map ? value.first['count'] : null;
+      return (count as num?)?.toInt() ?? 0;
+    }
+    return 0;
   }
 
   UserProfile _copyProfile(
@@ -2539,6 +2633,9 @@ class MapLovRepository {
     imagePath: value.imagePath,
     photoUrls: value.photoUrls,
     photoIds: value.photoIds,
+    photoLikeCounts: value.photoLikeCounts,
+    photoSuperLikeCounts: value.photoSuperLikeCounts,
+    photoCommentCounts: value.photoCommentCounts,
     photoDisplayStyle: value.photoDisplayStyle,
     profession: value.profession,
     distanceKm: value.distanceKm,
@@ -2560,6 +2657,7 @@ class MapLovRepository {
         compatibilityBreakdown ?? value.compatibilityBreakdown,
     likedByMe: likedByMe ?? value.likedByMe,
     lastActiveAt: value.lastActiveAt,
+    createdAt: value.createdAt,
   );
 
   Future<MapLovMessage> _messageFromRow(

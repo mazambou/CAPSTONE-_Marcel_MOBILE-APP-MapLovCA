@@ -208,12 +208,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         'date_of_birth': birthDate.text,
         'gender': gender,
         'city': city.text.trim(),
-        'country_name': country,
         'residence_city': city.text.trim(),
-        'residence_country_name': country,
         'origin_city': originCity.text.trim(),
-        'origin_country_name': originCountry,
-        'country_code': country == 'Canada' ? 'CA' : null,
         'profession': profession.text.trim(),
         'education_level': educationLevel,
         'height_cm': height.round(),
@@ -309,13 +305,23 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       const SizedBox(height: 12),
       _textField(city, 'City', Icons.location_city_outlined),
       const SizedBox(height: 12),
-      _dropdown('Country of residence', country, _worldCountries, (value) {
-        country = value;
-      }),
+      _dropdown(
+        'Country of residence',
+        country,
+        _worldCountries,
+        (value) => country = value,
+        enabled: false,
+        helperText: 'Change and re-verify your phone number to update it.',
+      ),
       const _SectionTitle('Origin'),
-      _dropdown('Country of origin', originCountry, _worldCountries, (value) {
-        originCountry = value;
-      }),
+      _dropdown(
+        'Country of origin',
+        originCountry,
+        _worldCountries,
+        (value) => originCountry = value,
+        enabled: false,
+        helperText: 'Country of origin is chosen once during registration.',
+      ),
       const SizedBox(height: 12),
       _textField(originCity, 'City of origin', Icons.travel_explore_outlined),
       const SizedBox(height: 12),
@@ -548,11 +554,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     String label,
     String value,
     List<String> options,
-    ValueChanged<String> update,
-  ) => DropdownButtonFormField<String>(
+    ValueChanged<String> update, {
+    bool enabled = true,
+    String? helperText,
+  }) => DropdownButtonFormField<String>(
     initialValue: value,
     isExpanded: true,
-    decoration: InputDecoration(labelText: label),
+    decoration: InputDecoration(labelText: label, helperText: helperText),
     items: options
         .map(
           (option) => DropdownMenuItem(
@@ -561,9 +569,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           ),
         )
         .toList(),
-    onChanged: (selected) {
-      if (selected != null) setState(() => update(selected));
-    },
+    onChanged: enabled
+        ? (selected) {
+            if (selected != null) setState(() => update(selected));
+          }
+        : null,
   );
 
   Widget _chips(List<String> options, Set<String> selected) => Wrap(

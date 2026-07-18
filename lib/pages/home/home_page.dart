@@ -237,9 +237,19 @@ class _DiscoverHeader extends StatelessWidget {
           IconButton(
             key: const Key('home_notifications_button'),
             onPressed: onNotifications,
-            icon: const Badge(
-              label: Text('3'),
-              child: Icon(Icons.notifications_none, size: 29),
+            icon: StreamBuilder<List<MapLovNotification>>(
+              stream: MapLovRepository.instance.watchNotifications(),
+              builder: (context, snapshot) {
+                final unread = (snapshot.data ?? const <MapLovNotification>[])
+                    .where((item) => !item.isRead)
+                    .length;
+                return Badge(
+                  key: const Key('discover_notification_badge'),
+                  label: Text('$unread'),
+                  isLabelVisible: unread > 0,
+                  child: const Icon(Icons.notifications_none, size: 29),
+                );
+              },
             ),
           ),
         ],

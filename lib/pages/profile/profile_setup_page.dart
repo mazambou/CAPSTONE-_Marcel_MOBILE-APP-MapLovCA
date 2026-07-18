@@ -17,6 +17,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   String originCity = 'Toronto';
   bool saving = false;
   bool loadingProfile = true;
+  bool originLocked = false;
   late Future<List<Map<String, dynamic>>> photos;
 
   @override
@@ -51,6 +52,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
         if (savedOriginCountry != null &&
             _worldCountries.contains(savedOriginCountry)) {
           originCountry = savedOriginCountry;
+          originLocked = true;
         }
         final savedOriginCity = profile['origin_city'] as String?;
         if (savedOriginCity != null) {
@@ -188,6 +190,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
           residenceCityOther.clear();
         }),
         onCityChanged: (value) => setState(() => residenceCity = value),
+        countryReadOnly: true,
       ),
       const _SectionTitle('Your origin'),
       _geographyFields(
@@ -203,6 +206,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
           originCityOther.clear();
         }),
         onCityChanged: (value) => setState(() => originCity = value),
+        countryReadOnly: originLocked,
       ),
       const SizedBox(height: 12),
       DropdownButtonFormField<String>(
@@ -245,6 +249,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     required String cityLabel,
     required ValueChanged<String> onCountryChanged,
     required ValueChanged<String> onCityChanged,
+    bool countryReadOnly = false,
   }) {
     final cities = [...?_registrationCitiesByCountry[country], 'Other city'];
     return Column(
@@ -257,6 +262,11 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
           decoration: InputDecoration(
             labelText: countryLabel,
             prefixIcon: const Icon(Icons.public),
+            helperText: countryReadOnly
+                ? countryLabel.contains('residence')
+                      ? 'Determined by your verified phone number.'
+                      : 'Country of origin can only be chosen once.'
+                : null,
           ),
           items: _worldCountries
               .map(
@@ -266,7 +276,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                 ),
               )
               .toList(),
-          onChanged: saving
+          onChanged: saving || countryReadOnly
               ? null
               : (value) {
                   if (value != null) onCountryChanged(value);

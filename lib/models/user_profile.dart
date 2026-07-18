@@ -1,5 +1,19 @@
 enum PhotoDisplayStyle { profileDetails, social }
 
+bool newAccountVisibleToTier({
+  required DateTime createdAt,
+  required String viewerTier,
+  required bool isOwner,
+  DateTime? now,
+}) {
+  if (isOwner) return true;
+  final age = (now ?? DateTime.now()).toUtc().difference(createdAt.toUtc());
+  final vip = viewerTier == 'vip' || viewerTier == 'elite';
+  if (age < const Duration(days: 7)) return vip;
+  if (age < const Duration(days: 14)) return vip || viewerTier == 'plus';
+  return true;
+}
+
 class UserProfile {
   const UserProfile({
     this.id = '',
@@ -19,6 +33,9 @@ class UserProfile {
     this.bio = '',
     this.photoUrls = const [],
     this.photoIds = const [],
+    this.photoLikeCounts = const [],
+    this.photoSuperLikeCounts = const [],
+    this.photoCommentCounts = const [],
     this.isVerified = false,
     this.isVip = false,
     this.gender = '',
@@ -33,6 +50,7 @@ class UserProfile {
     this.compatibilityBreakdown = const {},
     this.likedByMe = false,
     this.lastActiveAt,
+    this.createdAt,
   });
 
   final String id;
@@ -52,6 +70,9 @@ class UserProfile {
   final String bio;
   final List<String> photoUrls;
   final List<String> photoIds;
+  final List<int> photoLikeCounts;
+  final List<int> photoSuperLikeCounts;
+  final List<int> photoCommentCounts;
   final bool isVerified;
   final bool isVip;
   final String gender;
@@ -66,6 +87,27 @@ class UserProfile {
   final Map<String, dynamic> compatibilityBreakdown;
   final bool likedByMe;
   final DateTime? lastActiveAt;
+  final DateTime? createdAt;
+
+  int photoLikeCount(int index) =>
+      index < photoLikeCounts.length ? photoLikeCounts[index] : 0;
+  int photoSuperLikeCount(int index) =>
+      index < photoSuperLikeCounts.length ? photoSuperLikeCounts[index] : 0;
+  int photoCommentCount(int index) =>
+      index < photoCommentCounts.length ? photoCommentCounts[index] : 0;
+
+  int get engagementScore {
+    var highest = 0;
+    final count = photoUrls.isEmpty ? 1 : photoUrls.length;
+    for (var index = 0; index < count; index++) {
+      final score =
+          photoLikeCount(index) +
+          photoSuperLikeCount(index) +
+          photoCommentCount(index);
+      if (score > highest) highest = score;
+    }
+    return highest;
+  }
 
   bool get hasNetworkImage =>
       imagePath.startsWith('http://') || imagePath.startsWith('https://');

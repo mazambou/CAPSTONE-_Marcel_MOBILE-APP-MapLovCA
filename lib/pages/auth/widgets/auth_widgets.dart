@@ -117,14 +117,16 @@ class _FieldState extends State<_Field> {
     enabled: widget.enabled,
     autofillHints: widget.autofillHints,
     decoration: InputDecoration(
-      labelText: widget.label,
+      labelText: context.tr(widget.label),
       prefixIcon: Icon(widget.icon),
       suffixIcon: widget.secret
           ? IconButton(
               key: Key(
                 'toggle_${widget.label.toLowerCase().replaceAll(' ', '_')}',
               ),
-              tooltip: _obscured ? 'Show password' : 'Hide password',
+              tooltip: context.tr(
+                _obscured ? 'Show password' : 'Hide password',
+              ),
               onPressed: () => setState(() => _obscured = !_obscured),
               icon: Icon(
                 _obscured

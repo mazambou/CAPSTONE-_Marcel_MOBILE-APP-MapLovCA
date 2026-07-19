@@ -222,7 +222,7 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
       const _SectionTitle('Who you want to meet'),
       DropdownButtonFormField<String>(
         initialValue: gender,
-        decoration: const InputDecoration(labelText: 'Gender'),
+        decoration: InputDecoration(labelText: context.tr('Gender')),
         items: ['Everyone', 'Women', 'Men', 'Non-binary']
             .map((value) => DropdownMenuItem(value: value, child: Text(value)))
             .toList(),
@@ -259,7 +259,7 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
       const _SectionTitle('Compatibility priorities'),
       DropdownButtonFormField<String>(
         initialValue: relationshipGoal,
-        decoration: const InputDecoration(labelText: 'Relationship goal'),
+        decoration: InputDecoration(labelText: context.tr('Relationship goal')),
         items: ['Long-term', 'Dating', 'Friendship', 'Networking']
             .map((value) => DropdownMenuItem(value: value, child: Text(value)))
             .toList(),
@@ -275,7 +275,7 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
       const SizedBox(height: 12),
       DropdownButtonFormField<String>(
         initialValue: language,
-        decoration: const InputDecoration(labelText: 'Languages'),
+        decoration: InputDecoration(labelText: context.tr('Languages')),
         items: ['English & French', 'English', 'French', 'Any language']
             .map((value) => DropdownMenuItem(value: value, child: Text(value)))
             .toList(),
@@ -290,7 +290,7 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
       const SizedBox(height: 12),
       DropdownButtonFormField<String>(
         initialValue: personality,
-        decoration: const InputDecoration(labelText: 'Personality'),
+        decoration: InputDecoration(labelText: context.tr('Personality')),
         items:
             [
                   'Any personality',

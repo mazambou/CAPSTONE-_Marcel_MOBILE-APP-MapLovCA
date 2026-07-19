@@ -201,16 +201,17 @@ class _PremiumHeader extends StatelessWidget {
                     fontSize: isWide ? 23 : 16,
                     height: 1.35,
                   ),
-                  children: const [
+                  children: [
                     TextSpan(
-                      text:
-                          'Choose the plan that fits your needs\nand enjoy the full ',
+                      text: context.tr(
+                        'Choose the plan that fits your needs\nand enjoy the full ',
+                      ),
                     ),
-                    TextSpan(
+                    const TextSpan(
                       text: 'MapLov',
                       style: TextStyle(color: AppColors.deepPink),
                     ),
-                    TextSpan(text: ' experience.'),
+                    TextSpan(text: context.tr(' experience.')),
                   ],
                 ),
                 textAlign: TextAlign.center,

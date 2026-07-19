@@ -97,7 +97,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                         style: const TextStyle(fontWeight: FontWeight.w700),
                       ),
                       subtitle: Text(
-                        '${item.body}\n${_relativeTime(item.createdAt)}',
+                        '${context.tr(item.body)}\n'
+                        '${context.tr(_relativeTime(item.createdAt))}',
                       ),
                       trailing: PopupMenuButton<String>(
                         itemBuilder: (_) => [

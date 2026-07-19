@@ -40,8 +40,8 @@ class _ModerationReportsScreenState extends State<ModerationReportsScreen> {
         content: TextField(
           controller: controller,
           maxLines: 3,
-          decoration: const InputDecoration(
-            labelText: 'Optional moderation notes',
+          decoration: InputDecoration(
+            labelText: context.tr('Optional moderation notes'),
           ),
         ),
         actions: [
@@ -104,7 +104,9 @@ class _ModerationReportsScreenState extends State<ModerationReportsScreen> {
         content: TextField(
           controller: controller,
           maxLines: 4,
-          decoration: const InputDecoration(labelText: 'Resolution notes'),
+          decoration: InputDecoration(
+            labelText: context.tr('Resolution notes'),
+          ),
         ),
         actions: [
           TextButton(

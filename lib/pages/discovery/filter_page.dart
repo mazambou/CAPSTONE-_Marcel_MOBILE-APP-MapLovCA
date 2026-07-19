@@ -353,7 +353,7 @@ class _FilterScreenState extends State<FilterScreen> {
       children: [
         DropdownButtonFormField<String>(
           initialValue: selectedGender,
-          decoration: const InputDecoration(labelText: 'Gender'),
+          decoration: InputDecoration(labelText: context.tr('Gender')),
           items: ['Everyone', 'Women', 'Men', 'Non-binary']
               .map(
                 (value) => DropdownMenuItem(value: value, child: Text(value)),
@@ -401,7 +401,7 @@ class _FilterScreenState extends State<FilterScreen> {
           key: const Key('quick_language_filter'),
           initialValue: quickLanguage,
           isExpanded: true,
-          decoration: const InputDecoration(labelText: 'Languages'),
+          decoration: InputDecoration(labelText: context.tr('Languages')),
           items: const ['Any', 'English', 'French', 'Spanish']
               .map(
                 (value) => DropdownMenuItem(value: value, child: Text(value)),
@@ -414,7 +414,9 @@ class _FilterScreenState extends State<FilterScreen> {
           key: const Key('quick_relationship_goal_filter'),
           initialValue: quickRelationshipGoal,
           isExpanded: true,
-          decoration: const InputDecoration(labelText: 'Relationship goal'),
+          decoration: InputDecoration(
+            labelText: context.tr('Relationship goal'),
+          ),
           items:
               const [
                     'Any',
@@ -1160,7 +1162,7 @@ class _HeightFilterCard extends StatelessWidget {
                 child: DropdownButtonFormField<String>(
                   initialValue: minimum,
                   isExpanded: true,
-                  decoration: const InputDecoration(labelText: 'From'),
+                  decoration: InputDecoration(labelText: context.tr('From')),
                   items: _heightOptions
                       .map(
                         (value) =>
@@ -1180,7 +1182,7 @@ class _HeightFilterCard extends StatelessWidget {
                 child: DropdownButtonFormField<String>(
                   initialValue: maximum,
                   isExpanded: true,
-                  decoration: const InputDecoration(labelText: 'To'),
+                  decoration: InputDecoration(labelText: context.tr('To')),
                   items: _heightOptions
                       .map(
                         (value) =>
@@ -1552,9 +1554,9 @@ class _MyCountryFilter extends StatelessWidget {
             key: const Key('my_country_city_dropdown'),
             initialValue: selectedCity,
             isExpanded: true,
-            decoration: const InputDecoration(
-              labelText: 'City in Canada',
-              prefixIcon: Icon(Icons.location_city_outlined),
+            decoration: InputDecoration(
+              labelText: context.tr('City in Canada'),
+              prefixIcon: const Icon(Icons.location_city_outlined),
             ),
             items: _canadianCities
                 .map((city) => DropdownMenuItem(value: city, child: Text(city)))
@@ -1612,9 +1614,9 @@ class _InternationalFilter extends StatelessWidget {
             initialValue: selectedCountry,
             isExpanded: true,
             menuMaxHeight: 360,
-            decoration: const InputDecoration(
-              labelText: 'Country',
-              prefixIcon: Icon(Icons.flag_outlined),
+            decoration: InputDecoration(
+              labelText: context.tr('Country'),
+              prefixIcon: const Icon(Icons.flag_outlined),
             ),
             items: _worldCountries
                 .map(
@@ -1637,9 +1639,9 @@ class _InternationalFilter extends StatelessWidget {
                 ? selectedCity
                 : 'Any city',
             isExpanded: true,
-            decoration: const InputDecoration(
-              labelText: 'City of residence',
-              prefixIcon: Icon(Icons.location_city_outlined),
+            decoration: InputDecoration(
+              labelText: context.tr('City of residence'),
+              prefixIcon: const Icon(Icons.location_city_outlined),
             ),
             items:
                 ['Any city', ...?_registrationCitiesByCountry[selectedCountry]]
@@ -1689,9 +1691,9 @@ class _OriginFilter extends StatelessWidget {
             initialValue: country,
             isExpanded: true,
             menuMaxHeight: 360,
-            decoration: const InputDecoration(
-              labelText: 'Country of origin',
-              prefixIcon: Icon(Icons.public_outlined),
+            decoration: InputDecoration(
+              labelText: context.tr('Country of origin'),
+              prefixIcon: const Icon(Icons.public_outlined),
             ),
             items: ['Any country', ..._worldCountries]
                 .map(
@@ -1708,9 +1710,9 @@ class _OriginFilter extends StatelessWidget {
             key: ValueKey('origin_city_${country}_$city'),
             initialValue: cityOptions.contains(city) ? city : 'Any city',
             isExpanded: true,
-            decoration: const InputDecoration(
-              labelText: 'City of origin',
-              prefixIcon: Icon(Icons.location_city_outlined),
+            decoration: InputDecoration(
+              labelText: context.tr('City of origin'),
+              prefixIcon: const Icon(Icons.location_city_outlined),
             ),
             items: cityOptions
                 .map(

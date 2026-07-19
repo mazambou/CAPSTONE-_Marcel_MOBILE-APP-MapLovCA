@@ -1076,7 +1076,7 @@ class _PhotoCommentsSheetState extends State<_PhotoCommentsSheet> {
               controller: controller,
               style: const TextStyle(color: Colors.white),
               decoration: InputDecoration(
-                hintText: 'Add a respectful comment...',
+                hintText: context.tr('Add a respectful comment...'),
                 hintStyle: const TextStyle(color: Colors.white54),
                 fillColor: Colors.white.withValues(alpha: 0.1),
                 suffixIcon: IconButton(

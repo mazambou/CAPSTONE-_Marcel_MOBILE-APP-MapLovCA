@@ -31,9 +31,9 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
         style: TextStyle(color: AppColors.grayText),
       ),
       TextField(
-        decoration: const InputDecoration(
-          hintText: 'Search users',
-          prefixIcon: Icon(Icons.search),
+        decoration: InputDecoration(
+          hintText: context.tr('Search users'),
+          prefixIcon: const Icon(Icons.search),
         ),
         onChanged: (value) =>
             setState(() => query = value.trim().toLowerCase()),

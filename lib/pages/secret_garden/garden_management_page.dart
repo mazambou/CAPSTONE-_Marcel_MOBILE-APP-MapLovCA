@@ -33,7 +33,7 @@ class _GardenManagementScreenState extends State<GardenManagementScreen> {
         content: TextFormField(
           initialValue: initialValue,
           autofocus: true,
-          decoration: const InputDecoration(labelText: 'Album name'),
+          decoration: InputDecoration(labelText: context.tr('Album name')),
           textInputAction: TextInputAction.done,
           onChanged: (value) => draft = value,
           onFieldSubmitted: (value) => Navigator.pop(context, value.trim()),

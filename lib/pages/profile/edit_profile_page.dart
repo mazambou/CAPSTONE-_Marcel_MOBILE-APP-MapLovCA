@@ -335,9 +335,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       TextField(
         controller: bio,
         maxLines: 4,
-        decoration: const InputDecoration(
-          labelText: 'Bio',
-          hintText: 'Curious traveler, coffee enthusiast...',
+        decoration: InputDecoration(
+          labelText: context.tr('Bio'),
+          hintText: context.tr('Curious traveler, coffee enthusiast...'),
         ),
       ),
       const _SectionTitle('Relationship goal'),
@@ -367,9 +367,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         controller: birthDate,
         readOnly: true,
         onTap: _pickBirthDate,
-        decoration: const InputDecoration(
-          labelText: 'Date of birth',
-          prefixIcon: Icon(Icons.calendar_month_outlined),
+        decoration: InputDecoration(
+          labelText: context.tr('Date of birth'),
+          prefixIcon: const Icon(Icons.calendar_month_outlined),
         ),
       ),
       const SizedBox(height: 12),
@@ -556,9 +556,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     controller: controller,
     enabled: enabled,
     decoration: InputDecoration(
-      labelText: label,
+      labelText: context.tr(label),
       prefixIcon: Icon(icon),
-      helperText: helperText,
+      helperText: helperText == null ? null : context.tr(helperText),
     ),
   );
 
@@ -572,7 +572,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   }) => DropdownButtonFormField<String>(
     initialValue: value,
     isExpanded: true,
-    decoration: InputDecoration(labelText: label, helperText: helperText),
+    decoration: InputDecoration(
+      labelText: context.tr(label),
+      helperText: helperText == null ? null : context.tr(helperText),
+    ),
     items: options
         .map(
           (option) => DropdownMenuItem(

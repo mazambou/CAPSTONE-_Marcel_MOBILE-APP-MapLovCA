@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:maplove/app.dart';
 import 'package:maplove/config/supabase_config.dart';
 import 'package:maplove/routes/app_routes.dart';
+import 'package:maplove/services/locale_service.dart';
 import 'package:maplove/services/location_service.dart';
 import 'package:maplove/services/maplov_repository.dart';
 
@@ -1414,8 +1415,37 @@ void main() {
     expect(translations.translate('Settings'), 'Paramètres');
     expect(translations.translate('Manage photos'), 'Gérer les photos');
     expect(
+      translations.translate('Unable to apply filters: network error'),
+      'Impossible d’appliquer les filtres : network error',
+    );
+    expect(translations.translate('2 Comments'), '2 commentaires');
+    expect(
       translations.translate('Unknown dynamic content'),
       'Unknown dynamic content',
+    );
+  });
+
+  test('saved language wins and device language is the first-run default', () {
+    expect(
+      LocaleService.resolveInitialLocale(
+        savedLanguageCode: null,
+        deviceLocale: const Locale('fr', 'CA'),
+      ),
+      const Locale('fr'),
+    );
+    expect(
+      LocaleService.resolveInitialLocale(
+        savedLanguageCode: null,
+        deviceLocale: const Locale('es'),
+      ),
+      const Locale('en'),
+    );
+    expect(
+      LocaleService.resolveInitialLocale(
+        savedLanguageCode: 'en',
+        deviceLocale: const Locale('fr', 'CA'),
+      ),
+      const Locale('en'),
     );
   });
 

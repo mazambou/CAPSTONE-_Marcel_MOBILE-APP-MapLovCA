@@ -92,8 +92,8 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
         controller: _body,
         minLines: 5,
         maxLines: 8,
-        decoration: const InputDecoration(
-          hintText: 'Share something with your friends...',
+        decoration: InputDecoration(
+          hintText: context.tr('Share something with your friends...'),
           alignLabelWithHint: true,
         ),
       ),

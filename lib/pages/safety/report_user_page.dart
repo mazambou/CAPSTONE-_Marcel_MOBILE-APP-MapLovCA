@@ -90,7 +90,7 @@ class _ReportUserScreenState extends State<ReportUserScreen> {
       TextField(
         controller: comment,
         maxLines: 4,
-        decoration: const InputDecoration(labelText: 'Optional comment'),
+        decoration: InputDecoration(labelText: context.tr('Optional comment')),
       ),
       if (widget.profile != null)
         CheckboxListTile(

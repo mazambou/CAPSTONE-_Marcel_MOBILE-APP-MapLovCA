@@ -16,8 +16,8 @@ class _HelpCenterScreenState extends State<HelpCenterScreen> {
     final items = _helpArticles.where(
       (item) =>
           normalized.isEmpty ||
-          item.title.toLowerCase().contains(normalized) ||
-          item.answer.toLowerCase().contains(normalized),
+          context.tr(item.title).toLowerCase().contains(normalized) ||
+          context.tr(item.answer).toLowerCase().contains(normalized),
     );
     return _AppPage(
       title: 'Help Center',
@@ -25,9 +25,9 @@ class _HelpCenterScreenState extends State<HelpCenterScreen> {
         TextField(
           key: const Key('help_search'),
           onChanged: (value) => setState(() => query = value),
-          decoration: const InputDecoration(
-            hintText: 'Search for help',
-            prefixIcon: Icon(Icons.search),
+          decoration: InputDecoration(
+            hintText: context.tr('Search for help'),
+            prefixIcon: const Icon(Icons.search),
           ),
         ),
         const _SectionTitle('Popular topics'),
@@ -50,7 +50,7 @@ class _HelpCenterScreenState extends State<HelpCenterScreen> {
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 18),
                   child: Align(
                     alignment: Alignment.centerLeft,
-                    child: SelectableText(item.answer),
+                    child: SelectableText(context.tr(item.answer)),
                   ),
                 ),
               ],
@@ -62,11 +62,13 @@ class _HelpCenterScreenState extends State<HelpCenterScreen> {
             context: context,
             builder: (context) => AlertDialog(
               title: const Text('Contact support'),
-              content: const SelectableText(
-                'General support: support@maplov.ca\n'
-                'Privacy: privacy@maplov.ca\n'
-                'Child safety: child-safety@maplov.ca\n\n'
-                'Include your account email, device model and a short description. Never send your password or SMS code.',
+              content: SelectableText(
+                context.tr(
+                  'General support: support@maplov.ca\n'
+                  'Privacy: privacy@maplov.ca\n'
+                  'Child safety: child-safety@maplov.ca\n\n'
+                  'Include your account email, device model and a short description. Never send your password or SMS code.',
+                ),
               ),
               actions: [
                 TextButton(

@@ -507,16 +507,16 @@ class _LoginCard extends StatelessWidget {
           const SizedBox(height: 4),
           TextButton(
             onPressed: onRegister,
-            child: const Text.rich(
+            child: Text.rich(
               TextSpan(
                 children: [
                   TextSpan(
-                    text: 'New to MapLov? ',
-                    style: TextStyle(color: AppColors.grayText),
+                    text: context.tr('New to MapLov? '),
+                    style: const TextStyle(color: AppColors.grayText),
                   ),
                   TextSpan(
-                    text: 'Create Account',
-                    style: TextStyle(
+                    text: context.tr('Create Account'),
+                    style: const TextStyle(
                       color: AppColors.deepPink,
                       fontWeight: FontWeight.w700,
                     ),
@@ -567,7 +567,7 @@ class _LoginField extends StatelessWidget {
       enabled: enabled,
       autofillHints: autofillHints,
       decoration: InputDecoration(
-        hintText: hintText,
+        hintText: context.tr(hintText),
         hintStyle: const TextStyle(color: AppColors.grayText),
         filled: true,
         fillColor: AppColors.white,

@@ -104,8 +104,8 @@ class _PostDetailsScreenState extends State<PostDetailsScreen> {
           const _SectionTitle('Add a comment'),
           TextField(
             controller: comment,
-            decoration: const InputDecoration(
-              hintText: 'Write a respectful comment…',
+            decoration: InputDecoration(
+              hintText: context.tr('Write a respectful comment…'),
             ),
           ),
           const SizedBox(height: 10),

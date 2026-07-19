@@ -193,7 +193,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   initialValue: _country,
                   isExpanded: true,
                   menuMaxHeight: 360,
-                  decoration: const InputDecoration(labelText: 'Code'),
+                  decoration: InputDecoration(labelText: context.tr('Code')),
                   selectedItemBuilder: (context) => _worldCountries
                       .map(
                         (country) => Align(
@@ -260,10 +260,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
             initialValue: _country,
             isExpanded: true,
             menuMaxHeight: 360,
-            decoration: const InputDecoration(
-              labelText: 'Country of residence (from phone)',
-              prefixIcon: Icon(Icons.public),
-              helperText: 'Change the phone country code to update residence.',
+            decoration: InputDecoration(
+              labelText: context.tr('Country of residence (from phone)'),
+              prefixIcon: const Icon(Icons.public),
+              helperText: context.tr(
+                'Change the phone country code to update residence.',
+              ),
             ),
             items: _worldCountries
                 .map(
@@ -282,9 +284,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
           initialValue: _city,
           isExpanded: true,
           menuMaxHeight: 360,
-          decoration: const InputDecoration(
-            labelText: 'City of residence',
-            prefixIcon: Icon(Icons.location_city_outlined),
+          decoration: InputDecoration(
+            labelText: context.tr('City of residence'),
+            prefixIcon: const Icon(Icons.location_city_outlined),
           ),
           items: _availableCities
               .map(
@@ -316,10 +318,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
           initialValue: _originCountry,
           isExpanded: true,
           menuMaxHeight: 360,
-          decoration: const InputDecoration(
-            labelText: 'Country of origin',
-            prefixIcon: Icon(Icons.travel_explore_outlined),
-            helperText: 'This choice is permanent after account creation.',
+          decoration: InputDecoration(
+            labelText: context.tr('Country of origin'),
+            prefixIcon: const Icon(Icons.travel_explore_outlined),
+            helperText: context.tr(
+              'This choice is permanent after account creation.',
+            ),
           ),
           items: _worldCountries
               .map(
@@ -344,10 +348,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
           initialValue: _originCity,
           isExpanded: true,
           menuMaxHeight: 360,
-          decoration: const InputDecoration(
-            labelText: 'City of origin',
-            prefixIcon: Icon(Icons.travel_explore_outlined),
-            helperText: 'This choice is permanent after account creation.',
+          decoration: InputDecoration(
+            labelText: context.tr('City of origin'),
+            prefixIcon: const Icon(Icons.travel_explore_outlined),
+            helperText: context.tr(
+              'This choice is permanent after account creation.',
+            ),
           ),
           items: _availableOriginCities
               .map(

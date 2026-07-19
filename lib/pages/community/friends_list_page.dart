@@ -61,9 +61,9 @@ class _FriendsListScreenState extends State<FriendsListScreen> {
       TextField(
         onChanged: (value) =>
             setState(() => query = value.trim().toLowerCase()),
-        decoration: const InputDecoration(
-          hintText: 'Search friends',
-          prefixIcon: Icon(Icons.search),
+        decoration: InputDecoration(
+          hintText: context.tr('Search friends'),
+          prefixIcon: const Icon(Icons.search),
         ),
       ),
       const SizedBox(height: 16),

@@ -189,9 +189,9 @@ class _VerifyPhoneScreenState extends State<VerifyPhoneScreen> {
           maxLength: 6,
           autofillHints: const [AutofillHints.oneTimeCode],
           onSubmitted: (_) => _verify(),
-          decoration: const InputDecoration(
-            labelText: '6-digit code',
-            prefixIcon: Icon(Icons.password_outlined),
+          decoration: InputDecoration(
+            labelText: context.tr('6-digit code'),
+            prefixIcon: const Icon(Icons.password_outlined),
           ),
         ),
         if (_message != null) ...[

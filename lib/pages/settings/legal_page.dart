@@ -172,11 +172,11 @@ class _LegalDocumentScreen extends StatelessWidget {
       ...sections.expand(
         (section) => [
           _SectionTitle(section.title),
-          SelectableText(section.body),
+          SelectableText(context.tr(section.body)),
         ],
       ),
       const SizedBox(height: 20),
-      const SelectableText('Questions: privacy@maplov.ca'),
+      SelectableText(context.tr('Questions: privacy@maplov.ca')),
     ],
   );
 }

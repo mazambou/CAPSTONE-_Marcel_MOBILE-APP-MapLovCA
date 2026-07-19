@@ -71,8 +71,8 @@ class _AccessRequestsScreenState extends State<AccessRequestsScreen> {
                           ),
                           DropdownButtonFormField<int?>(
                             initialValue: item.requestedSeconds,
-                            decoration: const InputDecoration(
-                              labelText: 'Access duration',
+                            decoration: InputDecoration(
+                              labelText: context.tr('Access duration'),
                             ),
                             items: const [
                               DropdownMenuItem(

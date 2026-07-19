@@ -215,7 +215,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       DropdownButtonFormField<String>(
         initialValue: gender,
         isExpanded: true,
-        decoration: const InputDecoration(labelText: 'Gender'),
+        decoration: InputDecoration(labelText: context.tr('Gender')),
         items: const ['Woman', 'Man', 'Non-binary', 'Prefer not to say']
             .map((value) => DropdownMenuItem(value: value, child: Text(value)))
             .toList(),
@@ -225,8 +225,8 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       TextField(
         controller: bio,
         maxLines: 4,
-        decoration: const InputDecoration(
-          labelText: 'Tell people about yourself',
+        decoration: InputDecoration(
+          labelText: context.tr('Tell people about yourself'),
         ),
       ),
       const SizedBox(height: 20),
@@ -264,12 +264,12 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
           isExpanded: true,
           menuMaxHeight: 360,
           decoration: InputDecoration(
-            labelText: countryLabel,
+            labelText: context.tr(countryLabel),
             prefixIcon: const Icon(Icons.public),
             helperText: countryReadOnly
                 ? countryLabel.contains('residence')
-                      ? 'Determined by your verified phone number.'
-                      : 'Country of origin can only be chosen once.'
+                      ? context.tr('Determined by your verified phone number.')
+                      : context.tr('Country of origin can only be chosen once.')
                 : null,
           ),
           items: _worldCountries
@@ -292,10 +292,10 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
           initialValue: cities.contains(city) ? city : 'Other city',
           isExpanded: true,
           decoration: InputDecoration(
-            labelText: cityLabel,
+            labelText: context.tr(cityLabel),
             prefixIcon: const Icon(Icons.location_city_outlined),
             helperText: cityReadOnly
-                ? 'City of origin can only be chosen once.'
+                ? context.tr('City of origin can only be chosen once.')
                 : null,
           ),
           items: cities
@@ -315,7 +315,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
             controller: otherController,
             enabled: !saving && !cityReadOnly,
             decoration: InputDecoration(
-              labelText: '$cityLabel name',
+              labelText: context.tr('$cityLabel name'),
               prefixIcon: const Icon(Icons.edit_location_alt_outlined),
             ),
           ),

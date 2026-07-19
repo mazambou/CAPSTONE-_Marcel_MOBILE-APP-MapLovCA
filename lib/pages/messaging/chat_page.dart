@@ -898,8 +898,8 @@ class _ChatScreenState extends State<ChatScreen> {
                     onSubmitted: (_) {
                       if (_canSendText) unawaited(_sendText());
                     },
-                    decoration: const InputDecoration(
-                      hintText: 'Type a message...',
+                    decoration: InputDecoration(
+                      hintText: context.tr('Type a message...'),
                       filled: false,
                       border: InputBorder.none,
                       enabledBorder: InputBorder.none,

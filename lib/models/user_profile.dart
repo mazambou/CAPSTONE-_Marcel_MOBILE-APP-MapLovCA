@@ -48,6 +48,13 @@ class UserProfile {
     this.eyeColor = '',
     this.hairColor = '',
     this.heightCm,
+    this.childrenPreference = '',
+    this.relationshipStatus = '',
+    this.educationLevel = '',
+    this.beardStyle = '',
+    this.smokingStatus = '',
+    this.incomeLevel = '',
+    this.isPhotoVerified = false,
     this.compatibilityBreakdown = const {},
     this.likedByMe = false,
     this.lastActiveAt,
@@ -86,6 +93,13 @@ class UserProfile {
   final String eyeColor;
   final String hairColor;
   final int? heightCm;
+  final String childrenPreference;
+  final String relationshipStatus;
+  final String educationLevel;
+  final String beardStyle;
+  final String smokingStatus;
+  final String incomeLevel;
+  final bool isPhotoVerified;
   final Map<String, dynamic> compatibilityBreakdown;
   final bool likedByMe;
   final DateTime? lastActiveAt;

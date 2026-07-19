@@ -129,7 +129,7 @@ const _helpArticles = [
   ),
   _HelpArticle(
     'Location and privacy',
-    'Nearby uses foreground location only after your action. MapLov stores coordinates for discovery but displays only approximate distance when enabled. You can use country or worldwide search without location.',
+    'MapLov requests foreground location during registration to initialize Discover and refreshes it when you open Nearby. It stores coordinates for discovery but displays only approximate distance. It never requests background location.',
     Icons.location_on_outlined,
   ),
   _HelpArticle(

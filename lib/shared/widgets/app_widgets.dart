@@ -296,27 +296,6 @@ class _QuickCard extends StatelessWidget {
   );
 }
 
-class _Dropdown extends StatelessWidget {
-  const _Dropdown(this.label, this.items);
-  final String label;
-  final List<String> items;
-  @override
-  Widget build(BuildContext context) => DropdownButtonFormField<String>(
-    isExpanded: true,
-    initialValue: items.first,
-    decoration: InputDecoration(labelText: label),
-    items: items
-        .map(
-          (i) => DropdownMenuItem(
-            value: i,
-            child: Text(i, overflow: TextOverflow.ellipsis),
-          ),
-        )
-        .toList(),
-    onChanged: (_) {},
-  );
-}
-
 // Retained for the validated compact-message presentation variant.
 // ignore: unused_element
 class _Bubble extends StatelessWidget {

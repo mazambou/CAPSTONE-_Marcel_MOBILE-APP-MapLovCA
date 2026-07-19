@@ -686,6 +686,16 @@ void main() {
     );
     originDropdown.onChanged!('Cameroon');
     await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('quick_language_filter')),
+      250,
+      scrollable: quickScrollable,
+    );
+    final languageDropdown = tester.widget<DropdownButtonFormField<String>>(
+      find.byKey(const Key('quick_language_filter')),
+    );
+    languageDropdown.onChanged!('French');
+    await tester.pumpAndSettle();
     await tester.dragUntilVisible(
       find.byKey(const Key('quick_show_results')),
       quickList,
@@ -697,6 +707,8 @@ void main() {
     expect(find.byType(FilterScreen), findsNothing);
     expect(find.byKey(const Key('open_filters_for_result')), findsOneWidget);
     expect(appliedFilters?.originCountries, const ['Cameroon']);
+    expect(appliedFilters?.languages, const ['French']);
+    expect(appliedFilters?.requiredLanguages, isTrue);
     expect(tester.takeException(), isNull);
   });
 
@@ -708,6 +720,39 @@ void main() {
     expect(profiles.map((profile) => profile.name), contains('Sophie'));
     expect(
       profiles.every((profile) => profile.originCountry == 'Cameroon'),
+      isTrue,
+    );
+  });
+
+  test('Nearby uses the selected radius instead of a fixed distance', () async {
+    final profiles = await MapLovRepository.instance.discoverProfiles(
+      tab: 'Nearby',
+      filters: const DiscoveryFilters(distanceKm: 5, requiredLocation: true),
+    );
+
+    expect(
+      profiles.map((profile) => profile.name),
+      containsAll(['Sophie', 'Alex']),
+    );
+    expect(profiles.every((profile) => profile.distanceKm <= 5), isTrue);
+  });
+
+  test('Nearby combines distance and country-of-origin filters', () async {
+    final profiles = await MapLovRepository.instance.discoverProfiles(
+      tab: 'Nearby',
+      filters: const DiscoveryFilters(
+        distanceKm: 5,
+        originCountries: ['Cameroon'],
+        requiredLocation: true,
+      ),
+    );
+
+    expect(profiles.map((profile) => profile.name), ['Sophie']);
+    expect(
+      profiles.every(
+        (profile) =>
+            profile.distanceKm <= 5 && profile.originCountry == 'Cameroon',
+      ),
       isTrue,
     );
   });

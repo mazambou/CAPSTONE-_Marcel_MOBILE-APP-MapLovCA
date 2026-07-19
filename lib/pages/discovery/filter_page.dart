@@ -1,5 +1,17 @@
 part of '../../app.dart';
 
+String _storedGenderFilterValue(String value) => switch (value) {
+  'Women' => 'Woman',
+  'Men' => 'Man',
+  _ => value,
+};
+
+String _displayGenderFilterValue(String value) => switch (value) {
+  'Woman' => 'Women',
+  'Man' => 'Men',
+  _ => value,
+};
+
 class FilterScreen extends StatefulWidget {
   const FilterScreen({super.key});
 
@@ -13,18 +25,26 @@ class _FilterScreenState extends State<FilterScreen> {
   double distance = 10;
   String selectedCity = 'Any city';
   String selectedCountry = 'Canada';
+  String residenceCountry = 'Canada';
   String originCountry = 'Any country';
   String originCity = 'Any city';
   RangeValues standardAges = const RangeValues(22, 30);
   double standardDistance = 50;
   RangeValues advancedAges = const RangeValues(22, 30);
   double advancedDistance = 50;
-  bool standardVerified = true;
-  bool advancedVerified = true;
-  bool photoVerified = true;
-  bool activeToday = true;
+  bool standardVerified = false;
+  bool advancedVerified = false;
+  bool photoVerified = false;
+  bool activeToday = false;
   bool applyingFilters = false;
   String selectedGender = 'Everyone';
+  String quickLanguage = 'Any';
+  String quickRelationshipGoal = 'Any';
+  final Set<String> quickInterests = {};
+  String standardMinimumHeight = 'Any';
+  String standardMaximumHeight = 'Any';
+  String advancedMinimumHeight = 'Any';
+  String advancedMaximumHeight = 'Any';
   String? selectedEyeColor;
   String? selectedHairColor;
   final Map<String, String> standardSelections = {
@@ -36,7 +56,7 @@ class _FilterScreenState extends State<FilterScreen> {
     'Body type': 'Any',
     'Education level': 'Any',
   };
-  final Set<String> standardInterests = {'Travel', 'Music', 'Hiking'};
+  final Set<String> standardInterests = {};
   final Map<String, String> advancedSelections = {
     'Language': 'Any',
     'Religion': 'Any',
@@ -51,6 +71,30 @@ class _FilterScreenState extends State<FilterScreen> {
     'Income level': 'Any income level',
   };
 
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_loadResidenceCountry());
+  }
+
+  Future<void> _loadResidenceCountry() async {
+    try {
+      final profile = await MapLovRepository.instance.myProfileDetails();
+      final country = profile?['country_name'] as String?;
+      if (mounted && country != null && country.trim().isNotEmpty) {
+        setState(() => residenceCountry = country.trim());
+      }
+    } catch (_) {
+      // The filter can still be applied with the locally known default.
+    }
+  }
+
+  Future<void> _persistFilters(DiscoveryFilters filters) async {
+    await MapLovRepository.instance
+        .savePreferences(filters)
+        .timeout(const Duration(seconds: 12));
+  }
+
   void _resetFilters() {
     setState(() {
       ages = const RangeValues(18, 80);
@@ -64,19 +108,24 @@ class _FilterScreenState extends State<FilterScreen> {
       standardDistance = 50;
       advancedAges = const RangeValues(22, 30);
       advancedDistance = 50;
-      standardVerified = true;
-      advancedVerified = true;
-      photoVerified = true;
-      activeToday = true;
+      standardVerified = false;
+      advancedVerified = false;
+      photoVerified = false;
+      activeToday = false;
       selectedGender = 'Everyone';
+      quickLanguage = 'Any';
+      quickRelationshipGoal = 'Any';
+      quickInterests.clear();
+      standardMinimumHeight = 'Any';
+      standardMaximumHeight = 'Any';
+      advancedMinimumHeight = 'Any';
+      advancedMaximumHeight = 'Any';
       selectedEyeColor = null;
       selectedHairColor = null;
       standardSelections.updateAll((key, value) => 'Any');
       standardSelections['Language'] = 'Any';
       standardSelections['Education level'] = 'Any';
-      standardInterests
-        ..clear()
-        ..addAll(['Travel', 'Music', 'Hiking']);
+      standardInterests.clear();
       advancedSelections.updateAll((key, value) => 'Any');
       advancedSelections['Profession'] = 'Any profession';
       advancedSelections['Income level'] = 'Any income level';
@@ -111,16 +160,35 @@ class _FilterScreenState extends State<FilterScreen> {
           : distance;
       final language = tab == 2
           ? advancedSelections['Language']
-          : standardSelections['Language'];
+          : tab == 1
+          ? standardSelections['Language']
+          : quickLanguage;
       final goal = tab == 2
           ? advancedSelections['Relationship goal']
-          : standardSelections['Relationship goal'];
+          : tab == 1
+          ? standardSelections['Relationship goal']
+          : quickRelationshipGoal;
       final religion = tab == 2
           ? advancedSelections['Religion']
-          : standardSelections['Religion'];
+          : tab == 1
+          ? standardSelections['Religion']
+          : null;
       final bodyType = tab == 2
           ? advancedSelections['Body type']
-          : standardSelections['Body type'];
+          : tab == 1
+          ? standardSelections['Body type']
+          : null;
+      final selections = tab == 2 ? advancedSelections : standardSelections;
+      final minimumHeight = tab == 2
+          ? _heightInCentimeters(advancedMinimumHeight)
+          : tab == 1
+          ? _heightInCentimeters(standardMinimumHeight)
+          : null;
+      final maximumHeight = tab == 2
+          ? _heightInCentimeters(advancedMaximumHeight)
+          : tab == 1
+          ? _heightInCentimeters(standardMaximumHeight)
+          : null;
       final mode = switch (locationMode) {
         'My country' => 'my_country',
         'International' => 'specific_country',
@@ -131,9 +199,11 @@ class _FilterScreenState extends State<FilterScreen> {
         maximumAge: selectedAges.end.round(),
         distanceKm: selectedDistance.round(),
         locationMode: mode,
-        countries: locationMode == 'International'
-            ? [selectedCountry]
-            : const [],
+        countries: switch (locationMode) {
+          'My country' => [residenceCountry],
+          'International' => [selectedCountry],
+          _ => const [],
+        },
         cities: locationMode != 'Near me' && selectedCity != 'Any city'
             ? [selectedCity]
             : const [],
@@ -149,7 +219,9 @@ class _FilterScreenState extends State<FilterScreen> {
             ? advancedVerified
             : tab == 1 && standardVerified,
         activeTodayOnly: tab == 2 && activeToday,
-        genders: selectedGender == 'Everyone' ? const [] : [selectedGender],
+        genders: selectedGender == 'Everyone'
+            ? const []
+            : [_storedGenderFilterValue(selectedGender)],
         religions: religion == null || religion == 'Any'
             ? const []
             : [religion],
@@ -162,15 +234,39 @@ class _FilterScreenState extends State<FilterScreen> {
         hairColors: tab == 2 && selectedHairColor != null
             ? [selectedHairColor!]
             : const [],
-        interestSlugs: tab == 1
-            ? standardInterests.map((value) => value.toLowerCase()).toList()
-            : const [],
+        minimumHeightCm: minimumHeight,
+        maximumHeightCm: maximumHeight,
+        childrenPreferences: _singleSelection(
+          tab == 0 ? null : selections['Want children'],
+        ),
+        relationshipStatuses: _singleSelection(
+          tab == 0 ? null : selections['Relationship status'],
+        ),
+        educationLevels: _singleSelection(
+          tab == 0 ? null : selections['Education level'],
+        ),
+        beardStyles: _singleSelection(tab == 2 ? selections['Beard'] : null),
+        smokingStatuses: _singleSelection(
+          tab == 2 ? selections['Smoking'] : null,
+        ),
+        professionCategories: _singleSelection(
+          tab == 2 ? selections['Profession'] : null,
+          anyValues: const {'Any', 'Any profession'},
+        ),
+        incomeLevels: _singleSelection(
+          tab == 2 ? selections['Income level'] : null,
+          anyValues: const {'Any', 'Any income level'},
+        ),
+        photoVerifiedOnly: tab == 2 && photoVerified,
+        interestSlugs: (tab == 1 ? standardInterests : quickInterests)
+            .map((value) => value.toLowerCase().replaceAll(' ', '-'))
+            .toList(),
         requiredGenders: selectedGender != 'Everyone',
         requiredLocation: mode != 'worldwide',
         requiredLanguages: language != null && language != 'Any',
         requiredRelationshipGoal: goal != null && goal != 'Any',
       );
-      await MapLovRepository.instance.savePreferences(filters);
+      await _persistFilters(filters);
       if (mounted) Navigator.pop(context, filters);
     } catch (error) {
       if (mounted) {
@@ -189,6 +285,16 @@ class _FilterScreenState extends State<FilterScreen> {
 
   void _setAdvancedSelection(String title, String value) {
     setState(() => advancedSelections[title] = value);
+  }
+
+  List<String> _singleSelection(
+    String? value, {
+    Set<String> anyValues = const {'Any'},
+  }) => value == null || anyValues.contains(value) ? const [] : [value];
+
+  int? _heightInCentimeters(String value) {
+    if (value == 'Any') return null;
+    return int.tryParse(value.replaceAll(RegExp(r'[^0-9]'), ''));
   }
 
   @override
@@ -291,26 +397,57 @@ class _FilterScreenState extends State<FilterScreen> {
               setState(() => originCity = value ?? 'Any city'),
         ),
         const _SectionTitle('More preferences'),
-        const _Dropdown('Languages', ['English', 'French', 'Spanish']),
+        DropdownButtonFormField<String>(
+          key: const Key('quick_language_filter'),
+          initialValue: quickLanguage,
+          isExpanded: true,
+          decoration: const InputDecoration(labelText: 'Languages'),
+          items: const ['Any', 'English', 'French', 'Spanish']
+              .map(
+                (value) => DropdownMenuItem(value: value, child: Text(value)),
+              )
+              .toList(),
+          onChanged: (value) => setState(() => quickLanguage = value ?? 'Any'),
+        ),
         const SizedBox(height: 12),
-        const _Dropdown('Relationship goal', [
-          'Long-term',
-          'Dating',
-          'Friendship',
-        ]),
+        DropdownButtonFormField<String>(
+          key: const Key('quick_relationship_goal_filter'),
+          initialValue: quickRelationshipGoal,
+          isExpanded: true,
+          decoration: const InputDecoration(labelText: 'Relationship goal'),
+          items:
+              const [
+                    'Any',
+                    'Long-term relationship',
+                    'Marriage',
+                    'Dating',
+                    'Friendship',
+                  ]
+                  .map(
+                    (value) =>
+                        DropdownMenuItem(value: value, child: Text(value)),
+                  )
+                  .toList(),
+          onChanged: (value) =>
+              setState(() => quickRelationshipGoal = value ?? 'Any'),
+        ),
         const SizedBox(height: 12),
         const Text('Interests'),
-        const Wrap(
+        Wrap(
           spacing: 8,
-          children: [
-            FilterChip(label: Text('Travel'), selected: true, onSelected: null),
-            FilterChip(label: Text('Music'), selected: false, onSelected: null),
-            FilterChip(
-              label: Text('Sports'),
-              selected: false,
-              onSelected: null,
-            ),
-          ],
+          children: const ['Travel', 'Music', 'Sports']
+              .map(
+                (value) => FilterChip(
+                  label: Text(value),
+                  selected: quickInterests.contains(value),
+                  onSelected: (_) => setState(() {
+                    if (!quickInterests.add(value)) {
+                      quickInterests.remove(value);
+                    }
+                  }),
+                ),
+              )
+              .toList(),
         ),
       ],
     );
@@ -382,7 +519,14 @@ class _FilterScreenState extends State<FilterScreen> {
           onSelected: (value) =>
               _setStandardSelection('Relationship status', value),
         ),
-        const _HeightFilterCard(),
+        _HeightFilterCard(
+          minimum: standardMinimumHeight,
+          maximum: standardMaximumHeight,
+          onMinimumChanged: (value) =>
+              setState(() => standardMinimumHeight = value),
+          onMaximumChanged: (value) =>
+              setState(() => standardMaximumHeight = value),
+        ),
         _ChoiceFilterCard(
           title: 'Body type',
           icon: Icons.accessibility_new,
@@ -516,7 +660,15 @@ class _FilterScreenState extends State<FilterScreen> {
           subtitle: 'Physical preferences',
           icon: Icons.person_outline,
           children: [
-            const _HeightFilterCard(nested: true),
+            _HeightFilterCard(
+              nested: true,
+              minimum: advancedMinimumHeight,
+              maximum: advancedMaximumHeight,
+              onMinimumChanged: (value) =>
+                  setState(() => advancedMinimumHeight = value),
+              onMaximumChanged: (value) =>
+                  setState(() => advancedMaximumHeight = value),
+            ),
             _advancedChoice('Body type', Icons.accessibility_new, const [
               'Any',
               'Slim',
@@ -962,9 +1114,19 @@ class _MultiChoiceFilterCard extends StatelessWidget {
 }
 
 class _HeightFilterCard extends StatelessWidget {
-  const _HeightFilterCard({this.nested = false});
+  const _HeightFilterCard({
+    required this.minimum,
+    required this.maximum,
+    required this.onMinimumChanged,
+    required this.onMaximumChanged,
+    this.nested = false,
+  });
 
   final bool nested;
+  final String minimum;
+  final String maximum;
+  final ValueChanged<String> onMinimumChanged;
+  final ValueChanged<String> onMaximumChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -973,17 +1135,22 @@ class _HeightFilterCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
+          Row(
             children: [
-              Icon(Icons.straighten, color: AppColors.coral),
-              SizedBox(width: 9),
-              Expanded(
+              const Icon(Icons.straighten, color: AppColors.coral),
+              const SizedBox(width: 9),
+              const Expanded(
                 child: Text(
                   'Height',
                   style: TextStyle(fontWeight: FontWeight.w800),
                 ),
               ),
-              Text('Any', style: TextStyle(color: AppColors.deepPink)),
+              Text(
+                minimum == 'Any' && maximum == 'Any'
+                    ? 'Any'
+                    : '$minimum – $maximum',
+                style: const TextStyle(color: AppColors.deepPink),
+              ),
             ],
           ),
           const SizedBox(height: 10),
@@ -991,7 +1158,7 @@ class _HeightFilterCard extends StatelessWidget {
             children: [
               Expanded(
                 child: DropdownButtonFormField<String>(
-                  initialValue: 'Any',
+                  initialValue: minimum,
                   isExpanded: true,
                   decoration: const InputDecoration(labelText: 'From'),
                   items: _heightOptions
@@ -1000,7 +1167,9 @@ class _HeightFilterCard extends StatelessWidget {
                             DropdownMenuItem(value: value, child: Text(value)),
                       )
                       .toList(),
-                  onChanged: (_) {},
+                  onChanged: (value) {
+                    if (value != null) onMinimumChanged(value);
+                  },
                 ),
               ),
               const Padding(
@@ -1009,7 +1178,7 @@ class _HeightFilterCard extends StatelessWidget {
               ),
               Expanded(
                 child: DropdownButtonFormField<String>(
-                  initialValue: 'Any',
+                  initialValue: maximum,
                   isExpanded: true,
                   decoration: const InputDecoration(labelText: 'To'),
                   items: _heightOptions
@@ -1018,7 +1187,9 @@ class _HeightFilterCard extends StatelessWidget {
                             DropdownMenuItem(value: value, child: Text(value)),
                       )
                       .toList(),
-                  onChanged: (_) {},
+                  onChanged: (value) {
+                    if (value != null) onMaximumChanged(value);
+                  },
                 ),
               ),
             ],

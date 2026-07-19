@@ -268,7 +268,7 @@ const _childSafetySections = [
 const _locationSections = [
   _LegalSection(
     'User-initiated access',
-    'MapLov requests foreground location only when you use Nearby or explicitly refresh your location. It does not request background location.',
+    'MapLov requests foreground location while you complete registration to initialize Discover, and again when you open Nearby or explicitly refresh your location. It does not request background location.',
   ),
   _LegalSection(
     'Purpose and display',

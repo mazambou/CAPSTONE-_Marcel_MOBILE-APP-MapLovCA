@@ -31,6 +31,14 @@ class DiscoveryFilters {
     this.hairColors = const [],
     this.minimumHeightCm,
     this.maximumHeightCm,
+    this.childrenPreferences = const [],
+    this.relationshipStatuses = const [],
+    this.educationLevels = const [],
+    this.beardStyles = const [],
+    this.smokingStatuses = const [],
+    this.professionCategories = const [],
+    this.incomeLevels = const [],
+    this.photoVerifiedOnly = false,
     this.interestImportance = 1,
     this.requiredGenders = false,
     this.requiredLocation = false,
@@ -59,6 +67,14 @@ class DiscoveryFilters {
   final List<String> hairColors;
   final int? minimumHeightCm;
   final int? maximumHeightCm;
+  final List<String> childrenPreferences;
+  final List<String> relationshipStatuses;
+  final List<String> educationLevels;
+  final List<String> beardStyles;
+  final List<String> smokingStatuses;
+  final List<String> professionCategories;
+  final List<String> incomeLevels;
+  final bool photoVerifiedOnly;
   final int interestImportance;
   final bool requiredGenders;
   final bool requiredLocation;
@@ -87,6 +103,14 @@ class DiscoveryFilters {
     'hair_colors': hairColors,
     'minimum_height_cm': minimumHeightCm,
     'maximum_height_cm': maximumHeightCm,
+    'children_preferences': childrenPreferences,
+    'relationship_statuses': relationshipStatuses,
+    'education_levels': educationLevels,
+    'beard_styles': beardStyles,
+    'smoking_statuses': smokingStatuses,
+    'profession_categories': professionCategories,
+    'income_levels': incomeLevels,
+    'photo_verified_only': photoVerifiedOnly,
     'interest_importance': interestImportance,
     'required_genders': requiredGenders,
     'required_location': requiredLocation,
@@ -124,6 +148,20 @@ class DiscoveryFilters {
       hairColors: List<String>.from(row['hair_colors'] ?? const []),
       minimumHeightCm: row['minimum_height_cm'] as int?,
       maximumHeightCm: row['maximum_height_cm'] as int?,
+      childrenPreferences: List<String>.from(
+        row['children_preferences'] ?? const [],
+      ),
+      relationshipStatuses: List<String>.from(
+        row['relationship_statuses'] ?? const [],
+      ),
+      educationLevels: List<String>.from(row['education_levels'] ?? const []),
+      beardStyles: List<String>.from(row['beard_styles'] ?? const []),
+      smokingStatuses: List<String>.from(row['smoking_statuses'] ?? const []),
+      professionCategories: List<String>.from(
+        row['profession_categories'] ?? const [],
+      ),
+      incomeLevels: List<String>.from(row['income_levels'] ?? const []),
+      photoVerifiedOnly: row['photo_verified_only'] as bool? ?? false,
       interestImportance: row['interest_importance'] as int? ?? 1,
       requiredGenders: row['required_genders'] as bool? ?? false,
       requiredLocation: row['required_location'] as bool? ?? false,
@@ -138,6 +176,16 @@ class ProfileLikeResult {
   const ProfileLikeResult({required this.liked, required this.matched});
   final bool liked;
   final bool matched;
+}
+
+class PhotoReactionState {
+  const PhotoReactionState({
+    this.likedPhotoIds = const {},
+    this.superLikedPhotoIds = const {},
+  });
+
+  final Set<String> likedPhotoIds;
+  final Set<String> superLikedPhotoIds;
 }
 
 class MatchItem {
@@ -372,10 +420,19 @@ class MapLovRepository {
       await _client!.rpc('set_my_presence', params: {'online': online});
     } on PostgrestException {
       // Compatibility fallback until the additive presence migration deploys.
-      await _client!
-          .from('profiles')
-          .update({'last_active_at': DateTime.now().toUtc().toIso8601String()})
-          .eq('id', currentUserId!);
+      try {
+        await _client!
+            .from('profiles')
+            .update({
+              'last_active_at': DateTime.now().toUtc().toIso8601String(),
+            })
+            .eq('id', currentUserId!);
+      } catch (_) {
+        // Presence is best effort and must never interrupt user actions.
+      }
+    } catch (_) {
+      // Network transitions commonly happen while the app is backgrounded.
+      // Presence is best effort and must not become an unhandled exception.
     }
   }
 
@@ -388,7 +445,9 @@ class MapLovRepository {
       final profiles = mockProfiles.where((profile) {
         if (_demoBlockedIds.contains(profile.id)) return false;
         if (!_profileMatchesFilters(profile, filters)) return false;
-        if (tab == 'Nearby' && profile.distanceKm > 10) return false;
+        if (tab == 'Nearby' && profile.distanceKm > filters.distanceKm) {
+          return false;
+        }
         if (tab == 'Online' && !profile.isOnline) return false;
         if (tab == 'New' && !profile.isNew) return false;
         return true;
@@ -416,31 +475,48 @@ class MapLovRepository {
                   },
                 )
                 as List<dynamic>;
-        final result = <UserProfile>[];
-        for (final raw in nearby.cast<Map<String, dynamic>>()) {
-          final id = raw['id'] as String?;
-          if (id == null) continue;
-          final fullProfile = await getProfile(id);
-          if (fullProfile == null || fullProfile.photoUrls.isEmpty) continue;
-          result.add(
-            _copyProfile(
-              fullProfile,
-              distanceKm: (raw['distance_km'] as num?)?.round(),
-            ),
-          );
+        final nearbyRows = nearby.cast<Map<String, dynamic>>();
+        final distanceById = <String, int>{
+          for (final raw in nearbyRows)
+            if (raw['id'] case final String id)
+              id: (raw['distance_km'] as num?)?.round() ?? 0,
+        };
+        if (tab == 'Discover' && currentUserId != null) {
+          distanceById.putIfAbsent(currentUserId!, () => 0);
         }
-        final enriched = await Future.wait(result.map(_enrichCompatibility));
+        if (distanceById.isEmpty) return const [];
+        final profileRows = await _client!
+            .from('profiles')
+            .select()
+            .inFilter('id', distanceById.keys.toList());
+        final hydrated = await _mapInBatches(
+          profileRows.cast<Map<String, dynamic>>(),
+          _profileFromRow,
+        );
+        final result = hydrated
+            .where((profile) => profile.photoUrls.isNotEmpty)
+            .map(
+              (profile) => _copyProfile(
+                profile,
+                distanceKm: distanceById[profile.id] ?? profile.distanceKm,
+              ),
+            )
+            .toList();
+        final enriched = await _mapInBatches(result, _enrichCompatibility);
         return enriched
             .where(
               (profile) =>
-                  _profileMatchesFilters(profile, filters) &&
-                  _newAccountVisibleToViewer(profile, viewerTier),
+                  (profile.id == currentUserId && profile.isNew) ||
+                  (_profileMatchesFilters(profile, filters) &&
+                      _newAccountVisibleToViewer(profile, viewerTier)),
             )
             .toList()
           ..sort(_compareDiscoverProfiles);
       } on PostgrestException {
-        // A new account may not have shared its position yet. Continue with
-        // discovery instead of making the page unusable.
+        // Never replace a failed geographic query with ordinary discovery:
+        // those rows do not contain a measured distance and would make the
+        // selected Nearby radius misleading.
+        rethrow;
       }
     }
 
@@ -450,22 +526,39 @@ class MapLovRepository {
         .eq('status', 'active')
         .eq('is_discoverable', true)
         .limit(100);
-    final profiles = <UserProfile>[];
-    for (final row in rows) {
-      final profile = await _profileFromRow(row);
-      if (profile.id == currentUserId && !profile.isNew) continue;
-      if (!_newAccountVisibleToViewer(profile, viewerTier)) continue;
-      if (profile.photoUrls.isEmpty) continue;
-      if (profile.age < filters.minimumAge ||
-          profile.age > filters.maximumAge) {
-        continue;
-      }
-      if (tab == 'Online' && !profile.isOnline) continue;
-      if (tab == 'New' && !profile.isNew) continue;
-      final enriched = await _enrichCompatibility(profile);
-      if (!_profileMatchesFilters(enriched, filters)) continue;
-      profiles.add(enriched);
-    }
+    final hydrated = await _mapInBatches(
+      rows.cast<Map<String, dynamic>>(),
+      _profileFromRow,
+    );
+    final candidates = hydrated
+        .where((profile) {
+          if (profile.id == currentUserId) {
+            return profile.isNew && profile.photoUrls.isNotEmpty;
+          }
+          if (!_newAccountVisibleToViewer(profile, viewerTier)) return false;
+          if (profile.photoUrls.isEmpty) return false;
+          if (profile.age < filters.minimumAge ||
+              profile.age > filters.maximumAge) {
+            return false;
+          }
+          if (tab == 'Online' && !profile.isOnline) return false;
+          if (tab == 'New' && !profile.isNew) return false;
+          return true;
+        })
+        .map(
+          (profile) => profile.id == currentUserId
+              ? _copyProfile(profile, distanceKm: 0)
+              : profile,
+        )
+        .toList();
+    final enriched = await _mapInBatches(candidates, _enrichCompatibility);
+    final profiles = enriched
+        .where(
+          (profile) =>
+              (profile.id == currentUserId && profile.isNew) ||
+              _profileMatchesFilters(profile, filters),
+        )
+        .toList();
     profiles.sort(_compareDiscoverProfiles);
     return profiles;
   }
@@ -499,7 +592,11 @@ class MapLovRepository {
     }
     if (filters.requiredGenders &&
         filters.genders.isNotEmpty &&
-        !filters.genders.contains(profile.gender)) {
+        !_matchesFilterValue(
+          profile.gender,
+          filters.genders,
+          normalizeGender: true,
+        )) {
       return false;
     }
     if (filters.requiredLocation &&
@@ -530,32 +627,45 @@ class MapLovRepository {
     }
     if (filters.requiredLanguages &&
         filters.languages.isNotEmpty &&
-        !filters.languages.any(profile.languages.contains)) {
+        !filters.languages.any(
+          (filter) => profile.languages.any(
+            (value) =>
+                _normalizedFilterValue(value) == _normalizedFilterValue(filter),
+          ),
+        )) {
       return false;
     }
     if (filters.requiredRelationshipGoal &&
         filters.relationshipGoals.isNotEmpty &&
-        !filters.relationshipGoals.contains(profile.relationshipGoal)) {
+        !_matchesFilterValue(
+          profile.relationshipGoal,
+          filters.relationshipGoals,
+        )) {
       return false;
     }
     if (filters.interestSlugs.isNotEmpty &&
-        !filters.interestSlugs.any(profile.interests.contains)) {
+        !filters.interestSlugs.any(
+          (filter) => profile.interests.any(
+            (value) =>
+                _normalizedFilterValue(value) == _normalizedFilterValue(filter),
+          ),
+        )) {
       return false;
     }
     if (filters.religions.isNotEmpty &&
-        !filters.religions.contains(profile.religion)) {
+        !_matchesFilterValue(profile.religion, filters.religions)) {
       return false;
     }
     if (filters.bodyTypes.isNotEmpty &&
-        !filters.bodyTypes.contains(profile.bodyType)) {
+        !_matchesFilterValue(profile.bodyType, filters.bodyTypes)) {
       return false;
     }
     if (filters.eyeColors.isNotEmpty &&
-        !filters.eyeColors.contains(profile.eyeColor)) {
+        !_matchesFilterValue(profile.eyeColor, filters.eyeColors)) {
       return false;
     }
     if (filters.hairColors.isNotEmpty &&
-        !filters.hairColors.contains(profile.hairColor)) {
+        !_matchesFilterValue(profile.hairColor, filters.hairColors)) {
       return false;
     }
     if (filters.minimumHeightCm != null &&
@@ -566,6 +676,44 @@ class MapLovRepository {
         (profile.heightCm ?? 1000) > filters.maximumHeightCm!) {
       return false;
     }
+    if (filters.childrenPreferences.isNotEmpty &&
+        !_matchesFilterValue(
+          profile.childrenPreference,
+          filters.childrenPreferences,
+        )) {
+      return false;
+    }
+    if (filters.relationshipStatuses.isNotEmpty &&
+        !_matchesFilterValue(
+          profile.relationshipStatus,
+          filters.relationshipStatuses,
+        )) {
+      return false;
+    }
+    if (filters.educationLevels.isNotEmpty &&
+        !_matchesFilterValue(profile.educationLevel, filters.educationLevels)) {
+      return false;
+    }
+    if (filters.beardStyles.isNotEmpty &&
+        !_matchesFilterValue(profile.beardStyle, filters.beardStyles)) {
+      return false;
+    }
+    if (filters.smokingStatuses.isNotEmpty &&
+        !_matchesFilterValue(profile.smokingStatus, filters.smokingStatuses)) {
+      return false;
+    }
+    if (filters.incomeLevels.isNotEmpty &&
+        !_matchesFilterValue(profile.incomeLevel, filters.incomeLevels)) {
+      return false;
+    }
+    if (filters.professionCategories.isNotEmpty &&
+        !filters.professionCategories.any(
+          (category) =>
+              _professionMatchesCategory(profile.profession, category),
+        )) {
+      return false;
+    }
+    if (filters.photoVerifiedOnly && !profile.isPhotoVerified) return false;
     if (filters.verifiedOnly && !profile.isVerified) return false;
     if (filters.activeTodayOnly &&
         (profile.lastActiveAt == null ||
@@ -573,6 +721,67 @@ class MapLovRepository {
       return false;
     }
     return true;
+  }
+
+  bool _matchesFilterValue(
+    String value,
+    List<String> filters, {
+    bool normalizeGender = false,
+  }) {
+    final normalizedValue = normalizeGender
+        ? _normalizedGender(value)
+        : _normalizedFilterValue(value);
+    return filters.any((filter) {
+      final normalizedFilter = normalizeGender
+          ? _normalizedGender(filter)
+          : _normalizedFilterValue(filter);
+      return normalizedValue == normalizedFilter;
+    });
+  }
+
+  String _normalizedGender(String value) {
+    return switch (_normalizedFilterValue(value)) {
+      'women' || 'woman' => 'woman',
+      'men' || 'man' => 'man',
+      final normalized => normalized,
+    };
+  }
+
+  String _normalizedFilterValue(String value) => value.trim().toLowerCase();
+
+  bool _professionMatchesCategory(String profession, String category) {
+    final value = _normalizedFilterValue(profession);
+    final keywords = switch (_normalizedFilterValue(category)) {
+      'technology' => const [
+        'engineer',
+        'developer',
+        'software',
+        'technology',
+        'data',
+        'product',
+        'it ',
+      ],
+      'healthcare' => const ['doctor', 'nurse', 'medical', 'health', 'pharmac'],
+      'education' => const ['teacher', 'professor', 'educat', 'school'],
+      'business' => const [
+        'business',
+        'manager',
+        'finance',
+        'account',
+        'marketing',
+        'sales',
+      ],
+      'arts' => const [
+        'artist',
+        'designer',
+        'music',
+        'writer',
+        'photograph',
+        'creative',
+      ],
+      _ => [category.toLowerCase()],
+    };
+    return keywords.any(value.contains);
   }
 
   Future<UserProfile> _enrichCompatibility(UserProfile profile) async {
@@ -673,7 +882,12 @@ class MapLovRepository {
       'user_id': currentUserId!,
       ...filters.toDatabase(),
     });
-    await _client!.rpc('refresh_my_compatibility_scores');
+    try {
+      await _client!.rpc('refresh_my_compatibility_scores');
+    } on PostgrestException {
+      // Preferences remain valid if the optional compatibility RPC has not
+      // been deployed yet.
+    }
   }
 
   Future<DiscoveryFilters> myPreferences() async {
@@ -983,22 +1197,39 @@ class MapLovRepository {
         matched: liked && _demoReciprocalPhotoLikeIds.contains(profileId),
       );
     }
-    if (currentlyLiked) {
+    final existing = await _client!
+        .from('photo_likes')
+        .select('photo_id')
+        .eq('photo_id', photoId)
+        .eq('user_id', currentUserId!)
+        .maybeSingle();
+    if (existing != null) {
       await _client!
           .from('photo_likes')
           .delete()
           .eq('photo_id', photoId)
           .eq('user_id', currentUserId!);
       return const ProfileLikeResult(liked: false, matched: false);
-    } else {
-      final wasMatched = await _hasMatchWith(profileId);
+    }
+    final wasMatched = await _hasMatchWith(profileId);
+    try {
       await _client!.from('photo_likes').insert({
         'photo_id': photoId,
         'user_id': currentUserId!,
       });
-      final isMatched = await _hasMatchWith(profileId);
-      return ProfileLikeResult(liked: true, matched: !wasMatched && isMatched);
+    } on PostgrestException catch (error) {
+      if (error.code != '23505') rethrow;
+      // A stale local reaction state must behave like a toggle, not expose a
+      // database constraint error to the user.
+      await _client!
+          .from('photo_likes')
+          .delete()
+          .eq('photo_id', photoId)
+          .eq('user_id', currentUserId!);
+      return const ProfileLikeResult(liked: false, matched: false);
     }
+    final isMatched = await _hasMatchWith(profileId);
+    return ProfileLikeResult(liked: true, matched: !wasMatched && isMatched);
   }
 
   Future<bool> togglePhotoSuperLike(
@@ -1013,7 +1244,13 @@ class MapLovRepository {
       _demoSuperLikedPhotoIds.add(photoId);
       return true;
     }
-    if (currentlySuperLiked) {
+    final existing = await _client!
+        .from('photo_super_likes')
+        .select('photo_id')
+        .eq('photo_id', photoId)
+        .eq('user_id', currentUserId!)
+        .maybeSingle();
+    if (existing != null) {
       await _client!
           .from('photo_super_likes')
           .delete()
@@ -1021,11 +1258,54 @@ class MapLovRepository {
           .eq('user_id', currentUserId!);
       return false;
     }
-    await _client!.from('photo_super_likes').insert({
-      'photo_id': photoId,
-      'user_id': currentUserId!,
-    });
+    try {
+      await _client!.from('photo_super_likes').insert({
+        'photo_id': photoId,
+        'user_id': currentUserId!,
+      });
+    } on PostgrestException catch (error) {
+      if (error.code != '23505') rethrow;
+      await _client!
+          .from('photo_super_likes')
+          .delete()
+          .eq('photo_id', photoId)
+          .eq('user_id', currentUserId!);
+      return false;
+    }
     return true;
+  }
+
+  Future<PhotoReactionState> photoReactionState(List<String> photoIds) async {
+    if (photoIds.isEmpty || !isLive) return const PhotoReactionState();
+    final likes = await _client!
+        .from('photo_likes')
+        .select('photo_id')
+        .eq('user_id', currentUserId!)
+        .inFilter('photo_id', photoIds);
+    final superLikes = await _client!
+        .from('photo_super_likes')
+        .select('photo_id')
+        .eq('user_id', currentUserId!)
+        .inFilter('photo_id', photoIds);
+    return PhotoReactionState(
+      likedPhotoIds: likes.map((row) => row['photo_id'] as String).toSet(),
+      superLikedPhotoIds: superLikes
+          .map((row) => row['photo_id'] as String)
+          .toSet(),
+    );
+  }
+
+  Future<String?> profilePhotoId(String profileId, int index) async {
+    if (!isLive) return 'demo-photo-$profileId-$index';
+    final rows = await _client!
+        .from('profile_photos')
+        .select('id')
+        .eq('user_id', profileId)
+        .eq('moderation_status', 'visible')
+        .order('is_primary', ascending: false)
+        .order('display_order');
+    if (index < 0 || index >= rows.length) return null;
+    return rows[index]['id'] as String?;
   }
 
   Future<List<Map<String, String>>> photoComments(String photoId) async {
@@ -1101,24 +1381,22 @@ class MapLovRepository {
     var query = _client!.from('friendships').select();
     if (status != null) query = query.eq('status', status);
     final rows = await query.order('updated_at', ascending: false);
-    final result = <FriendshipItem>[];
-    for (final row in rows) {
+    final items = await _mapInBatches(rows.cast<Map<String, dynamic>>(), (
+      row,
+    ) async {
       final sentByMe = row['requester_id'] == currentUserId;
       final otherId =
           (sentByMe ? row['addressee_id'] : row['requester_id']) as String;
       final profile = await getProfile(otherId);
-      if (profile != null) {
-        result.add(
-          FriendshipItem(
-            id: row['id'] as String,
-            profile: profile,
-            status: row['status'] as String,
-            sentByMe: sentByMe,
-          ),
-        );
-      }
-    }
-    return result;
+      if (profile == null) return null;
+      return FriendshipItem(
+        id: row['id'] as String,
+        profile: profile,
+        status: row['status'] as String,
+        sentByMe: sentByMe,
+      );
+    });
+    return items.whereType<FriendshipItem>().toList();
   }
 
   Future<void> sendFriendRequest(String userId) async {
@@ -2768,9 +3046,31 @@ class MapLovRepository {
       eyeColor: row['eye_color'] as String? ?? '',
       hairColor: row['hair_color'] as String? ?? '',
       heightCm: row['height_cm'] as int?,
+      childrenPreference: row['children_preference'] as String? ?? '',
+      relationshipStatus: row['relationship_status'] as String? ?? '',
+      educationLevel: row['education_level'] as String? ?? '',
+      beardStyle: row['beard_style'] as String? ?? '',
+      smokingStatus: row['smoking_status'] as String? ?? '',
+      incomeLevel: row['income_level'] as String? ?? '',
+      isPhotoVerified: row['is_photo_verified'] as bool? ?? false,
       lastActiveAt: lastActive,
       createdAt: createdAt,
     );
+  }
+
+  Future<List<R>> _mapInBatches<T, R>(
+    Iterable<T> values,
+    Future<R> Function(T value) mapper, {
+    int batchSize = 8,
+  }) async {
+    final input = values.toList(growable: false);
+    final result = <R>[];
+    for (var start = 0; start < input.length; start += batchSize) {
+      final proposedEnd = start + batchSize;
+      final end = proposedEnd < input.length ? proposedEnd : input.length;
+      result.addAll(await Future.wait(input.sublist(start, end).map(mapper)));
+    }
+    return result;
   }
 
   int _embeddedCount(dynamic value) {
@@ -2820,6 +3120,13 @@ class MapLovRepository {
     eyeColor: value.eyeColor,
     hairColor: value.hairColor,
     heightCm: value.heightCm,
+    childrenPreference: value.childrenPreference,
+    relationshipStatus: value.relationshipStatus,
+    educationLevel: value.educationLevel,
+    beardStyle: value.beardStyle,
+    smokingStatus: value.smokingStatus,
+    incomeLevel: value.incomeLevel,
+    isPhotoVerified: value.isPhotoVerified,
     compatibilityBreakdown:
         compatibilityBreakdown ?? value.compatibilityBreakdown,
     likedByMe: likedByMe ?? value.likedByMe,

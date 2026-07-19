@@ -61,7 +61,7 @@ class AuthService {
       !isPhoneVerificationDeferred;
   bool get requiresPreferencesCompletion =>
       isConfigured &&
-      pendingPhoneNumber?.isNotEmpty == true &&
+      _client?.auth.currentUser != null &&
       _client?.auth.currentUser?.userMetadata?['preferences_completed'] != true;
 
   Stream<MapLovAuthEvent> get events {

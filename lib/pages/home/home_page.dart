@@ -26,7 +26,53 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     selectedTab = widget.initialTab;
-    unawaited(_loadProfiles());
+    unawaited(_initializeDiscovery());
+  }
+
+  Future<void> _initializeDiscovery() async {
+    if (mounted) setState(() => _loading = true);
+    try {
+      if (MapLovRepository.instance.isLive) {
+        final savedFilters = await MapLovRepository.instance.myPreferences();
+        if (!mounted) return;
+        _filters = savedFilters;
+        try {
+          await LocationService.instance.updateMyLocation();
+          _locationFailure = null;
+        } on MapLovLocationFailure catch (error) {
+          if (mounted) {
+            setState(() {
+              _locationFailure = error;
+              _profiles = const [];
+              _loading = false;
+            });
+          }
+          return;
+        } catch (error) {
+          if (mounted) {
+            setState(() {
+              _profiles = const [];
+              _loading = false;
+            });
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Unable to update your location: $error')),
+            );
+          }
+          return;
+        }
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Unable to load your saved filters. Default filters will be used: $error',
+            ),
+          ),
+        );
+      }
+    }
+    if (mounted) await _loadProfiles(refreshNearbyLocation: false);
   }
 
   @override
@@ -38,17 +84,20 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed &&
-        selectedTab == 'Nearby' &&
         _locationFailure != null &&
         !_loading) {
-      unawaited(_loadProfiles());
+      unawaited(
+        selectedTab == 'Nearby' ? _loadProfiles() : _initializeDiscovery(),
+      );
     }
   }
 
-  Future<void> _loadProfiles() async {
+  Future<void> _loadProfiles({bool refreshNearbyLocation = true}) async {
     if (mounted) setState(() => _loading = true);
     try {
-      if (selectedTab == 'Nearby' && MapLovRepository.instance.isLive) {
+      if (selectedTab == 'Nearby' &&
+          refreshNearbyLocation &&
+          MapLovRepository.instance.isLive) {
         try {
           await LocationService.instance.updateMyLocation();
           _locationFailure = null;
@@ -61,7 +110,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           }
           return;
         }
-      } else {
+      } else if (_filters.locationMode != 'near_me' ||
+          !_filters.requiredLocation) {
         _locationFailure = null;
       }
       final profiles = await MapLovRepository.instance.discoverProfiles(
@@ -94,7 +144,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       await LocationService.instance.openRequiredSettings(failure);
       return;
     }
-    await _loadProfiles();
+    if (selectedTab == 'Nearby') {
+      await _loadProfiles();
+    } else {
+      await _initializeDiscovery();
+    }
   }
 
   Future<void> _openFilters() async {
@@ -108,7 +162,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   List<UserProfile> get visibleProfiles {
     return switch (selectedTab) {
       'Nearby' =>
-        _profiles.where((profile) => profile.distanceKm <= 10).toList(),
+        _profiles
+            .where((profile) => profile.distanceKm <= _filters.distanceKm)
+            .toList(),
       'Online' => _profiles.where((profile) => profile.isOnline).toList(),
       'New' => _profiles.where((profile) => profile.isNew).toList(),
       _ => _profiles,
@@ -239,7 +295,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   selectedTab = tab;
                   if (tab != 'Nearby') _locationFailure = null;
                 });
-                unawaited(_loadProfiles());
+                unawaited(
+                  tab == 'Discover' &&
+                          _filters.locationMode == 'near_me' &&
+                          _filters.requiredLocation
+                      ? _initializeDiscovery()
+                      : _loadProfiles(),
+                );
               },
             ),
             const Divider(height: 1),
@@ -251,7 +313,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 onOpen: _openPopularPhoto,
               ),
             Expanded(
-              child: selectedTab == 'Nearby' && _locationFailure != null
+              child: _locationFailure != null
                   ? _NearbyLocationAccessState(
                       failure: _locationFailure!,
                       onResolve: () => unawaited(_resolveLocationFailure()),

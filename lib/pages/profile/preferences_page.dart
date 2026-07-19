@@ -13,6 +13,7 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
   double distance = 50;
   String selectedCity = 'Any city';
   String preferredCountry = 'Canada';
+  String residenceCountry = 'Canada';
   String gender = 'Everyone';
   String relationshipGoal = 'Long-term';
   String language = 'Any language';
@@ -33,6 +34,7 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
 
   Future<void> _load() async {
     final saved = await MapLovRepository.instance.myPreferences();
+    final profile = await MapLovRepository.instance.myProfileDetails();
     if (!mounted) return;
     setState(() {
       ages = RangeValues(
@@ -46,11 +48,15 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
       };
       distance = saved.distanceKm.toDouble().clamp(1, 100);
       selectedCity = saved.cities.firstOrNull ?? 'Any city';
-      gender = saved.genders.firstOrNull ?? 'Everyone';
+      gender = _displayGenderFilterValue(
+        saved.genders.firstOrNull ?? 'Everyone',
+      );
       relationshipGoal = saved.relationshipGoals.firstOrNull ?? 'Long-term';
       language = saved.languages.firstOrNull ?? 'Any language';
       personality = saved.personalities.firstOrNull ?? 'Any personality';
       preferredCountry = saved.countries.firstOrNull ?? 'Canada';
+      residenceCountry =
+          profile?['country_name'] as String? ?? residenceCountry;
       requiredGender = saved.requiredGenders;
       requiredLanguage = saved.requiredLanguages;
       requiredGoal = saved.requiredRelationshipGoal;
@@ -65,6 +71,68 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
       Navigator.pop(context);
     } else {
       Navigator.pushReplacementNamed(context, AppRoutes.profileSetup);
+    }
+  }
+
+  Future<bool> _confirmRegistrationLocation() async {
+    if (!mounted) return false;
+    return await showDialog<bool>(
+          context: context,
+          barrierDismissible: false,
+          builder: (dialogContext) => AlertDialog(
+            title: const Text('Enable location for Discover'),
+            content: const Text(
+              'MapLov uses your current GPS position to initialize Discover and calculate approximate distances. Your exact coordinates are never shown to other members, and background location is not used.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext, false),
+                child: const Text('Not now'),
+              ),
+              FilledButton(
+                key: const Key('confirm_registration_location'),
+                onPressed: () => Navigator.pop(dialogContext, true),
+                child: const Text('Continue'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+  }
+
+  Future<bool> _captureCurrentLocation({bool confirm = false}) async {
+    if (!MapLovRepository.instance.isLive) return true;
+    if (confirm && !await _confirmRegistrationLocation()) return false;
+    try {
+      await LocationService.instance.updateMyLocation();
+      return true;
+    } on MapLovLocationFailure catch (failure) {
+      if (!mounted) return false;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            failure.requiresSettings
+                ? '$failure Open the device settings, allow location while using MapLov, then tap Next again.'
+                : 'Location permission is required to initialize Discover. Allow it, then tap Next again.',
+          ),
+          action: failure.requiresSettings
+              ? SnackBarAction(
+                  label: 'Settings',
+                  onPressed: () => unawaited(
+                    LocationService.instance.openRequiredSettings(failure),
+                  ),
+                )
+              : null,
+        ),
+      );
+      return false;
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Unable to save your location: $error')),
+        );
+      }
+      return false;
     }
   }
 
@@ -85,13 +153,17 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
             'International' => 'specific_country',
             _ => 'near_me',
           },
-          countries: searchMode == 'International'
-              ? [preferredCountry]
-              : const [],
+          countries: switch (searchMode) {
+            'My country' => [residenceCountry],
+            'International' => [preferredCountry],
+            _ => const [],
+          },
           cities: searchMode == 'My country' && selectedCity != 'Any city'
               ? [selectedCity]
               : const [],
-          genders: gender == 'Everyone' ? const [] : [gender],
+          genders: gender == 'Everyone'
+              ? const []
+              : [_storedGenderFilterValue(gender)],
           relationshipGoals: [relationshipGoal],
           languages: language == 'Any language'
               ? const []
@@ -109,6 +181,9 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
           requiredRelationshipGoal: requiredGoal,
         ),
       );
+      if (!await _captureCurrentLocation(confirm: completingRegistration)) {
+        return;
+      }
       await AuthService.instance.markPreferencesCompleted();
       if (!mounted) return;
       if (AuthService.instance.isConfigured &&

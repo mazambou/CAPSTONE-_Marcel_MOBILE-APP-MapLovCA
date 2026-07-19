@@ -417,12 +417,14 @@ class _SocialPhotoViewerState extends State<_SocialPhotoViewer> {
   late final PageController _pageController;
   late final List<String> _photos;
   late int _currentIndex;
-  bool _liked = false;
-  bool _superLiked = false;
   late bool _profileLiked;
   late final List<int> _likeCounts;
   late final List<int> _superLikeCounts;
   late final List<int> _commentCounts;
+  late final List<bool> _likedStates;
+  late final List<bool> _superLikedStates;
+  bool _likeUpdating = false;
+  bool _superLikeUpdating = false;
 
   @override
   void initState() {
@@ -449,7 +451,10 @@ class _SocialPhotoViewerState extends State<_SocialPhotoViewer> {
       _photos.length,
       (index) => widget.profile.photoCommentCount(_sourcePhotoIndex(index)),
     );
+    _likedStates = List<bool>.filled(_photos.length, false);
+    _superLikedStates = List<bool>.filled(_photos.length, false);
     _pageController = PageController(initialPage: _currentIndex);
+    unawaited(_loadReactionState());
   }
 
   int _sourcePhotoIndex(int localIndex) =>
@@ -470,24 +475,87 @@ class _SocialPhotoViewerState extends State<_SocialPhotoViewer> {
     );
   }
 
-  Future<void> _toggleLike() async {
-    final sourceIndex = _sourcePhotoIndex(_currentIndex);
-    final photoId = widget.profile.photoIds.length > sourceIndex
+  String? _knownPhotoId(int localIndex) {
+    final sourceIndex = _sourcePhotoIndex(localIndex);
+    return widget.profile.photoIds.length > sourceIndex
         ? widget.profile.photoIds[sourceIndex]
-        : MapLovRepository.instance.isLive
-        ? null
-        : 'demo-photo-${widget.profile.id}-$sourceIndex';
-    if (photoId == null) return;
+        : null;
+  }
+
+  Future<String?> _photoId(int localIndex) async {
+    final known = _knownPhotoId(localIndex);
+    if (known != null) return known;
+    return MapLovRepository.instance
+        .profilePhotoId(widget.profile.id, _sourcePhotoIndex(localIndex))
+        .timeout(const Duration(seconds: 8));
+  }
+
+  Future<void> _loadReactionState() async {
+    final ids = List.generate(
+      _photos.length,
+      _knownPhotoId,
+    ).whereType<String>().toList();
+    if (ids.isEmpty) return;
     try {
-      final result = await MapLovRepository.instance.togglePhotoLike(
-        photoId,
-        profileId: widget.profile.id,
-        currentlyLiked: _liked,
-      );
+      final state = await MapLovRepository.instance
+          .photoReactionState(ids)
+          .timeout(const Duration(seconds: 10));
       if (!mounted) return;
       setState(() {
-        _liked = result.liked;
-        _likeCounts[_currentIndex] += result.liked ? 1 : -1;
+        for (var index = 0; index < _photos.length; index++) {
+          final id = _knownPhotoId(index);
+          if (id == null) continue;
+          if (!_likeUpdating || index != _currentIndex) {
+            _likedStates[index] = state.likedPhotoIds.contains(id);
+          }
+          if (!_superLikeUpdating || index != _currentIndex) {
+            _superLikedStates[index] = state.superLikedPhotoIds.contains(id);
+          }
+        }
+      });
+    } catch (_) {
+      // Reactions can still be toggled atomically if this initial read fails.
+    }
+  }
+
+  Future<void> _toggleLike() async {
+    if (_likeUpdating) return;
+    final index = _currentIndex;
+    final photoId = await _photoId(index);
+    if (photoId == null || !mounted) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('This photo is not available.')),
+        );
+      }
+      return;
+    }
+    final previousLiked = _likedStates[index];
+    final previousCount = _likeCounts[index];
+    final optimisticLiked = !previousLiked;
+    setState(() {
+      _likeUpdating = true;
+      _likedStates[index] = optimisticLiked;
+      _likeCounts[index] = math.max(
+        0,
+        previousCount + (optimisticLiked ? 1 : -1),
+      );
+    });
+    try {
+      final result = await MapLovRepository.instance
+          .togglePhotoLike(
+            photoId,
+            profileId: widget.profile.id,
+            currentlyLiked: previousLiked,
+          )
+          .timeout(const Duration(seconds: 12));
+      if (!mounted) return;
+      setState(() {
+        _likedStates[index] = result.liked;
+        _likeCounts[index] = math.max(
+          0,
+          previousCount + (result.liked ? 1 : 0) - (previousLiked ? 1 : 0),
+        );
       });
       if (result.matched) {
         await Navigator.push(
@@ -499,9 +567,15 @@ class _SocialPhotoViewerState extends State<_SocialPhotoViewer> {
       }
     } catch (error) {
       if (!mounted) return;
+      setState(() {
+        _likedStates[index] = previousLiked;
+        _likeCounts[index] = previousCount;
+      });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Unable to update this photo like: $error')),
       );
+    } finally {
+      if (mounted) setState(() => _likeUpdating = false);
     }
   }
 
@@ -513,26 +587,52 @@ class _SocialPhotoViewerState extends State<_SocialPhotoViewer> {
   }
 
   Future<void> _toggleSuperLike() async {
-    final sourceIndex = _sourcePhotoIndex(_currentIndex);
-    final photoId = widget.profile.photoIds.length > sourceIndex
-        ? widget.profile.photoIds[sourceIndex]
-        : 'demo-photo-${widget.profile.id}-$sourceIndex';
-    try {
-      final active = await MapLovRepository.instance.togglePhotoSuperLike(
-        photoId,
-        currentlySuperLiked: _superLiked,
+    if (_superLikeUpdating) return;
+    final index = _currentIndex;
+    final photoId = await _photoId(index);
+    if (photoId == null || !mounted) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('This photo is not available.')),
+        );
+      }
+      return;
+    }
+    final previousLiked = _superLikedStates[index];
+    final previousCount = _superLikeCounts[index];
+    final optimisticLiked = !previousLiked;
+    setState(() {
+      _superLikeUpdating = true;
+      _superLikedStates[index] = optimisticLiked;
+      _superLikeCounts[index] = math.max(
+        0,
+        previousCount + (optimisticLiked ? 1 : -1),
       );
+    });
+    try {
+      final active = await MapLovRepository.instance
+          .togglePhotoSuperLike(photoId, currentlySuperLiked: previousLiked)
+          .timeout(const Duration(seconds: 12));
       if (!mounted) return;
       setState(() {
-        _superLiked = active;
-        _superLikeCounts[_currentIndex] += active ? 1 : -1;
+        _superLikedStates[index] = active;
+        _superLikeCounts[index] = math.max(
+          0,
+          previousCount + (active ? 1 : 0) - (previousLiked ? 1 : 0),
+        );
       });
     } catch (error) {
       if (mounted) {
+        setState(() {
+          _superLikedStates[index] = previousLiked;
+          _superLikeCounts[index] = previousCount;
+        });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Unable to update this Super Like: $error')),
         );
       }
+    } finally {
+      if (mounted) setState(() => _superLikeUpdating = false);
     }
   }
 
@@ -572,11 +672,7 @@ class _SocialPhotoViewerState extends State<_SocialPhotoViewer> {
           PageView.builder(
             controller: _pageController,
             itemCount: _photos.length,
-            onPageChanged: (index) => setState(() {
-              _currentIndex = index;
-              _liked = false;
-              _superLiked = false;
-            }),
+            onPageChanged: (index) => setState(() => _currentIndex = index),
             itemBuilder: (context, index) => mediaImage(
               _photos[index],
               fit: BoxFit.cover,
@@ -617,8 +713,8 @@ class _SocialPhotoViewerState extends State<_SocialPhotoViewer> {
                   Align(
                     alignment: Alignment.centerRight,
                     child: _SocialPhotoActions(
-                      liked: _liked,
-                      superLiked: _superLiked,
+                      liked: _likedStates[_currentIndex],
+                      superLiked: _superLikedStates[_currentIndex],
                       likeCount: _likeCounts[_currentIndex],
                       superLikeCount: _superLikeCounts[_currentIndex],
                       commentCount: _commentCounts[_currentIndex],

@@ -81,15 +81,9 @@ flutter:
     - assets/avatars/
     - assets/login/
     - assets/register/
-    - assets/home/
-    - assets/discover/
-    - assets/filters/
-    - assets/match/
     - assets/chat/
     - assets/profile/
-    - assets/settings/
     - assets/secret_garden/
-    - assets/premium/
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

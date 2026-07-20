@@ -38,6 +38,24 @@ void main() {
     expect(visible(2, 'free', owner: true), isTrue);
   });
 
+  test(
+    'international discovery opt-out only affects international searches',
+    () {
+      bool visible(String mode, {bool owner = false}) =>
+          visibleInInternationalDiscovery(
+            allowsInternationalDiscovery: false,
+            isOwner: owner,
+            locationMode: mode,
+          );
+
+      expect(visible('specific_country'), isFalse);
+      expect(visible('worldwide'), isFalse);
+      expect(visible('near_me'), isTrue);
+      expect(visible('my_country'), isTrue);
+      expect(visible('specific_country', owner: true), isTrue);
+    },
+  );
+
   test('photo engagement combines likes, Super Likes and comments', () {
     const profile = UserProfile(
       name: 'Engagement',
@@ -222,6 +240,13 @@ void main() {
       ),
       findsOneWidget,
     );
+    final canadianCityDropdown = tester.widget<DropdownButton<String>>(
+      find.descendant(
+        of: find.byKey(const ValueKey('registration_city_dropdown_Canada')),
+        matching: find.byType(DropdownButton<String>),
+      ),
+    );
+    expect(canadianCityDropdown.items!.length, greaterThan(150));
 
     final phoneIndicator = tester.widget<DropdownButton<String>>(
       find.descendant(
@@ -257,6 +282,38 @@ void main() {
     expect(synchronizedCountry.value, 'Cameroon');
     expect(find.text('Douala'), findsOneWidget);
     expect(find.text('+237'), findsOneWidget);
+    final cameroonCityDropdown = tester.widget<DropdownButton<String>>(
+      find.descendant(
+        of: find.byKey(const ValueKey('registration_city_dropdown_Cameroon')),
+        matching: find.byType(DropdownButton<String>),
+      ),
+    );
+    expect(
+      cameroonCityDropdown.items!.map((item) => item.value).toList(),
+      const [
+        'Douala',
+        'Yaoundé',
+        'Garoua',
+        'Bamenda',
+        'Maroua',
+        'Bafoussam',
+        'Ngaoundéré',
+        'Kumba',
+        'Limbe',
+        'Bertoua',
+        'Ebolowa',
+        'Kribi',
+        'Nkongsamba',
+        'Foumban',
+        'Dschang',
+        'Mbouda',
+        'Edéa',
+        'Kousséri',
+        'Kumbo',
+        'Bafang',
+        'Other city',
+      ],
+    );
   });
 
   testWidgets('phone verification requires a six-digit code', (tester) async {
@@ -512,12 +569,35 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
 
     await tester.pumpWidget(const MaterialApp(home: ProfileScreen()));
-    await tester.drag(find.byType(ListView).first, const Offset(0, -1000));
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('personal_recent_activity')),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
     await tester.pumpAndSettle();
 
     expect(find.text('My Friends'), findsOneWidget);
     expect(find.text('Friends Posts'), findsOneWidget);
     expect(find.text('Recent activity'), findsOneWidget);
+  });
+
+  testWidgets('profile can disable international discovery', (tester) async {
+    tester.view.physicalSize = const Size(390, 1400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(const MaterialApp(home: ProfileScreen()));
+    await tester.pump();
+
+    final finder = find.byKey(const Key('international_discovery_switch'));
+    expect(finder, findsOneWidget);
+    expect(tester.widget<SwitchListTile>(finder).value, isTrue);
+
+    await tester.tap(finder);
+    await tester.pump();
+
+    expect(tester.widget<SwitchListTile>(finder).value, isFalse);
   });
 
   testWidgets('switches between the three geographic filter modes', (

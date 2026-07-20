@@ -1733,36 +1733,7 @@ final _locationFilterDecoration = BoxDecoration(
   border: Border.all(color: AppColors.blush),
 );
 
-const _canadianCities = [
-  'Any city',
-  'Toronto',
-  'Montréal',
-  'Vancouver',
-  'Calgary',
-  'Edmonton',
-  'Ottawa',
-  'Winnipeg',
-  'Québec City',
-  'Hamilton',
-  'Kitchener',
-  'London',
-  'Victoria',
-  'Halifax',
-  'Oshawa',
-  'Windsor',
-  'Saskatoon',
-  'Regina',
-  'St. John’s',
-  'Kelowna',
-  'Sherbrooke',
-  'Trois-Rivières',
-  'Moncton',
-  'Fredericton',
-  'Charlottetown',
-  'Whitehorse',
-  'Yellowknife',
-  'Iqaluit',
-];
+const _canadianCities = ['Any city', ..._canadianCitiesWithoutAny];
 
 const _worldCountries = [
   'Afghanistan',

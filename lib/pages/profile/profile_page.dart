@@ -20,6 +20,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
         'Curious traveler, coffee enthusiast, and always ready for a live concert.',
   );
   bool loading = AuthService.instance.isConfigured;
+  bool allowInternationalDiscovery = true;
+  bool savingInternationalDiscovery = false;
   String? loadError;
 
   @override
@@ -39,6 +41,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       if (mounted) {
         setState(() {
           profile = loaded;
+          allowInternationalDiscovery = loaded.allowsInternationalDiscovery;
           loadError = null;
         });
       }
@@ -62,6 +65,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Future<void> _choosePhotoDisplay() async {
     await Navigator.pushNamed(context, AppRoutes.photoDisplaySettings);
     await _load();
+  }
+
+  Future<void> _setInternationalDiscovery(bool value) async {
+    if (savingInternationalDiscovery) return;
+    final previous = allowInternationalDiscovery;
+    setState(() {
+      allowInternationalDiscovery = value;
+      savingInternationalDiscovery = true;
+    });
+    try {
+      await MapLovRepository.instance.setInternationalDiscovery(value);
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => allowInternationalDiscovery = previous);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Unable to update international discovery: $error'),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => savingInternationalDiscovery = false);
+    }
   }
 
   Future<bool> _requirePremium({bool vip = false}) async {
@@ -218,6 +243,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
           style: const TextStyle(color: AppColors.grayText),
         ),
       const SizedBox(height: 14),
+      Card(
+        color: AppColors.palePink,
+        child: SwitchListTile.adaptive(
+          key: const Key('international_discovery_switch'),
+          secondary: const Icon(Icons.public_outlined, color: AppColors.coral),
+          value: allowInternationalDiscovery,
+          onChanged: savingInternationalDiscovery
+              ? null
+              : _setInternationalDiscovery,
+          title: const Text(
+            'Allow international discovery',
+            style: TextStyle(fontWeight: FontWeight.w800),
+          ),
+          subtitle: const Text(
+            'When disabled, your profile is hidden from searches that use the International option.',
+          ),
+        ),
+      ),
       Text(profile.bio),
       const _SectionTitle('Interests'),
       if (profile.interests.isEmpty && AuthService.instance.isConfigured)

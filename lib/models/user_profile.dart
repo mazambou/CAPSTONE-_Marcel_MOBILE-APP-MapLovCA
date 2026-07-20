@@ -14,6 +14,17 @@ bool newAccountVisibleToTier({
   return true;
 }
 
+bool visibleInInternationalDiscovery({
+  required bool allowsInternationalDiscovery,
+  required bool isOwner,
+  required String locationMode,
+}) {
+  if (isOwner) return true;
+  final international =
+      locationMode == 'specific_country' || locationMode == 'worldwide';
+  return !international || allowsInternationalDiscovery;
+}
+
 class UserProfile {
   const UserProfile({
     this.id = '',
@@ -55,6 +66,7 @@ class UserProfile {
     this.smokingStatus = '',
     this.incomeLevel = '',
     this.isPhotoVerified = false,
+    this.allowsInternationalDiscovery = true,
     this.compatibilityBreakdown = const {},
     this.likedByMe = false,
     this.lastActiveAt,
@@ -100,6 +112,7 @@ class UserProfile {
   final String smokingStatus;
   final String incomeLevel;
   final bool isPhotoVerified;
+  final bool allowsInternationalDiscovery;
   final Map<String, dynamic> compatibilityBreakdown;
   final bool likedByMe;
   final DateTime? lastActiveAt;

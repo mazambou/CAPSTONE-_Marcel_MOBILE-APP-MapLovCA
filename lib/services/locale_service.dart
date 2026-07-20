@@ -967,6 +967,9 @@ class MapLovLocalizations {
         'L’autorisation de localisation est bloquée dans les paramètres de l’appareil.',
     'Now': 'Maintenant',
     'Add friend': 'Ajouter comme ami',
+    'Allow international discovery': 'Autoriser la découverte internationale',
+    'When disabled, your profile is hidden from searches that use the International option.':
+        'Lorsque cette option est désactivée, votre profil est masqué des recherches utilisant l’option International.',
   };
 
   String translate(String value) {
@@ -1084,6 +1087,8 @@ class MapLovLocalizations {
           'Impossible de mettre à jour le J’aime de cette photo',
       'Unable to update your location':
           'Impossible de mettre à jour votre position',
+      'Unable to update international discovery':
+          'Impossible de mettre à jour la découverte internationale',
     };
     for (final entry in errorActions.entries) {
       if (value == entry.key) return entry.value;

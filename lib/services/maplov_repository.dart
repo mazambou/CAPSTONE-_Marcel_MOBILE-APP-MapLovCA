@@ -520,12 +520,21 @@ class MapLovRepository {
       }
     }
 
-    final rows = await _client!
+    var profileQuery = _client!
         .from('profiles')
         .select()
         .eq('status', 'active')
-        .eq('is_discoverable', true)
-        .limit(100);
+        .eq('is_discoverable', true);
+    if (filters.locationMode == 'specific_country' ||
+        filters.locationMode == 'worldwide') {
+      final viewerId = currentUserId;
+      profileQuery = viewerId == null
+          ? profileQuery.eq('allow_international_discovery', true)
+          : profileQuery.or(
+              'allow_international_discovery.eq.true,id.eq.$viewerId',
+            );
+    }
+    final rows = await profileQuery.limit(100);
     final hydrated = await _mapInBatches(
       rows.cast<Map<String, dynamic>>(),
       _profileFromRow,
@@ -582,6 +591,13 @@ class MapLovRepository {
   }
 
   bool _profileMatchesFilters(UserProfile profile, DiscoveryFilters filters) {
+    if (!visibleInInternationalDiscovery(
+      allowsInternationalDiscovery: profile.allowsInternationalDiscovery,
+      isOwner: profile.id == currentUserId,
+      locationMode: filters.locationMode,
+    )) {
+      return false;
+    }
     if (profile.age < filters.minimumAge || profile.age > filters.maximumAge) {
       return false;
     }
@@ -831,6 +847,14 @@ class MapLovRepository {
         .update(editableValues)
         .eq('id', currentUserId!);
     await completeProfileIfReady();
+  }
+
+  Future<void> setInternationalDiscovery(bool allow) async {
+    if (!isLive) return;
+    await _client!
+        .from('profiles')
+        .update({'allow_international_discovery': allow})
+        .eq('id', currentUserId!);
   }
 
   Future<bool> completeProfileIfReady() async {
@@ -3053,6 +3077,8 @@ class MapLovRepository {
       smokingStatus: row['smoking_status'] as String? ?? '',
       incomeLevel: row['income_level'] as String? ?? '',
       isPhotoVerified: row['is_photo_verified'] as bool? ?? false,
+      allowsInternationalDiscovery:
+          row['allow_international_discovery'] as bool? ?? true,
       lastActiveAt: lastActive,
       createdAt: createdAt,
     );
@@ -3127,6 +3153,7 @@ class MapLovRepository {
     smokingStatus: value.smokingStatus,
     incomeLevel: value.incomeLevel,
     isPhotoVerified: value.isPhotoVerified,
+    allowsInternationalDiscovery: value.allowsInternationalDiscovery,
     compatibilityBreakdown:
         compatibilityBreakdown ?? value.compatibilityBreakdown,
     likedByMe: likedByMe ?? value.likedByMe,

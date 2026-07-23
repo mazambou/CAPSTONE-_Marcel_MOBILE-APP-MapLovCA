@@ -8,6 +8,16 @@ import '../config/supabase_config.dart';
 import '../data/mock_data.dart';
 import '../models/user_profile.dart';
 
+class FaceVerificationException implements Exception {
+  const FaceVerificationException(this.code, this.message);
+
+  final String code;
+  final String message;
+
+  @override
+  String toString() => message;
+}
+
 class DiscoveryFilters {
   const DiscoveryFilters({
     this.minimumAge = 18,
@@ -15,8 +25,10 @@ class DiscoveryFilters {
     this.distanceKm = 50,
     this.locationMode = 'near_me',
     this.countries = const [],
+    this.regions = const [],
     this.cities = const [],
     this.originCountries = const [],
+    this.originRegions = const [],
     this.originCities = const [],
     this.languages = const [],
     this.relationshipGoals = const [],
@@ -44,6 +56,9 @@ class DiscoveryFilters {
     this.requiredLocation = false,
     this.requiredLanguages = false,
     this.requiredRelationshipGoal = false,
+    this.premiumOnly = false,
+    this.vipOnly = false,
+    this.mostLikedFirst = false,
   });
 
   final int minimumAge;
@@ -51,8 +66,10 @@ class DiscoveryFilters {
   final int distanceKm;
   final String locationMode;
   final List<String> countries;
+  final List<String> regions;
   final List<String> cities;
   final List<String> originCountries;
+  final List<String> originRegions;
   final List<String> originCities;
   final List<String> languages;
   final List<String> relationshipGoals;
@@ -80,6 +97,9 @@ class DiscoveryFilters {
   final bool requiredLocation;
   final bool requiredLanguages;
   final bool requiredRelationshipGoal;
+  final bool premiumOnly;
+  final bool vipOnly;
+  final bool mostLikedFirst;
 
   Map<String, Object?> toDatabase() => {
     'minimum_age': minimumAge,
@@ -87,8 +107,10 @@ class DiscoveryFilters {
     'distance_km': distanceKm,
     'location_mode': locationMode,
     'country_codes': countries,
+    'regions': regions,
     'cities': cities,
     'origin_country_names': originCountries,
+    'origin_regions': originRegions,
     'origin_cities': originCities,
     'languages': languages,
     'relationship_goals': relationshipGoals,
@@ -116,6 +138,9 @@ class DiscoveryFilters {
     'required_location': requiredLocation,
     'required_languages': requiredLanguages,
     'required_relationship_goal': requiredRelationshipGoal,
+    'premium_only': premiumOnly,
+    'vip_only': vipOnly,
+    'most_liked_first': mostLikedFirst,
   };
 
   factory DiscoveryFilters.fromDatabase(Map<String, dynamic> row) {
@@ -128,10 +153,12 @@ class DiscoveryFilters {
       distanceKm: row['distance_km'] as int? ?? 50,
       locationMode: row['location_mode'] as String? ?? 'near_me',
       countries: List<String>.from(row['country_codes'] ?? const []),
+      regions: List<String>.from(row['regions'] ?? const []),
       cities: List<String>.from(row['cities'] ?? const []),
       originCountries: List<String>.from(
         row['origin_country_names'] ?? const [],
       ),
+      originRegions: List<String>.from(row['origin_regions'] ?? const []),
       originCities: List<String>.from(row['origin_cities'] ?? const []),
       languages: List<String>.from(row['languages'] ?? const []),
       relationshipGoals: List<String>.from(
@@ -168,8 +195,64 @@ class DiscoveryFilters {
       requiredLanguages: row['required_languages'] as bool? ?? false,
       requiredRelationshipGoal:
           row['required_relationship_goal'] as bool? ?? false,
+      premiumOnly: row['premium_only'] as bool? ?? false,
+      vipOnly: row['vip_only'] as bool? ?? false,
+      mostLikedFirst: row['most_liked_first'] as bool? ?? false,
     );
   }
+
+  DiscoveryFilters copyWith({
+    String? locationMode,
+    List<String>? countries,
+    List<String>? regions,
+    List<String>? cities,
+    List<String>? originCountries,
+    List<String>? originRegions,
+    List<String>? originCities,
+    bool? premiumOnly,
+    bool? vipOnly,
+    bool? mostLikedFirst,
+  }) => DiscoveryFilters(
+    minimumAge: minimumAge,
+    maximumAge: maximumAge,
+    distanceKm: distanceKm,
+    locationMode: locationMode ?? this.locationMode,
+    countries: countries ?? this.countries,
+    regions: regions ?? this.regions,
+    cities: cities ?? this.cities,
+    originCountries: originCountries ?? this.originCountries,
+    originRegions: originRegions ?? this.originRegions,
+    originCities: originCities ?? this.originCities,
+    languages: languages,
+    relationshipGoals: relationshipGoals,
+    verifiedOnly: verifiedOnly,
+    activeTodayOnly: activeTodayOnly,
+    genders: genders,
+    personalities: personalities,
+    interestSlugs: interestSlugs,
+    religions: religions,
+    bodyTypes: bodyTypes,
+    eyeColors: eyeColors,
+    hairColors: hairColors,
+    minimumHeightCm: minimumHeightCm,
+    maximumHeightCm: maximumHeightCm,
+    childrenPreferences: childrenPreferences,
+    relationshipStatuses: relationshipStatuses,
+    educationLevels: educationLevels,
+    beardStyles: beardStyles,
+    smokingStatuses: smokingStatuses,
+    professionCategories: professionCategories,
+    incomeLevels: incomeLevels,
+    photoVerifiedOnly: photoVerifiedOnly,
+    interestImportance: interestImportance,
+    requiredGenders: requiredGenders,
+    requiredLocation: requiredLocation,
+    requiredLanguages: requiredLanguages,
+    requiredRelationshipGoal: requiredRelationshipGoal,
+    premiumOnly: premiumOnly ?? this.premiumOnly,
+    vipOnly: vipOnly ?? this.vipOnly,
+    mostLikedFirst: mostLikedFirst ?? this.mostLikedFirst,
+  );
 }
 
 class ProfileLikeResult {
@@ -217,11 +300,13 @@ class SubscriptionInfo {
     this.tier = 'free',
     this.status = 'active',
     this.renewsAt,
+    this.autoRenewEnabled = false,
     this.history = const [],
   });
   final String tier;
   final String status;
   final DateTime? renewsAt;
+  final bool autoRenewEnabled;
   final List<Map<String, dynamic>> history;
 
   bool get isPremium => tier == 'plus' || tier == 'elite' || tier == 'vip';
@@ -456,6 +541,50 @@ class MapLovRepository {
     }
 
     final viewerTier = (await subscriptionInfo()).tier;
+    if (filters.vipOnly && viewerTier != 'elite' && viewerTier != 'vip') {
+      throw StateError('VIP profiles require a VIP subscription.');
+    }
+    if (filters.premiumOnly &&
+        viewerTier != 'plus' &&
+        viewerTier != 'elite' &&
+        viewerTier != 'vip') {
+      throw StateError('Premium profile discovery requires Premium Plus.');
+    }
+    if ((filters.originCountries.isNotEmpty ||
+            filters.originRegions.isNotEmpty ||
+            filters.originCities.isNotEmpty) &&
+        viewerTier != 'plus' &&
+        viewerTier != 'elite' &&
+        viewerTier != 'vip') {
+      throw StateError('Origin filters require Premium Plus.');
+    }
+    if ((filters.locationMode == 'my_country' ||
+            filters.locationMode == 'specific_country' ||
+            filters.locationMode == 'worldwide') &&
+        viewerTier != 'plus' &&
+        viewerTier != 'elite' &&
+        viewerTier != 'vip') {
+      throw StateError('International search requires Premium Plus.');
+    }
+
+    final vipRanking = <String, int>{};
+    if (filters.vipOnly || filters.premiumOnly || filters.mostLikedFirst) {
+      final rankingRows =
+          await _client!.rpc(
+                'vip_discovery_ranking',
+                params: {
+                  'vip_only_value': filters.vipOnly,
+                  'premium_only_value': filters.premiumOnly,
+                  'most_liked_first_value': filters.mostLikedFirst,
+                },
+              )
+              as List<dynamic>;
+      for (final row in rankingRows.cast<Map<String, dynamic>>()) {
+        vipRanking[row['profile_id'] as String] =
+            (row['popularity_score'] as num?)?.toInt() ?? 0;
+      }
+      if (vipRanking.isEmpty) return const [];
+    }
 
     try {
       await _client!.rpc('refresh_my_compatibility_scores');
@@ -495,6 +624,10 @@ class MapLovRepository {
         );
         final result = hydrated
             .where((profile) => profile.photoUrls.isNotEmpty)
+            .where(
+              (profile) =>
+                  vipRanking.isEmpty || vipRanking.containsKey(profile.id),
+            )
             .map(
               (profile) => _copyProfile(
                 profile,
@@ -511,7 +644,7 @@ class MapLovRepository {
                       _newAccountVisibleToViewer(profile, viewerTier)),
             )
             .toList()
-          ..sort(_compareDiscoverProfiles);
+          ..sort((a, b) => _compareWithVipRanking(a, b, filters, vipRanking));
       } on PostgrestException {
         // Never replace a failed geographic query with ordinary discovery:
         // those rows do not contain a measured distance and would make the
@@ -533,6 +666,13 @@ class MapLovRepository {
           : profileQuery.or(
               'allow_international_discovery.eq.true,id.eq.$viewerId',
             );
+    }
+    if (filters.vipOnly || filters.premiumOnly || filters.mostLikedFirst) {
+      if (vipRanking.isEmpty) return const [];
+      final rankedIds = filters.mostLikedFirst
+          ? vipRanking.keys.take(100).toList()
+          : vipRanking.keys.toList();
+      profileQuery = profileQuery.inFilter('id', rankedIds);
     }
     final rows = await profileQuery.limit(100);
     final hydrated = await _mapInBatches(
@@ -568,8 +708,21 @@ class MapLovRepository {
               _profileMatchesFilters(profile, filters),
         )
         .toList();
-    profiles.sort(_compareDiscoverProfiles);
+    profiles.sort((a, b) => _compareWithVipRanking(a, b, filters, vipRanking));
     return profiles;
+  }
+
+  int _compareWithVipRanking(
+    UserProfile a,
+    UserProfile b,
+    DiscoveryFilters filters,
+    Map<String, int> ranking,
+  ) {
+    if (filters.mostLikedFirst) {
+      final result = (ranking[b.id] ?? 0).compareTo(ranking[a.id] ?? 0);
+      if (result != 0) return result;
+    }
+    return _compareDiscoverProfiles(a, b);
   }
 
   bool _newAccountVisibleToViewer(UserProfile profile, String viewerTier) {
@@ -629,9 +782,22 @@ class MapLovRepository {
         )) {
       return false;
     }
+    if (filters.requiredLocation &&
+        filters.regions.isNotEmpty &&
+        !filters.regions.any(
+          (value) => value.toLowerCase() == profile.region.toLowerCase(),
+        )) {
+      return false;
+    }
     if (filters.originCountries.isNotEmpty &&
         !filters.originCountries.any(
           (value) => value.toLowerCase() == profile.originCountry.toLowerCase(),
+        )) {
+      return false;
+    }
+    if (filters.originRegions.isNotEmpty &&
+        !filters.originRegions.any(
+          (value) => value.toLowerCase() == profile.originRegion.toLowerCase(),
         )) {
       return false;
     }
@@ -857,6 +1023,22 @@ class MapLovRepository {
         .eq('id', currentUserId!);
   }
 
+  Future<void> setDiscoverable(bool discoverable) async {
+    if (!isLive) return;
+    await _client!
+        .from('profiles')
+        .update({'is_discoverable': discoverable})
+        .eq('id', currentUserId!);
+  }
+
+  Future<void> setOriginProfileVisibility(bool visible) async {
+    if (!isLive) return;
+    await _client!
+        .from('profiles')
+        .update({'show_origin_on_profile': visible})
+        .eq('id', currentUserId!);
+  }
+
   Future<bool> completeProfileIfReady() async {
     if (!isLive) return true;
     final profile = await myProfileDetails();
@@ -866,14 +1048,20 @@ class MapLovRepository {
         .eq('user_id', currentUserId!)
         .eq('moderation_status', 'visible')
         .limit(1);
+    final hasReferenceSelfie = await hasFaceReference();
     final ready =
         profile?['first_name'] != null &&
         profile?['date_of_birth'] != null &&
         profile?['gender'] != null &&
         profile?['city'] != null &&
         profile?['country_name'] != null &&
+        profile?['residence_region'] != null &&
+        profile?['origin_country_name'] != null &&
+        profile?['origin_region'] != null &&
+        profile?['origin_city'] != null &&
         (profile?['spoken_languages'] as List?)?.isNotEmpty == true &&
-        photos.isNotEmpty;
+        photos.isNotEmpty &&
+        hasReferenceSelfie;
     if (ready && profile?['profile_completed_at'] == null) {
       await _client!
           .from('profiles')
@@ -1084,35 +1272,108 @@ class MapLovRepository {
     );
   }
 
-  Future<void> uploadProfilePhoto({
+  Future<String?> uploadProfilePhoto({
     required Uint8List bytes,
     required String extension,
   }) async {
     _validateMedia(
       bytes,
       extension,
-      allowed: const {'jpg', 'jpeg', 'png', 'webp'},
-      maxBytes: 10 * 1024 * 1024,
+      allowed: const {'jpg', 'jpeg', 'png'},
+      maxBytes: 5 * 1024 * 1024,
+    );
+    if (!isLive) return null;
+    final userId = currentUserId!;
+    final path = '$userId/${_uuid.v4()}.$extension';
+    await _client!.storage
+        .from('profile-media-pending')
+        .uploadBinary(
+          path,
+          bytes,
+          fileOptions: FileOptions(
+            upsert: false,
+            contentType: _faceImageContentType(extension),
+          ),
+        );
+    try {
+      final result = await _invokeFaceVerification(
+        action: 'verify',
+        storagePath: path,
+      );
+      final photoId = result['photoId'] as String?;
+      await completeProfileIfReady();
+      return photoId;
+    } catch (_) {
+      // The server normally removes rejected and failed pending uploads. A
+      // daily backend cleanup handles uploads left by network interruption.
+      rethrow;
+    }
+  }
+
+  Future<bool> hasFaceReference() async {
+    if (!isLive) return true;
+    final result = await _client!.rpc('has_my_face_reference');
+    return result == true;
+  }
+
+  Future<void> enrollFaceReference({
+    required Uint8List bytes,
+    required String extension,
+  }) async {
+    _validateMedia(
+      bytes,
+      extension,
+      allowed: const {'jpg', 'jpeg', 'png'},
+      maxBytes: 5 * 1024 * 1024,
     );
     if (!isLive) return;
     final userId = currentUserId!;
     final path = '$userId/${_uuid.v4()}.$extension';
     await _client!.storage
-        .from('profile-media')
+        .from('identity-selfies')
         .uploadBinary(
           path,
           bytes,
-          fileOptions: const FileOptions(upsert: false),
+          fileOptions: FileOptions(
+            upsert: false,
+            contentType: _faceImageContentType(extension),
+          ),
         );
+    await _invokeFaceVerification(
+      action: 'enroll',
+      storagePath: path,
+      consentVersion: 'face-verification-v1',
+    );
+  }
+
+  String _faceImageContentType(String extension) =>
+      extension.toLowerCase() == 'png' ? 'image/png' : 'image/jpeg';
+
+  Future<Map<String, dynamic>> _invokeFaceVerification({
+    required String action,
+    required String storagePath,
+    String? consentVersion,
+  }) async {
     try {
-      await _client!.rpc(
-        'register_profile_photo',
-        params: {'storage_path_value': path},
+      final response = await _client!.functions.invoke(
+        'verify-profile-photo',
+        body: {
+          'action': action,
+          'storagePath': storagePath,
+          'consentVersion': ?consentVersion,
+        },
       );
-      await completeProfileIfReady();
-    } catch (_) {
-      await _client!.storage.from('profile-media').remove([path]);
-      rethrow;
+      return Map<String, dynamic>.from(response.data as Map? ?? const {});
+    } on FunctionException catch (error) {
+      final details = error.details;
+      final body = details is Map
+          ? Map<String, dynamic>.from(details)
+          : const <String, dynamic>{};
+      throw FaceVerificationException(
+        body['code'] as String? ?? 'face_verification_failed',
+        body['message'] as String? ??
+            'The face verification service is unavailable.',
+      );
     }
   }
 
@@ -2301,6 +2562,9 @@ class MapLovRepository {
 
   Future<void> requestGardenAccess(String albumId, int? seconds) async {
     if (!isLive) return;
+    if (!(await subscriptionInfo()).isPremium) {
+      throw StateError('Secret album access requires Premium Plus.');
+    }
     await _client!.from('garden_access_requests').insert({
       'album_id': albumId,
       'requester_id': currentUserId!,
@@ -2529,6 +2793,52 @@ class MapLovRepository {
     }
   }
 
+  Future<List<Map<String, dynamic>>> moderatedProfileQueue() async {
+    if (!isLive) return [];
+    final cases = List<Map<String, dynamic>>.from(
+      await _client!
+          .from('profile_moderation_cases')
+          .select()
+          .eq('status', 'under_review')
+          .order('opened_at'),
+    );
+    final result = <Map<String, dynamic>>[];
+    for (final moderationCase in cases) {
+      final profile = await _client!
+          .from('profiles')
+          .select('id, first_name, city, country_name, status, is_discoverable')
+          .eq('id', moderationCase['profile_id'])
+          .maybeSingle();
+      if (profile == null) continue;
+      final reports = List<Map<String, dynamic>>.from(
+        await _client!
+            .from('reports')
+            .select('id, reporter_id, reason, comment, status, created_at')
+            .eq('target_type', 'user')
+            .eq('target_id', moderationCase['profile_id'])
+            .order('created_at'),
+      );
+      result.add({...moderationCase, 'profile': profile, 'reports': reports});
+    }
+    return result;
+  }
+
+  Future<void> decideModeratedProfile(
+    String profileId,
+    String decision, {
+    String? notes,
+  }) async {
+    if (!isLive) return;
+    await _client!.rpc(
+      'decide_profile_moderation',
+      params: {
+        'profile_id_value': profileId,
+        'decision_value': decision,
+        'notes_value': notes,
+      },
+    );
+  }
+
   Future<List<Map<String, dynamic>>> moderatedPhotoQueue() async {
     if (!isLive) return [];
     final cases = List<Map<String, dynamic>>.from(
@@ -2673,6 +2983,129 @@ class MapLovRepository {
           .from('profiles')
           .select('id, first_name, city, role, status, created_at')
           .order('created_at', ascending: false),
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> adminProfiles() async {
+    if (!isLive) return [];
+    return List<Map<String, dynamic>>.from(
+      await _client!
+          .from('profiles')
+          .select(
+            'id, first_name, city, country_name, status, is_discoverable, '
+            'is_verified, is_photo_verified, profile_completed_at, created_at',
+          )
+          .order('created_at', ascending: false)
+          .limit(300),
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> adminPhotos() async {
+    if (!isLive) return [];
+    return List<Map<String, dynamic>>.from(
+      await _client!
+          .from('profile_photos')
+          .select(
+            'id, user_id, storage_path, is_primary, is_verified, '
+            'moderation_status, created_at',
+          )
+          .order('created_at', ascending: false)
+          .limit(300),
+    );
+  }
+
+  Future<void> adminVerifyPhoto(String photoId) async {
+    if (!isLive) return;
+    await _client!
+        .from('profile_photos')
+        .update({'is_verified': true})
+        .eq('id', photoId);
+    await _client!.from('admin_actions').insert({
+      'admin_id': currentUserId!,
+      'action': 'photo_verified',
+      'target_type': 'photo',
+      'target_id': photoId,
+    });
+  }
+
+  Future<List<Map<String, dynamic>>> adminSubscriptions() async {
+    if (!isLive) return [];
+    return List<Map<String, dynamic>>.from(
+      await _client!
+          .from('subscriptions')
+          .select(
+            'id, user_id, tier, provider, status, is_current, '
+            'current_period_end, auto_renew_enabled, created_at',
+          )
+          .order('created_at', ascending: false)
+          .limit(300),
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> adminPayments() async {
+    if (!isLive) return [];
+    return List<Map<String, dynamic>>.from(
+      await _client!
+          .from('payment_transactions')
+          .select(
+            'id, user_id, provider, product_id, tier, event_type, status, '
+            'amount_minor, currency_code, created_at',
+          )
+          .order('created_at', ascending: false)
+          .limit(300),
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> adminRecoveryRequests() async {
+    if (!isLive) return [];
+    return List<Map<String, dynamic>>.from(
+      await _client!
+          .from('account_deletion_requests')
+          .select('id, user_id, status, requested_at, scheduled_for')
+          .order('requested_at', ascending: false)
+          .limit(300),
+    );
+  }
+
+  Future<Map<String, int>> adminDashboardStatistics() async {
+    if (!isLive) return const {};
+    final value = await _client!.rpc('admin_dashboard_statistics');
+    final map = Map<String, dynamic>.from(value as Map);
+    return map.map((key, value) => MapEntry(key, (value as num).toInt()));
+  }
+
+  Future<int> sendGlobalNotification(String title, String body) async {
+    if (!isLive) return 0;
+    final result = await _client!.rpc(
+      'admin_send_global_notification',
+      params: {'title_value': title, 'body_value': body},
+    );
+    return (result as num).toInt();
+  }
+
+  Future<void> restoreAccount(String userId, {String? reason}) async {
+    if (!isLive) return;
+    await _client!.rpc(
+      'admin_restore_account',
+      params: {'user_id_value': userId, 'reason_value': reason},
+    );
+  }
+
+  Future<void> setManualSubscription(
+    String userId,
+    String tier, {
+    required bool active,
+    String? reason,
+  }) async {
+    if (!isLive) return;
+    await _client!.rpc(
+      'admin_set_manual_subscription',
+      params: {
+        'user_id_value': userId,
+        'tier_value': tier,
+        'active_value': active,
+        'reason_value': reason,
+      },
     );
   }
 
@@ -2842,8 +3275,19 @@ class MapLovRepository {
         .select()
         .eq('user_id', currentUserId!)
         .order('created_at', ascending: false);
-    final history = List<Map<String, dynamic>>.from(rows);
-    final current = history
+    final subscriptions = List<Map<String, dynamic>>.from(rows);
+    final paymentRows = await _client!
+        .from('payment_transactions')
+        .select(
+          'id, provider, provider_transaction_id, product_id, tier, '
+          'event_type, status, amount_minor, currency_code, period_start, '
+          'period_end, environment, created_at',
+        )
+        .eq('user_id', currentUserId!)
+        .order('created_at', ascending: false)
+        .limit(200);
+    final history = List<Map<String, dynamic>>.from(paymentRows);
+    final current = subscriptions
         .where((item) => item['is_current'] == true)
         .firstOrNull;
     return SubscriptionInfo(
@@ -2852,6 +3296,7 @@ class MapLovRepository {
       renewsAt: DateTime.tryParse(
         current?['current_period_end'] as String? ?? '',
       ),
+      autoRenewEnabled: current?['auto_renew_enabled'] as bool? ?? false,
       history: history,
     );
   }
@@ -3040,7 +3485,9 @@ class MapLovRepository {
       age: age,
       city: row['city'] as String? ?? '',
       country: row['country_name'] as String? ?? '',
+      region: row['residence_region'] as String? ?? '',
       originCountry: row['origin_country_name'] as String? ?? '',
+      originRegion: row['origin_region'] as String? ?? '',
       originCity: row['origin_city'] as String? ?? '',
       compatibilityScore: 80,
       imagePath: urls.isEmpty
@@ -3079,6 +3526,7 @@ class MapLovRepository {
       isPhotoVerified: row['is_photo_verified'] as bool? ?? false,
       allowsInternationalDiscovery:
           row['allow_international_discovery'] as bool? ?? true,
+      showsOriginOnProfile: row['show_origin_on_profile'] as bool? ?? false,
       lastActiveAt: lastActive,
       createdAt: createdAt,
     );
@@ -3119,7 +3567,9 @@ class MapLovRepository {
     age: value.age,
     city: value.city,
     country: value.country,
+    region: value.region,
     originCountry: value.originCountry,
+    originRegion: value.originRegion,
     originCity: value.originCity,
     compatibilityScore: compatibilityScore ?? value.compatibilityScore,
     imagePath: value.imagePath,
@@ -3154,6 +3604,7 @@ class MapLovRepository {
     incomeLevel: value.incomeLevel,
     isPhotoVerified: value.isPhotoVerified,
     allowsInternationalDiscovery: value.allowsInternationalDiscovery,
+    showsOriginOnProfile: value.showsOriginOnProfile,
     compatibilityBreakdown:
         compatibilityBreakdown ?? value.compatibilityBreakdown,
     likedByMe: likedByMe ?? value.likedByMe,

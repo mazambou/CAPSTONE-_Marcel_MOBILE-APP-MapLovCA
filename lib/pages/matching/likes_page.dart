@@ -72,7 +72,18 @@ class _LikesScreenState extends State<LikesScreen> {
             );
           }
           final result = snapshot.data!;
-          if (!result.canSeeProfiles) return const _LikesPremiumCard();
+          if (!result.canSeeProfiles) {
+            return _LikesPremiumCard(
+              onOpen: () async {
+                final allowed = await _requireSubscriptionFeature(
+                  context,
+                  requirement: _SubscriptionRequirement.premiumPlus,
+                  feature: 'Seeing who liked your profile',
+                );
+                if (allowed && mounted) setState(() => data = _load());
+              },
+            );
+          }
           if (result.profiles.isEmpty) {
             return const ListTile(
               leading: Icon(Icons.favorite_border, color: AppColors.coral),
@@ -128,7 +139,9 @@ class _LikesScreenState extends State<LikesScreen> {
 }
 
 class _LikesPremiumCard extends StatelessWidget {
-  const _LikesPremiumCard();
+  const _LikesPremiumCard({required this.onOpen});
+
+  final VoidCallback onOpen;
 
   @override
   Widget build(BuildContext context) => Card(
@@ -145,14 +158,11 @@ class _LikesPremiumCard extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           const Text(
-            'Upgrade to reveal the people who already liked your profile.',
+            'Open the list of people who liked your profile.',
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 16),
-          FilledButton(
-            onPressed: () => Navigator.pushNamed(context, AppRoutes.premium),
-            child: const Text('View plans'),
-          ),
+          FilledButton(onPressed: onOpen, child: const Text('View likes')),
         ],
       ),
     ),

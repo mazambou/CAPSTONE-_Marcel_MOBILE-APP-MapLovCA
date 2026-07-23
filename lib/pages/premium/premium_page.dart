@@ -33,6 +33,7 @@ class PremiumScreen extends StatelessWidget {
         'See who liked your profile',
         'See who viewed your profile',
         'Advanced filters',
+        'International search by country and region',
         'Clear your unread messages for everyone',
         '3 Secret Garden albums and 30 photos',
         '20 Secret Garden requests per day',
@@ -53,7 +54,6 @@ class PremiumScreen extends StatelessWidget {
       icon: Icons.workspace_premium_rounded,
       featuresTitle: 'Everything in Plus, plus:',
       features: [
-        'Invisible navigation in Discover',
         'Your profile appears after you like or message',
         'Exclusive VIP profile badge',
         'Advanced statistics',
@@ -392,6 +392,7 @@ class _PremiumPlanCard extends StatelessWidget {
               ),
             ),
           ),
+          if (plan.name.contains('VIP')) ...[const _VipInvisibleModeControl()],
           if (isWide) const Spacer() else const SizedBox(height: 26),
           SizedBox(
             width: double.infinity,
@@ -491,6 +492,88 @@ class _PremiumPlanCard extends StatelessWidget {
       ),
     );
   }
+}
+
+class _VipInvisibleModeControl extends StatefulWidget {
+  const _VipInvisibleModeControl();
+
+  @override
+  State<_VipInvisibleModeControl> createState() =>
+      _VipInvisibleModeControlState();
+}
+
+class _VipInvisibleModeControlState extends State<_VipInvisibleModeControl> {
+  bool loading = true;
+  bool saving = false;
+  bool vip = false;
+  bool invisible = false;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_load());
+  }
+
+  Future<void> _load() async {
+    final results = await Future.wait([
+      MapLovRepository.instance.subscriptionInfo(),
+      MapLovRepository.instance.myProfileDetails(),
+    ]);
+    if (!mounted) return;
+    final subscription = results[0] as SubscriptionInfo;
+    final profile = results[1] as Map<String, dynamic>?;
+    setState(() {
+      vip = subscription.isVip;
+      invisible = !(profile?['is_discoverable'] as bool? ?? true);
+      loading = false;
+    });
+  }
+
+  Future<void> _toggle(bool value) async {
+    if (saving) return;
+    if (!vip) {
+      final allowed = await _requireSubscriptionFeature(
+        context,
+        requirement: _SubscriptionRequirement.vip,
+        feature: 'Invisible navigation',
+      );
+      if (!allowed || !mounted) return;
+      setState(() => vip = true);
+    }
+    final previous = invisible;
+    setState(() {
+      invisible = value;
+      saving = true;
+    });
+    try {
+      await MapLovRepository.instance.setDiscoverable(!value);
+    } catch (error) {
+      if (mounted) {
+        setState(() => invisible = previous);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Unable to update invisible navigation: $error'),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+    width: double.infinity,
+    child: OutlinedButton.icon(
+      key: const Key('vip_invisible_mode_control'),
+      onPressed: loading || saving ? null : () => _toggle(!invisible),
+      icon: Icon(invisible ? Icons.visibility_off : Icons.visibility_outlined),
+      label: const Text('Invisible navigation in Discover'),
+      style: OutlinedButton.styleFrom(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+      ),
+    ),
+  );
 }
 
 class _PremiumSecurityCard extends StatelessWidget {

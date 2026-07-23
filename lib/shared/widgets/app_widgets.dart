@@ -1,5 +1,49 @@
 part of '../../app.dart';
 
+enum _SubscriptionRequirement { premiumPlus, vip }
+
+Future<bool> _requireSubscriptionFeature(
+  BuildContext context, {
+  required _SubscriptionRequirement requirement,
+  required String feature,
+}) async {
+  final subscription = await MapLovRepository.instance.subscriptionInfo();
+  final allowed = requirement == _SubscriptionRequirement.vip
+      ? subscription.isVip
+      : subscription.isPremium;
+  if (allowed || !context.mounted) return allowed;
+
+  final level = requirement == _SubscriptionRequirement.vip
+      ? 'Premium VIP'
+      : 'Premium Plus';
+  final upgrade = await showDialog<bool>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      title: Text('$level required'),
+      content: Text('$feature requires a $level subscription.'),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(dialogContext, false),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(dialogContext, true),
+          child: const Text('Upgrade'),
+        ),
+      ],
+    ),
+  );
+  if (upgrade == true && context.mounted) {
+    await Navigator.pushNamed(context, AppRoutes.premium);
+    if (!context.mounted) return false;
+    final updated = await MapLovRepository.instance.subscriptionInfo();
+    return requirement == _SubscriptionRequirement.vip
+        ? updated.isVip
+        : updated.isPremium;
+  }
+  return false;
+}
+
 class _MainPage extends StatelessWidget {
   const _MainPage({
     required this.index,

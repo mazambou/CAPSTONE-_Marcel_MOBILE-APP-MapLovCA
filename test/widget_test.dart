@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' as material show Text;
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -196,9 +197,28 @@ void main() {
       MaterialApp(home: RegisterScreen(dateOfBirth: DateTime(1990, 1, 1))),
     );
 
+    final registrationScrollable = find.byType(Scrollable).first;
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('registration_geography_group')),
+      300,
+      scrollable: registrationScrollable,
+    );
+    expect(
+      find.byKey(const Key('registration_geography_group')),
+      findsOneWidget,
+    );
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('toggle_password')),
+      -300,
+      scrollable: registrationScrollable,
+    );
+
     expect(find.text('Phone number'), findsOneWidget);
     expect(find.byKey(const Key('phone_country_indicator')), findsOneWidget);
-    final password = find.byType(TextField).at(3);
+    final password = find.ancestor(
+      of: find.byKey(const Key('toggle_password')),
+      matching: find.byType(TextField),
+    );
     expect(tester.widget<TextField>(password).obscureText, isTrue);
     await tester.tap(find.byKey(const Key('toggle_password')));
     await tester.pump();
@@ -246,7 +266,38 @@ void main() {
         matching: find.byType(DropdownButton<String>),
       ),
     );
-    expect(canadianCityDropdown.items!.length, greaterThan(150));
+    expect(
+      canadianCityDropdown.items!.map((item) => item.value),
+      contains('Toronto'),
+    );
+    expect(
+      canadianCityDropdown.items!.map((item) => item.value),
+      isNot(contains('Montréal')),
+    );
+
+    final canadianRegionDropdown = tester.widget<DropdownButton<String>>(
+      find.descendant(
+        of: find.byKey(const ValueKey('registration_region_dropdown_Canada')),
+        matching: find.byType(DropdownButton<String>),
+      ),
+    );
+    canadianRegionDropdown.onChanged!('Quebec');
+    await tester.pumpAndSettle();
+    final quebecCityDropdown = tester.widget<DropdownButton<String>>(
+      find.descendant(
+        of: find.byKey(const ValueKey('registration_city_dropdown_Canada')),
+        matching: find.byType(DropdownButton<String>),
+      ),
+    );
+    expect(quebecCityDropdown.value, 'Alma');
+    expect(
+      quebecCityDropdown.items!.map((item) => item.value),
+      containsAll(['Montréal', 'Québec City']),
+    );
+    expect(
+      quebecCityDropdown.items!.map((item) => item.value),
+      isNot(contains('Toronto')),
+    );
 
     final phoneIndicator = tester.widget<DropdownButton<String>>(
       find.descendant(
@@ -261,7 +312,8 @@ void main() {
       find.byKey(const ValueKey('registration_city_dropdown_France')),
       findsOneWidget,
     );
-    expect(find.text('Paris'), findsOneWidget);
+    expect(find.text('Lyon'), findsOneWidget);
+    expect(find.text('Paris'), findsNothing);
     final frenchPhoneIndicator = tester.widget<DropdownButton<String>>(
       find.descendant(
         of: find.byKey(const Key('phone_country_indicator')),
@@ -280,8 +332,16 @@ void main() {
       ),
     );
     expect(synchronizedCountry.value, 'Cameroon');
-    expect(find.text('Douala'), findsOneWidget);
     expect(find.text('+237'), findsOneWidget);
+    final cameroonRegionDropdown = tester.widget<DropdownButton<String>>(
+      find.descendant(
+        of: find.byKey(const ValueKey('registration_region_dropdown_Cameroon')),
+        matching: find.byType(DropdownButton<String>),
+      ),
+    );
+    expect(cameroonRegionDropdown.value, 'Adamawa');
+    cameroonRegionDropdown.onChanged!('Littoral');
+    await tester.pumpAndSettle();
     final cameroonCityDropdown = tester.widget<DropdownButton<String>>(
       find.descendant(
         of: find.byKey(const ValueKey('registration_city_dropdown_Cameroon')),
@@ -292,25 +352,13 @@ void main() {
       cameroonCityDropdown.items!.map((item) => item.value).toList(),
       const [
         'Douala',
-        'Yaoundé',
-        'Garoua',
-        'Bamenda',
-        'Maroua',
-        'Bafoussam',
-        'Ngaoundéré',
-        'Kumba',
-        'Limbe',
-        'Bertoua',
-        'Ebolowa',
-        'Kribi',
         'Nkongsamba',
-        'Foumban',
-        'Dschang',
-        'Mbouda',
         'Edéa',
-        'Kousséri',
-        'Kumbo',
-        'Bafang',
+        'Loum',
+        'Manjo',
+        'Melong',
+        'Mbanga',
+        'Dibombari',
         'Other city',
       ],
     );
@@ -362,6 +410,24 @@ void main() {
     );
     expect(find.text('Country of origin', skipOffstage: false), findsOneWidget);
     expect(find.text('City of origin', skipOffstage: false), findsOneWidget);
+    expect(
+      find.byKey(const Key('private_reference_selfie'), skipOffstage: false),
+      findsOneWidget,
+    );
+    expect(
+      find.text(
+        'Verified and kept private. It is never shown on your profile.',
+        skipOffstage: false,
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(
+        const ValueKey<String>('Current country of residence_region_Canada'),
+        skipOffstage: false,
+      ),
+      findsOneWidget,
+    );
   });
 
   testWidgets('registration saves country and city of origin together', (
@@ -390,7 +456,7 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('City of origin'), findsOneWidget);
-    expect(find.text('Paris'), findsOneWidget);
+    expect(find.text('Lyon'), findsOneWidget);
   });
 
   testWidgets('profile setup can continue without uploading a photo', (
@@ -519,6 +585,18 @@ void main() {
 
     expect(find.byType(SecretGardenScreen), findsOneWidget);
     expect(find.text('Request access'), findsOneWidget);
+    await tester.drag(find.byType(ListView).last, const Offset(0, -350));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Request access'));
+    await tester.pumpAndSettle();
+    expect(find.text('Premium Plus required'), findsOneWidget);
+    expect(
+      find.text(
+        'Requesting access to secret albums requires a Premium Plus subscription.',
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('Upgrade'), findsOneWidget);
   });
 
   testWidgets('creates a Secret Garden album without breaking dialog state', (
@@ -609,27 +687,54 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
 
     await tester.pumpWidget(const MaterialApp(home: FilterScreen()));
-    expect(find.text('Search radius'), findsOneWidget);
-    expect(
-      find.byKey(
-        const ValueKey<String>('origin_country_Any country'),
-        skipOffstage: false,
-      ),
-      findsOneWidget,
+    final quickScrollable = find
+        .descendant(
+          of: find.byKey(const Key('quick_filter_tab')),
+          matching: find.byType(Scrollable),
+        )
+        .first;
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('near_me_country')),
+      300,
+      scrollable: quickScrollable,
     );
+    expect(find.text('Search radius'), findsOneWidget);
+    final countryTop = tester.getTopLeft(
+      find.byKey(const Key('near_me_country')),
+    );
+    final regionTop = tester.getTopLeft(
+      find.byKey(const Key('near_me_region')),
+    );
+    final cityTop = tester.getTopLeft(find.byKey(const Key('near_me_city')));
+    expect(countryTop.dy, lessThan(regionTop.dy));
+    expect(regionTop.dy, lessThan(cityTop.dy));
 
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('location_mode_My country')),
+      -300,
+      scrollable: quickScrollable,
+    );
     await tester.tap(find.byKey(const Key('location_mode_My country')));
     await tester.pumpAndSettle();
-    expect(find.byKey(const Key('my_country_city_dropdown')), findsOneWidget);
-    expect(find.text('City in Canada'), findsOneWidget);
+    expect(find.text('Premium Plus required'), findsOneWidget);
+    expect(
+      find.text('Country discovery requires a Premium Plus subscription.'),
+      findsOneWidget,
+    );
+    expect(find.text('Upgrade'), findsOneWidget);
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('near_me_filter')), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('location_mode_International')));
     await tester.pumpAndSettle();
+    expect(find.text('Premium Plus required'), findsOneWidget);
     expect(
-      find.byKey(const Key('international_country_dropdown')),
+      find.text(
+        'International discovery requires a Premium Plus subscription.',
+      ),
       findsOneWidget,
     );
-    expect(find.text('International search'), findsOneWidget);
   });
 
   testWidgets('preferences reuses the geographic filter selector', (
@@ -670,11 +775,22 @@ void main() {
 
     await tester.tap(find.text('Standard Filter'));
     await tester.pumpAndSettle();
-    expect(find.text('Religion'), findsOneWidget);
     final standardList = find.descendant(
       of: find.byKey(const Key('standard_filter_tab')),
       matching: find.byType(ListView),
     );
+    final standardScrollable = find
+        .descendant(
+          of: find.byKey(const Key('standard_filter_tab')),
+          matching: find.byType(Scrollable),
+        )
+        .first;
+    await tester.scrollUntilVisible(
+      find.text('Religion'),
+      300,
+      scrollable: standardScrollable,
+    );
+    expect(find.text('Religion'), findsOneWidget);
     await tester.drag(standardList, const Offset(0, -4000));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('standard_show_results')), findsOneWidget);
@@ -686,7 +802,18 @@ void main() {
       of: find.byKey(const Key('advanced_filter_tab')),
       matching: find.byType(ListView),
     );
-    await tester.drag(advancedList, const Offset(0, -1800));
+    final advancedScrollable = find
+        .descendant(
+          of: find.byKey(const Key('advanced_filter_tab')),
+          matching: find.byType(Scrollable),
+        )
+        .first;
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('eye_color_blue')),
+      500,
+      scrollable: advancedScrollable,
+    );
+    await tester.ensureVisible(find.byKey(const Key('eye_color_blue')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('eye_color_blue')));
     await tester.pumpAndSettle();
@@ -697,6 +824,8 @@ void main() {
       ),
       findsOneWidget,
     );
+    await tester.ensureVisible(find.byKey(const Key('hair_color_brown')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('hair_color_brown')));
     await tester.pumpAndSettle();
     expect(
@@ -752,22 +881,6 @@ void main() {
         )
         .first;
     await tester.scrollUntilVisible(
-      find.byKey(
-        const ValueKey<String>('origin_country_Any country'),
-        skipOffstage: false,
-      ),
-      250,
-      scrollable: quickScrollable,
-    );
-    final originDropdown = tester.widget<DropdownButtonFormField<String>>(
-      find.byKey(
-        const ValueKey<String>('origin_country_Any country'),
-        skipOffstage: false,
-      ),
-    );
-    originDropdown.onChanged!('Cameroon');
-    await tester.pumpAndSettle();
-    await tester.scrollUntilVisible(
       find.byKey(const Key('quick_language_filter')),
       250,
       scrollable: quickScrollable,
@@ -787,10 +900,36 @@ void main() {
 
     expect(find.byType(FilterScreen), findsNothing);
     expect(find.byKey(const Key('open_filters_for_result')), findsOneWidget);
-    expect(appliedFilters?.originCountries, const ['Cameroon']);
+    expect(appliedFilters?.originCountries, isEmpty);
     expect(appliedFilters?.languages, const ['French']);
     expect(appliedFilters?.requiredLanguages, isTrue);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Free origin filter opens the Premium Plus upgrade dialog', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(const MaterialApp(home: FilterScreen()));
+    final quickList = find.descendant(
+      of: find.byKey(const Key('quick_filter_tab')),
+      matching: find.byType(ListView),
+    );
+    await tester.drag(quickList, const Offset(0, -1250));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('origin_country_Any country')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Albania').last);
+    await tester.pumpAndSettle();
+    expect(find.text('Premium Plus required'), findsOneWidget);
+    expect(
+      find.text('Using origin filters requires a Premium Plus subscription.'),
+      findsOneWidget,
+    );
+    expect(find.text('Upgrade'), findsOneWidget);
   });
 
   test('country-of-origin filtering matches complete profile data', () async {
@@ -947,7 +1086,7 @@ void main() {
             find.widgetWithText(FilledButton, 'Clear for everyone'),
           )
           .onPressed,
-      isNull,
+      isNotNull,
     );
     await tester.tap(find.widgetWithText(TextButton, 'Clear for me'));
     await tester.pumpAndSettle();
@@ -1180,6 +1319,54 @@ void main() {
     expect(find.text('VIP'), findsOneWidget);
   });
 
+  testWidgets('origin is hidden unless the profile owner enables it', (
+    tester,
+  ) async {
+    const privateOrigin = UserProfile(
+      id: 'private-origin',
+      name: 'Alex',
+      age: 30,
+      city: 'Toronto',
+      country: 'Canada',
+      region: 'Ontario',
+      originCountry: 'Cameroon',
+      originRegion: 'Littoral',
+      originCity: 'Douala',
+      compatibilityScore: 90,
+      imagePath: 'assets/profile/profile_user_placeholder.png',
+      photoDisplayStyle: PhotoDisplayStyle.profileDetails,
+    );
+    await tester.pumpWidget(
+      const MaterialApp(home: PublicProfileScreen(profile: privateOrigin)),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Canada, Toronto'), findsOneWidget);
+    expect(find.textContaining('Originally from'), findsNothing);
+    expect(find.textContaining('Littoral'), findsNothing);
+
+    const publicOrigin = UserProfile(
+      id: 'public-origin',
+      name: 'Sam',
+      age: 31,
+      city: 'Montréal',
+      country: 'Canada',
+      region: 'Québec',
+      originCountry: 'Cameroon',
+      originRegion: 'Centre',
+      originCity: 'Yaoundé',
+      showsOriginOnProfile: true,
+      compatibilityScore: 88,
+      imagePath: 'assets/profile/profile_user_placeholder.png',
+      photoDisplayStyle: PhotoDisplayStyle.profileDetails,
+    );
+    await tester.pumpWidget(
+      const MaterialApp(home: PublicProfileScreen(profile: publicOrigin)),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Originally from Cameroon, Yaoundé'), findsOneWidget);
+    expect(find.textContaining('Centre'), findsNothing);
+  });
+
   testWidgets('public profile can send and cancel a friend request', (
     tester,
   ) async {
@@ -1261,8 +1448,8 @@ void main() {
     await tester.pumpAndSettle();
     final cityOfOriginFinder = find.byWidgetPredicate(
       (widget) =>
-          widget is TextField &&
-          widget.decoration?.labelText == 'City of origin',
+          widget is DropdownButtonFormField<String> &&
+          widget.decoration.labelText == 'City of origin',
     );
     final basicList = find.byKey(const Key('edit_profile_basic_tab'));
     await tester.scrollUntilVisible(
@@ -1272,8 +1459,18 @@ void main() {
           .descendant(of: basicList, matching: find.byType(Scrollable))
           .first,
     );
-    final cityOfOrigin = tester.widget<TextField>(cityOfOriginFinder);
-    expect(cityOfOrigin.enabled, isFalse);
+    final cityOfOrigin = tester.widget<DropdownButtonFormField<String>>(
+      cityOfOriginFinder,
+    );
+    expect(cityOfOrigin.onChanged, isNull);
+    final regionOfOrigin = tester.widget<DropdownButtonFormField<String>>(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is DropdownButtonFormField<String> &&
+            widget.decoration.labelText == 'Region of origin',
+      ),
+    );
+    expect(regionOfOrigin.onChanged, isNull);
   });
 
   testWidgets(
@@ -1288,6 +1485,54 @@ void main() {
       expect(find.text('Likes'), findsOneWidget);
     },
   );
+
+  testWidgets('main discovery exposes the three subscription filters', (
+    tester,
+  ) async {
+    await tester.pumpWidget(const MaterialApp(home: HomeScreen()));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('main_show_vip_only')), findsOneWidget);
+    expect(find.byKey(const Key('main_show_premium_profiles')), findsOneWidget);
+    final subscriptionFilters = find.byKey(
+      const Key('main_discovery_subscription_filters'),
+    );
+    await tester.drag(subscriptionFilters, const Offset(-700, 0));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('main_show_most_liked')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('main_show_most_liked')));
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .widget<FilterChip>(find.byKey(const Key('main_show_most_liked')))
+          .selected,
+      isTrue,
+    );
+
+    await tester.drag(subscriptionFilters, const Offset(700, 0));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('main_show_vip_only')));
+    await tester.pumpAndSettle();
+    expect(find.text('Premium VIP required'), findsOneWidget);
+    expect(find.text('Upgrade'), findsOneWidget);
+  });
+
+  testWidgets('Online discovery supports automatic and pull refresh', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      const MaterialApp(home: HomeScreen(initialTab: 'Online')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('discover_refresh_Online')), findsOneWidget);
+
+    await tester.pump(const Duration(seconds: 30));
+    await tester.pump();
+    expect(tester.takeException(), isNull);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
 
   testWidgets('incoming like must be opened before liking back', (
     tester,
@@ -1373,6 +1618,9 @@ void main() {
       'personalities': ['Creative'],
       'interest_slugs': ['travel'],
       'required_languages': true,
+      'premium_only': true,
+      'vip_only': true,
+      'most_liked_first': true,
     });
 
     expect(filters.minimumAge, 25);
@@ -1381,7 +1629,13 @@ void main() {
     expect(filters.personalities, ['Creative']);
     expect(filters.interestSlugs, ['travel']);
     expect(filters.requiredLanguages, isTrue);
+    expect(filters.premiumOnly, isTrue);
+    expect(filters.vipOnly, isTrue);
+    expect(filters.mostLikedFirst, isTrue);
     expect(filters.toDatabase()['location_mode'], 'specific_country');
+    expect(filters.toDatabase()['premium_only'], isTrue);
+    expect(filters.toDatabase()['vip_only'], isTrue);
+    expect(filters.toDatabase()['most_liked_first'], isTrue);
   });
 
   test('stored age preferences are normalized to the slider limits', () {
@@ -1464,11 +1718,17 @@ void main() {
     await tester.pumpWidget(const MaterialApp(home: ManagePhotosScreen()));
     await tester.pumpAndSettle();
 
+    expect(
+      find.byKey(const Key('photo_manager_reference_selfie')),
+      findsOneWidget,
+    );
     expect(find.text('Main'), findsNothing);
     expect(find.text('Set main'), findsNothing);
     expect(find.byTooltip('Move later'), findsNothing);
     expect(find.byTooltip('Move earlier'), findsNothing);
     expect(find.byTooltip('Delete photo'), findsNothing);
+    expect(find.text('Profile photo'), findsOneWidget);
+    expect(find.byTooltip('Use as profile photo'), findsWidgets);
 
     final firstPhoto = find
         .byWidgetPredicate(
@@ -1489,6 +1749,82 @@ void main() {
 
     expect(find.byKey(Key('delete_managed_photo_$photoId')), findsOneWidget);
   });
+
+  testWidgets('private selfie enrollment asks for explicit consent', (
+    tester,
+  ) async {
+    bool? accepted;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (context) => FilledButton(
+            onPressed: () async {
+              accepted = await confirmFaceVerificationConsent(context);
+            },
+            child: const material.Text('Open consent'),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Open consent'));
+    await tester.pumpAndSettle();
+    expect(find.text('Private selfie verification'), findsOneWidget);
+    expect(find.byKey(const Key('accept_face_verification')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('accept_face_verification')));
+    await tester.pumpAndSettle();
+    expect(accepted, isTrue);
+  });
+
+  test('face verification errors keep a safe user-facing message', () {
+    const error = FaceVerificationException(
+      'face_mismatch',
+      'The face does not match the private reference selfie.',
+    );
+    expect(error.code, 'face_mismatch');
+    expect(error.toString(), error.message);
+  });
+
+  testWidgets('non-VIP invisible navigation opens the VIP popup', (
+    tester,
+  ) async {
+    await tester.pumpWidget(const MaterialApp(home: PrivacyScreen()));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('invisible_navigation_switch')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Premium VIP required'), findsOneWidget);
+    expect(
+      find.text('Invisible navigation requires a Premium VIP subscription.'),
+      findsOneWidget,
+    );
+    expect(find.widgetWithText(FilledButton, 'Upgrade'), findsOneWidget);
+  });
+
+  test(
+    'discovery region is persisted without becoming profile display text',
+    () {
+      final filters = DiscoveryFilters.fromDatabase({
+        'country_codes': ['Canada'],
+        'regions': ['Ontario'],
+      });
+
+      expect(filters.regions, ['Ontario']);
+      expect(filters.toDatabase()['regions'], ['Ontario']);
+      const profile = UserProfile(
+        name: 'Jamie',
+        age: 29,
+        city: 'Toronto',
+        country: 'Canada',
+        region: 'Ontario',
+        compatibilityScore: 90,
+        imagePath: 'assets/profile/profile_user_placeholder.png',
+        photoDisplayStyle: PhotoDisplayStyle.profileDetails,
+      );
+      expect('${profile.city}, ${profile.country}', 'Toronto, Canada');
+    },
+  );
 
   test('French translations are centralized', () {
     const translations = MapLovLocalizations(Locale('fr'));
@@ -1684,6 +2020,14 @@ void main() {
     'moderation reports': const ModerationReportsScreen(),
     'admin users': const AdminUsersScreen(),
     'admin audit': const AdminAuditScreen(),
+    'admin profiles': const AdminProfilesScreen(),
+    'admin photos': const AdminPhotosScreen(),
+    'admin suspensions': const AdminSuspensionsScreen(),
+    'admin subscriptions': const AdminSubscriptionsScreen(),
+    'admin payments': const AdminPaymentsScreen(),
+    'admin statistics': const AdminStatisticsScreen(),
+    'admin global notifications': const AdminGlobalNotificationsScreen(),
+    'admin account recovery': const AdminAccountRecoveryScreen(),
   };
 
   for (final entry in screens.entries) {

@@ -12,6 +12,7 @@ class _PrivacyScreenState extends State<PrivacyScreen> {
   bool approximateDistance = true;
   bool onlineStatus = false;
   bool vip = false;
+  bool savingInvisibleMode = false;
 
   @override
   void initState() {
@@ -36,28 +37,50 @@ class _PrivacyScreenState extends State<PrivacyScreen> {
     await MapLovRepository.instance.saveMyProfile({key: value});
   }
 
+  Future<void> _setInvisibleMode(bool invisible) async {
+    if (!vip) {
+      await _requireSubscriptionFeature(
+        context,
+        requirement: _SubscriptionRequirement.vip,
+        feature: 'Invisible navigation',
+      );
+      return;
+    }
+    if (savingInvisibleMode) return;
+    final previous = discoverable;
+    setState(() {
+      discoverable = !invisible;
+      savingInvisibleMode = true;
+    });
+    try {
+      await MapLovRepository.instance.setDiscoverable(!invisible);
+    } catch (error) {
+      if (mounted) {
+        setState(() => discoverable = previous);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Unable to update invisible navigation: $error'),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => savingInvisibleMode = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) => _AppPage(
     title: 'Privacy',
     children: [
       SwitchListTile(
-        value: discoverable,
-        onChanged: (value) {
-          if (!value && !vip) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Invisible navigation requires Premium VIP.'),
-              ),
-            );
-            Navigator.pushNamed(context, AppRoutes.premium);
-            return;
-          }
-          setState(() => discoverable = value);
-          unawaited(_save('is_discoverable', value));
-        },
-        title: const Text('Show my profile in Discover'),
+        key: const Key('invisible_navigation_switch'),
+        value: !discoverable,
+        onChanged: savingInvisibleMode
+            ? null
+            : (value) => unawaited(_setInvisibleMode(value)),
+        title: const Text('Navigation invisible'),
         subtitle: const Text(
-          'VIP members can stay out of Discover. People can see your profile after you like them or send them a message.',
+          'Stay out of Discover. Your profile becomes visible after you like someone or send a message.',
         ),
       ),
       SwitchListTile(

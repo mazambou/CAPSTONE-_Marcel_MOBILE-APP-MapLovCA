@@ -10,6 +10,8 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
+  static const _onlineRefreshInterval = Duration(seconds: 30);
+
   late String selectedTab;
   final Set<String> likedProfiles = {};
   List<UserProfile> _profiles = AuthService.instance.isConfigured
@@ -19,6 +21,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       : [];
   DiscoveryFilters _filters = const DiscoveryFilters();
   bool _loading = false;
+  bool _refreshingOnline = false;
+  bool _isForeground = true;
+  Timer? _onlineRefreshTimer;
   MapLovLocationFailure? _locationFailure;
 
   @override
@@ -26,16 +31,63 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     selectedTab = widget.initialTab;
+    _syncOnlineRefreshTimer();
     unawaited(_initializeDiscovery());
+  }
+
+  void _syncOnlineRefreshTimer() {
+    _onlineRefreshTimer?.cancel();
+    _onlineRefreshTimer = null;
+    if (!_isForeground || selectedTab != 'Online') return;
+    _onlineRefreshTimer = Timer.periodic(
+      _onlineRefreshInterval,
+      (_) => unawaited(_refreshOnlineProfiles()),
+    );
+  }
+
+  Future<void> _refreshOnlineProfiles() async {
+    if (!mounted ||
+        !_isForeground ||
+        !TickerMode.valuesOf(context).enabled ||
+        selectedTab != 'Online' ||
+        _refreshingOnline ||
+        _loading) {
+      return;
+    }
+    _refreshingOnline = true;
+    try {
+      await _loadProfiles(
+        refreshNearbyLocation: false,
+        showLoading: false,
+        reportErrors: false,
+      );
+    } finally {
+      _refreshingOnline = false;
+    }
   }
 
   Future<void> _initializeDiscovery() async {
     if (mounted) setState(() => _loading = true);
     try {
+      final subscription = await MapLovRepository.instance.subscriptionInfo();
       if (MapLovRepository.instance.isLive) {
         final savedFilters = await MapLovRepository.instance.myPreferences();
         if (!mounted) return;
-        _filters = savedFilters;
+        _filters = !subscription.isPremium
+            ? savedFilters.copyWith(
+                locationMode: 'near_me',
+                countries: const [],
+                regions: const [],
+                cities: const [],
+                originCountries: const [],
+                originRegions: const [],
+                originCities: const [],
+                premiumOnly: false,
+                vipOnly: false,
+              )
+            : !subscription.isVip
+            ? savedFilters.copyWith(vipOnly: false)
+            : savedFilters;
         try {
           await LocationService.instance.updateMyLocation();
           _locationFailure = null;
@@ -78,22 +130,37 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _onlineRefreshTimer?.cancel();
     super.dispose();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed &&
-        _locationFailure != null &&
-        !_loading) {
-      unawaited(
-        selectedTab == 'Nearby' ? _loadProfiles() : _initializeDiscovery(),
-      );
+    if (state == AppLifecycleState.resumed) {
+      _isForeground = true;
+      _syncOnlineRefreshTimer();
+      if (selectedTab == 'Online') {
+        unawaited(_refreshOnlineProfiles());
+      } else if (_locationFailure != null && !_loading) {
+        unawaited(
+          selectedTab == 'Nearby' ? _loadProfiles() : _initializeDiscovery(),
+        );
+      }
+    } else if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.detached ||
+        state == AppLifecycleState.hidden) {
+      _isForeground = false;
+      _onlineRefreshTimer?.cancel();
+      _onlineRefreshTimer = null;
     }
   }
 
-  Future<void> _loadProfiles({bool refreshNearbyLocation = true}) async {
-    if (mounted) setState(() => _loading = true);
+  Future<void> _loadProfiles({
+    bool refreshNearbyLocation = true,
+    bool showLoading = true,
+    bool reportErrors = true,
+  }) async {
+    if (mounted && showLoading) setState(() => _loading = true);
     try {
       if (selectedTab == 'Nearby' &&
           refreshNearbyLocation &&
@@ -127,13 +194,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         });
       }
     } catch (error) {
-      if (mounted) {
+      if (mounted && reportErrors) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Unable to refresh profiles: $error')),
         );
       }
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted && showLoading) setState(() => _loading = false);
     }
   }
 
@@ -156,6 +223,54 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     if (result is DiscoveryFilters) {
       _filters = result;
       await _loadProfiles();
+    }
+  }
+
+  Future<void> _setMainDiscoveryFilter(String mode) async {
+    if (mode == 'vip') {
+      final allowed = await _requireSubscriptionFeature(
+        context,
+        requirement: _SubscriptionRequirement.vip,
+        feature: 'Show VIP Profiles Only',
+      );
+      if (!allowed) return;
+    }
+    if (!mounted) return;
+    if (mode == 'premium') {
+      final allowed = await _requireSubscriptionFeature(
+        context,
+        requirement: _SubscriptionRequirement.premiumPlus,
+        feature: 'Show Premium Plus & Premium VIP',
+      );
+      if (!allowed) return;
+    }
+    if (!mounted) return;
+    setState(() {
+      if (mode == 'vip') {
+        final enabled = !_filters.vipOnly;
+        _filters = _filters.copyWith(
+          vipOnly: enabled,
+          premiumOnly: enabled ? false : _filters.premiumOnly,
+        );
+      } else if (mode == 'premium') {
+        final enabled = !_filters.premiumOnly;
+        _filters = _filters.copyWith(
+          premiumOnly: enabled,
+          vipOnly: enabled ? false : _filters.vipOnly,
+        );
+      } else {
+        _filters = _filters.copyWith(mostLikedFirst: !_filters.mostLikedFirst);
+      }
+    });
+    try {
+      await MapLovRepository.instance.savePreferences(_filters);
+      await _loadProfiles(refreshNearbyLocation: false);
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Unable to apply discovery mode: $error')),
+        );
+      }
     }
   }
 
@@ -295,6 +410,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   selectedTab = tab;
                   if (tab != 'Nearby') _locationFailure = null;
                 });
+                _syncOnlineRefreshTimer();
                 unawaited(
                   tab == 'Discover' &&
                           _filters.locationMode == 'near_me' &&
@@ -304,6 +420,16 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 );
               },
             ),
+            if (selectedTab == 'Discover')
+              _MainDiscoveryControls(
+                vipOnly: _filters.vipOnly,
+                premiumOnly: _filters.premiumOnly,
+                mostLiked: _filters.mostLikedFirst,
+                onVip: () => unawaited(_setMainDiscoveryFilter('vip')),
+                onPremium: () => unawaited(_setMainDiscoveryFilter('premium')),
+                onMostLiked: () =>
+                    unawaited(_setMainDiscoveryFilter('most_liked')),
+              ),
             const Divider(height: 1),
             if (_loading) const LinearProgressIndicator(minHeight: 2),
             if (selectedTab == 'Discover' && popularPhotos.isNotEmpty)
@@ -318,29 +444,51 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       failure: _locationFailure!,
                       onResolve: () => unawaited(_resolveLocationFailure()),
                     )
-                  : profiles.isEmpty
-                  ? const _EmptyDiscoverState()
-                  : GridView.builder(
-                      key: Key('discover_grid_$selectedTab'),
-                      padding: const EdgeInsets.fromLTRB(12, 12, 12, 20),
-                      gridDelegate:
-                          const SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 2,
-                            crossAxisSpacing: 10,
-                            mainAxisSpacing: 10,
-                            childAspectRatio: 0.66,
-                          ),
-                      itemCount: profiles.length,
-                      itemBuilder: (context, index) {
-                        final profile = profiles[index];
-                        return _DiscoverGridCard(
-                          profile: profile,
-                          liked: likedProfiles.contains(profile.name),
-                          onPhotoTap: () => unawaited(_openPhoto(profile)),
-                          onNameTap: () => unawaited(_openProfile(profile)),
-                          onLike: () => unawaited(_toggleLike(profile)),
-                        );
-                      },
+                  : RefreshIndicator(
+                      key: Key('discover_refresh_$selectedTab'),
+                      onRefresh: _loadProfiles,
+                      child: profiles.isEmpty
+                          ? LayoutBuilder(
+                              builder: (context, constraints) => ListView(
+                                physics: const AlwaysScrollableScrollPhysics(),
+                                children: [
+                                  SizedBox(
+                                    height: constraints.maxHeight,
+                                    child: const _EmptyDiscoverState(),
+                                  ),
+                                ],
+                              ),
+                            )
+                          : GridView.builder(
+                              key: Key('discover_grid_$selectedTab'),
+                              physics: const AlwaysScrollableScrollPhysics(),
+                              padding: const EdgeInsets.fromLTRB(
+                                12,
+                                12,
+                                12,
+                                20,
+                              ),
+                              gridDelegate:
+                                  const SliverGridDelegateWithFixedCrossAxisCount(
+                                    crossAxisCount: 2,
+                                    crossAxisSpacing: 10,
+                                    mainAxisSpacing: 10,
+                                    childAspectRatio: 0.66,
+                                  ),
+                              itemCount: profiles.length,
+                              itemBuilder: (context, index) {
+                                final profile = profiles[index];
+                                return _DiscoverGridCard(
+                                  profile: profile,
+                                  liked: likedProfiles.contains(profile.name),
+                                  onPhotoTap: () =>
+                                      unawaited(_openPhoto(profile)),
+                                  onNameTap: () =>
+                                      unawaited(_openProfile(profile)),
+                                  onLike: () => unawaited(_toggleLike(profile)),
+                                );
+                              },
+                            ),
                     ),
             ),
           ],
@@ -349,6 +497,59 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       bottomNavigationBar: const _MapLovNavigationBar(selectedIndex: 0),
     );
   }
+}
+
+class _MainDiscoveryControls extends StatelessWidget {
+  const _MainDiscoveryControls({
+    required this.vipOnly,
+    required this.premiumOnly,
+    required this.mostLiked,
+    required this.onVip,
+    required this.onPremium,
+    required this.onMostLiked,
+  });
+
+  final bool vipOnly;
+  final bool premiumOnly;
+  final bool mostLiked;
+  final VoidCallback onVip;
+  final VoidCallback onPremium;
+  final VoidCallback onMostLiked;
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+    height: 54,
+    child: ListView(
+      key: const Key('main_discovery_subscription_filters'),
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+      children: [
+        FilterChip(
+          key: const Key('main_show_vip_only'),
+          avatar: const Icon(Icons.diamond_outlined, size: 18),
+          label: const Text('Show VIP Profiles Only'),
+          selected: vipOnly,
+          onSelected: (_) => onVip(),
+        ),
+        const SizedBox(width: 8),
+        FilterChip(
+          key: const Key('main_show_premium_profiles'),
+          avatar: const Icon(Icons.workspace_premium_outlined, size: 18),
+          label: const Text('Show Premium Plus & Premium VIP'),
+          selected: premiumOnly,
+          onSelected: (_) => onPremium(),
+        ),
+        const SizedBox(width: 8),
+        FilterChip(
+          key: const Key('main_show_most_liked'),
+          avatar: const Icon(Icons.favorite_border, size: 18),
+          label: const Text('Show Most Liked Profiles'),
+          selected: mostLiked,
+          onSelected: (_) => onMostLiked(),
+        ),
+      ],
+    ),
+  );
 }
 
 class _NearbyLocationAccessState extends StatelessWidget {

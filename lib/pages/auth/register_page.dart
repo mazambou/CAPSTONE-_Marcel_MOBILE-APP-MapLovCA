@@ -20,8 +20,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _confirmPasswordController = TextEditingController();
   final _customCityController = TextEditingController();
   final _customOriginCityController = TextEditingController();
+  final _customRegionController = TextEditingController();
+  final _customOriginRegionController = TextEditingController();
   String _country = 'Canada';
   String _originCountry = 'Canada';
+  String _region = 'Ontario';
+  String _originRegion = 'Ontario';
   String _city = 'Toronto';
   String _originCity = 'Toronto';
   bool _isLoading = false;
@@ -36,18 +40,20 @@ class _RegisterScreenState extends State<RegisterScreen> {
     _confirmPasswordController.dispose();
     _customCityController.dispose();
     _customOriginCityController.dispose();
+    _customRegionController.dispose();
+    _customOriginRegionController.dispose();
     super.dispose();
   }
 
   List<String> get _availableCities {
-    final known = _registrationCitiesByCountry[_country];
-    if (known == null) return const ['Other city'];
+    final known = _citiesForCountryRegion(_country, _region);
+    if (known.isEmpty) return const ['Other city'];
     return [...known, 'Other city'];
   }
 
   List<String> get _availableOriginCities {
-    final known = _registrationCitiesByCountry[_originCountry];
-    if (known == null) return const ['Other city'];
+    final known = _citiesForCountryRegion(_originCountry, _originRegion);
+    if (known.isEmpty) return const ['Other city'];
     return [...known, 'Other city'];
   }
 
@@ -58,6 +64,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
       ? _customOriginCityController.text.trim()
       : _originCity;
 
+  String get _selectedRegion =>
+      _region == 'Other region' ? _customRegionController.text.trim() : _region;
+
+  String get _selectedOriginRegion => _originRegion == 'Other region'
+      ? _customOriginRegionController.text.trim()
+      : _originRegion;
+
   String get _phoneNumber {
     final national = _phoneController.text.replaceAll(RegExp(r'\D'), '');
     return '+${_countryCallingCodes[_country]}${national.replaceFirst(RegExp(r'^0+'), '')}';
@@ -66,8 +79,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
   void _selectCountry(String country) {
     setState(() {
       _country = country;
-      _city = _registrationCitiesByCountry[country]?.first ?? 'Other city';
+      _region = _firstRegionForCountry(country);
+      _city = _firstCityForCountryRegion(country, _region);
       _customCityController.clear();
+      _customRegionController.clear();
     });
   }
 
@@ -91,7 +106,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
         callingCode: _countryCallingCodes[_country]!,
         password: _passwordController.text,
         country: _country,
+        region: _selectedRegion,
         originCountry: _originCountry,
+        originRegion: _selectedOriginRegion,
         originCity: _selectedOriginCity,
         city: _selectedCity,
         dateOfBirth: widget.effectiveDateOfBirth!,
@@ -150,6 +167,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
     }
     if (_selectedCity.isEmpty) {
       return 'Enter your city.';
+    }
+    if (_selectedRegion.isEmpty || _selectedOriginRegion.isEmpty) {
+      return 'Choose a region.';
     }
     if (_selectedOriginCity.isEmpty) {
       return 'Enter your city of origin.';
@@ -253,135 +273,240 @@ class _RegisterScreenState extends State<RegisterScreen> {
           autofillHints: const [AutofillHints.newPassword],
           enabled: !_isLoading,
         ),
-        KeyedSubtree(
-          key: const Key('registration_country_dropdown'),
-          child: DropdownButtonFormField<String>(
-            key: ValueKey('registration_country_dropdown_$_country'),
-            initialValue: _country,
-            isExpanded: true,
-            menuMaxHeight: 360,
-            decoration: InputDecoration(
-              labelText: context.tr('Country of residence (from phone)'),
-              prefixIcon: const Icon(Icons.public),
-              helperText: context.tr(
-                'Change the phone country code to update residence.',
+        Container(
+          key: const Key('registration_geography_group'),
+          padding: const EdgeInsets.all(16),
+          decoration: _locationFilterDecoration,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text(
+                'Residence',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
               ),
-            ),
-            items: _worldCountries
-                .map(
-                  (country) => DropdownMenuItem(
-                    value: country,
-                    child: Text(country, overflow: TextOverflow.ellipsis),
+              const SizedBox(height: 12),
+              KeyedSubtree(
+                key: const Key('registration_country_dropdown'),
+                child: DropdownButtonFormField<String>(
+                  key: ValueKey('registration_country_dropdown_$_country'),
+                  initialValue: _country,
+                  isExpanded: true,
+                  menuMaxHeight: 360,
+                  decoration: InputDecoration(
+                    labelText: context.tr('Country of residence (from phone)'),
+                    prefixIcon: const Icon(Icons.public),
+                    helperText: context.tr(
+                      'Change the phone country code to update residence.',
+                    ),
                   ),
-                )
-                .toList(),
-            onChanged: null,
-          ),
-        ),
-        const SizedBox(height: 12),
-        DropdownButtonFormField<String>(
-          key: ValueKey('registration_city_dropdown_$_country'),
-          initialValue: _city,
-          isExpanded: true,
-          menuMaxHeight: 360,
-          decoration: InputDecoration(
-            labelText: context.tr('City of residence'),
-            prefixIcon: const Icon(Icons.location_city_outlined),
-          ),
-          items: _availableCities
-              .map(
-                (city) => DropdownMenuItem(
-                  value: city,
-                  child: Text(city, overflow: TextOverflow.ellipsis),
+                  items: _worldCountries
+                      .map(
+                        (country) => DropdownMenuItem(
+                          value: country,
+                          child: Text(country, overflow: TextOverflow.ellipsis),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: null,
                 ),
-              )
-              .toList(),
-          onChanged: _isLoading || _country.isEmpty
-              ? null
-              : (value) => setState(() {
-                  _city = value ?? _city;
-                  if (_city != 'Other city') _customCityController.clear();
-                }),
-        ),
-        if (_city == 'Other city')
-          _Field(
-            'City of residence name',
-            Icons.edit_location_alt_outlined,
-            controller: _customCityController,
-            textInputAction: TextInputAction.next,
-            autofillHints: const [AutofillHints.addressCity],
-            enabled: !_isLoading,
-          ),
-        const SizedBox(height: 12),
-        DropdownButtonFormField<String>(
-          key: const Key('registration_origin_country_dropdown'),
-          initialValue: _originCountry,
-          isExpanded: true,
-          menuMaxHeight: 360,
-          decoration: InputDecoration(
-            labelText: context.tr('Country of origin'),
-            prefixIcon: const Icon(Icons.travel_explore_outlined),
-            helperText: context.tr(
-              'This choice is permanent after account creation.',
-            ),
-          ),
-          items: _worldCountries
-              .map(
-                (country) => DropdownMenuItem(
-                  value: country,
-                  child: Text(country, overflow: TextOverflow.ellipsis),
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                key: ValueKey('registration_region_dropdown_$_country'),
+                initialValue: _regionOptions(_country).contains(_region)
+                    ? _region
+                    : 'Other region',
+                isExpanded: true,
+                decoration: InputDecoration(
+                  labelText: context.tr('Region'),
+                  prefixIcon: const Icon(Icons.map_outlined),
                 ),
-              )
-              .toList(),
-          onChanged: _isLoading
-              ? null
-              : (value) => setState(() {
-                  _originCountry = value ?? _originCountry;
-                  _originCity =
-                      _registrationCitiesByCountry[_originCountry]?.first ??
-                      'Other city';
-                  _customOriginCityController.clear();
-                }),
-        ),
-        DropdownButtonFormField<String>(
-          key: ValueKey('registration_origin_city_dropdown_$_originCountry'),
-          initialValue: _originCity,
-          isExpanded: true,
-          menuMaxHeight: 360,
-          decoration: InputDecoration(
-            labelText: context.tr('City of origin'),
-            prefixIcon: const Icon(Icons.travel_explore_outlined),
-            helperText: context.tr(
-              'This choice is permanent after account creation.',
-            ),
-          ),
-          items: _availableOriginCities
-              .map(
-                (city) => DropdownMenuItem(
-                  value: city,
-                  child: Text(city, overflow: TextOverflow.ellipsis),
+                items: _regionOptions(_country)
+                    .where((value) => value != 'Any region')
+                    .map(
+                      (value) =>
+                          DropdownMenuItem(value: value, child: Text(value)),
+                    )
+                    .toList(),
+                onChanged: _isLoading
+                    ? null
+                    : (value) => setState(() {
+                        _region = value ?? _region;
+                        _city = _firstCityForCountryRegion(_country, _region);
+                        _customRegionController.clear();
+                        _customCityController.clear();
+                      }),
+              ),
+              if (_region == 'Other region')
+                _Field(
+                  'Region name',
+                  Icons.edit_location_alt_outlined,
+                  controller: _customRegionController,
+                  enabled: !_isLoading,
                 ),
-              )
-              .toList(),
-          onChanged: _isLoading || _originCountry.isEmpty
-              ? null
-              : (value) => setState(() {
-                  _originCity = value ?? _originCity;
-                  if (_originCity != 'Other city') {
-                    _customOriginCityController.clear();
-                  }
-                }),
-        ),
-        if (_originCity == 'Other city')
-          _Field(
-            'City of origin name',
-            Icons.edit_location_alt_outlined,
-            controller: _customOriginCityController,
-            textInputAction: TextInputAction.done,
-            autofillHints: const [AutofillHints.addressCity],
-            enabled: !_isLoading,
-            onSubmitted: (_) => _register(),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                key: ValueKey('registration_city_dropdown_$_country'),
+                initialValue: _city,
+                isExpanded: true,
+                menuMaxHeight: 360,
+                decoration: InputDecoration(
+                  labelText: context.tr('City of residence'),
+                  prefixIcon: const Icon(Icons.location_city_outlined),
+                ),
+                items: _availableCities
+                    .map(
+                      (city) => DropdownMenuItem(
+                        value: city,
+                        child: Text(city, overflow: TextOverflow.ellipsis),
+                      ),
+                    )
+                    .toList(),
+                onChanged: _isLoading || _country.isEmpty
+                    ? null
+                    : (value) => setState(() {
+                        _city = value ?? _city;
+                        if (_city != 'Other city') {
+                          _customCityController.clear();
+                        }
+                      }),
+              ),
+              if (_city == 'Other city')
+                _Field(
+                  'City of residence name',
+                  Icons.edit_location_alt_outlined,
+                  controller: _customCityController,
+                  textInputAction: TextInputAction.next,
+                  autofillHints: const [AutofillHints.addressCity],
+                  enabled: !_isLoading,
+                ),
+              const SizedBox(height: 18),
+              const Divider(),
+              const SizedBox(height: 8),
+              const Text(
+                'Origin',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                key: const Key('registration_origin_country_dropdown'),
+                initialValue: _originCountry,
+                isExpanded: true,
+                menuMaxHeight: 360,
+                decoration: InputDecoration(
+                  labelText: context.tr('Country of origin'),
+                  prefixIcon: const Icon(Icons.travel_explore_outlined),
+                  helperText: context.tr(
+                    'This choice is permanent after account creation.',
+                  ),
+                ),
+                items: _worldCountries
+                    .map(
+                      (country) => DropdownMenuItem(
+                        value: country,
+                        child: Text(country, overflow: TextOverflow.ellipsis),
+                      ),
+                    )
+                    .toList(),
+                onChanged: _isLoading
+                    ? null
+                    : (value) => setState(() {
+                        _originCountry = value ?? _originCountry;
+                        _originRegion = _firstRegionForCountry(_originCountry);
+                        _originCity = _firstCityForCountryRegion(
+                          _originCountry,
+                          _originRegion,
+                        );
+                        _customOriginRegionController.clear();
+                        _customOriginCityController.clear();
+                      }),
+              ),
+              DropdownButtonFormField<String>(
+                key: ValueKey(
+                  'registration_origin_region_dropdown_$_originCountry',
+                ),
+                initialValue:
+                    _regionOptions(_originCountry).contains(_originRegion)
+                    ? _originRegion
+                    : 'Other region',
+                isExpanded: true,
+                decoration: InputDecoration(
+                  labelText: context.tr('Region of origin'),
+                  prefixIcon: const Icon(Icons.map_outlined),
+                  helperText: context.tr(
+                    'This choice is permanent after account creation.',
+                  ),
+                ),
+                items: _regionOptions(_originCountry)
+                    .where((value) => value != 'Any region')
+                    .map(
+                      (value) =>
+                          DropdownMenuItem(value: value, child: Text(value)),
+                    )
+                    .toList(),
+                onChanged: _isLoading
+                    ? null
+                    : (value) => setState(() {
+                        _originRegion = value ?? _originRegion;
+                        _originCity = _firstCityForCountryRegion(
+                          _originCountry,
+                          _originRegion,
+                        );
+                        _customOriginRegionController.clear();
+                        _customOriginCityController.clear();
+                      }),
+              ),
+              if (_originRegion == 'Other region')
+                _Field(
+                  'Region of origin name',
+                  Icons.edit_location_alt_outlined,
+                  controller: _customOriginRegionController,
+                  enabled: !_isLoading,
+                ),
+              DropdownButtonFormField<String>(
+                key: ValueKey(
+                  'registration_origin_city_dropdown_$_originCountry',
+                ),
+                initialValue: _originCity,
+                isExpanded: true,
+                menuMaxHeight: 360,
+                decoration: InputDecoration(
+                  labelText: context.tr('City of origin'),
+                  prefixIcon: const Icon(Icons.travel_explore_outlined),
+                  helperText: context.tr(
+                    'This choice is permanent after account creation.',
+                  ),
+                ),
+                items: _availableOriginCities
+                    .map(
+                      (city) => DropdownMenuItem(
+                        value: city,
+                        child: Text(city, overflow: TextOverflow.ellipsis),
+                      ),
+                    )
+                    .toList(),
+                onChanged: _isLoading || _originCountry.isEmpty
+                    ? null
+                    : (value) => setState(() {
+                        _originCity = value ?? _originCity;
+                        if (_originCity != 'Other city') {
+                          _customOriginCityController.clear();
+                        }
+                      }),
+              ),
+              if (_originCity == 'Other city')
+                _Field(
+                  'City of origin name',
+                  Icons.edit_location_alt_outlined,
+                  controller: _customOriginCityController,
+                  textInputAction: TextInputAction.done,
+                  autofillHints: const [AutofillHints.addressCity],
+                  enabled: !_isLoading,
+                  onSubmitted: (_) => _register(),
+                ),
+            ],
           ),
+        ),
       ],
       primaryLabel: 'Create Account',
       onPrimary: _register,
@@ -430,26 +555,96 @@ const _registrationCitiesByCountry = <String, List<String>>{
   'Tunisia': ['Tunis', 'Sfax', 'Sousse', 'Kairouan', 'Bizerte'],
   'Senegal': ['Dakar', 'Thiès', 'Saint-Louis', 'Rufisque', 'Ziguinchor'],
   'Cameroon': [
-    'Douala',
-    'Yaoundé',
-    'Garoua',
-    'Bamenda',
-    'Maroua',
-    'Bafoussam',
     'Ngaoundéré',
-    'Kumba',
-    'Limbe',
+    'Meiganga',
+    'Banyo',
+    'Tibati',
+    'Tignère',
+    'Yaoundé',
+    'Mbalmayo',
+    'Bafia',
+    'Obala',
+    'Mfou',
+    'Nanga-Eboko',
+    'Akonolinga',
+    'Eséka',
+    'Monatélé',
+    'Ntui',
     'Bertoua',
+    'Batouri',
+    'Yokadouma',
+    'Abong-Mbang',
+    'Garoua-Boulaï',
+    'Bélabo',
+    'Kétté',
+    'Lomié',
+    'Maroua',
+    'Kousséri',
+    'Mokolo',
+    'Yagoua',
+    'Mora',
+    'Kaélé',
+    'Bogo',
+    'Maga',
+    'Waza',
+    'Douala',
+    'Nkongsamba',
+    'Edéa',
+    'Loum',
+    'Manjo',
+    'Melong',
+    'Mbanga',
+    'Dibombari',
+    'Garoua',
+    'Guider',
+    'Figuil',
+    'Pitoa',
+    'Poli',
+    'Lagdo',
+    'Touboro',
+    'Rey-Bouba',
+    'Tcholliré',
+    'Bamenda',
+    'Kumbo',
+    'Wum',
+    'Nkambe',
+    'Fundong',
+    'Ndop',
+    'Bali',
+    'Bafut',
+    'Batibo',
+    'Mbengwi',
     'Ebolowa',
     'Kribi',
-    'Nkongsamba',
-    'Foumban',
+    'Sangmélima',
+    'Ambam',
+    'Lolodorf',
+    'Akom II',
+    'Djoum',
+    'Zoétélé',
+    'Meyomessala',
+    'Buea',
+    'Limbe',
+    'Kumba',
+    'Tiko',
+    'Mamfe',
+    'Muyuka',
+    'Mutengene',
+    'Bangem',
+    'Mundemba',
+    'Tombel',
+    'Ekondo-Titi',
+    'Bafoussam',
     'Dschang',
+    'Foumban',
     'Mbouda',
-    'Edéa',
-    'Kousséri',
-    'Kumbo',
     'Bafang',
+    'Bangangté',
+    'Foumbot',
+    'Bandjoun',
+    'Baham',
+    'Tonga',
+    'Batcham',
   ],
   'Côte d’Ivoire': ['Abidjan', 'Bouaké', 'Yamoussoukro', 'Daloa', 'San-Pédro'],
   'Democratic Republic of the Congo': [

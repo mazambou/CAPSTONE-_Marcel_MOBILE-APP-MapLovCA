@@ -152,7 +152,7 @@ class AuthService {
     final row = await client
         .from('profiles')
         .select(
-          'first_name, date_of_birth, gender, city, country_name, spoken_languages',
+          'first_name, date_of_birth, gender, city, country_name, residence_region, origin_country_name, origin_region, origin_city, spoken_languages',
         )
         .eq('id', user.id)
         .maybeSingle();
@@ -161,6 +161,10 @@ class AuthService {
         row?['gender'] != null &&
         row?['city'] != null &&
         row?['country_name'] != null &&
+        row?['residence_region'] != null &&
+        row?['origin_country_name'] != null &&
+        row?['origin_region'] != null &&
+        row?['origin_city'] != null &&
         (row?['spoken_languages'] as List?)?.isNotEmpty == true;
   }
 
@@ -182,7 +186,9 @@ class AuthService {
     required String callingCode,
     required String password,
     required String country,
+    required String region,
     required String originCountry,
+    required String originRegion,
     required String originCity,
     required String city,
     required DateTime dateOfBirth,
@@ -215,7 +221,9 @@ class AuthService {
         'phone_calling_code': callingCode,
         'country_code': _countryCode(country),
         'country_name': country.trim(),
+        'residence_region': region.trim(),
         'origin_country_name': originCountry.trim(),
+        'origin_region': originRegion.trim(),
         'origin_city': originCity.trim(),
         'city': city.trim(),
         'date_of_birth': _dateOnly(dateOfBirth),

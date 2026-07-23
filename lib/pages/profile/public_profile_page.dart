@@ -222,12 +222,13 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
           ],
         ),
         Text(
-          '${selectedProfile.city}, ${selectedProfile.country}',
+          '${selectedProfile.country}${selectedProfile.city.isEmpty ? '' : ', ${selectedProfile.city}'}',
           style: const TextStyle(color: AppColors.grayText),
         ),
-        if (selectedProfile.originCountry.isNotEmpty)
+        if (selectedProfile.showsOriginOnProfile &&
+            selectedProfile.originCountry.isNotEmpty)
           Text(
-            'Originally from ${selectedProfile.originCity.isEmpty ? '' : '${selectedProfile.originCity}, '}${selectedProfile.originCountry}',
+            'Originally from ${selectedProfile.originCountry}${selectedProfile.originCity.isEmpty ? '' : ', ${selectedProfile.originCity}'}',
             style: const TextStyle(color: AppColors.grayText),
           ),
         const SizedBox(height: 12),

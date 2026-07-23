@@ -13,11 +13,26 @@ class _ManagePhotosScreenState extends State<ManagePhotosScreen> {
   bool _uploading = false;
   int _uploadedCount = 0;
   int _uploadTotal = 0;
+  bool _referenceReady = !MapLovRepository.instance.isLive;
+  bool _loadingReference = MapLovRepository.instance.isLive;
+  bool _enrollingReference = false;
 
   @override
   void initState() {
     super.initState();
     _reload();
+    unawaited(_loadReferenceStatus());
+  }
+
+  Future<void> _loadReferenceStatus() async {
+    try {
+      final ready = await MapLovRepository.instance.hasFaceReference();
+      if (mounted) setState(() => _referenceReady = ready);
+    } catch (_) {
+      if (mounted) setState(() => _referenceReady = false);
+    } finally {
+      if (mounted) setState(() => _loadingReference = false);
+    }
   }
 
   void _reload() {
@@ -34,6 +49,10 @@ class _ManagePhotosScreenState extends State<ManagePhotosScreen> {
 
   Future<void> _addPhoto() async {
     if (_uploading) return;
+    if (!_referenceReady) {
+      _showError('Create your private reference selfie first.');
+      return;
+    }
     List<XFile> photos;
     try {
       photos = await pickImagesForUpload(
@@ -61,10 +80,46 @@ class _ManagePhotosScreenState extends State<ManagePhotosScreen> {
         if (mounted) setState(() => _uploadedCount++);
       }
       _refreshPhotos();
+    } on FaceVerificationException catch (error) {
+      if (_uploadedCount > 0) _refreshPhotos();
+      if (mounted) _showError(error.message);
     } catch (error) {
+      if (_uploadedCount > 0) _refreshPhotos();
       if (mounted) _showError('Photo upload failed: $error');
     } finally {
       if (mounted) setState(() => _uploading = false);
+    }
+  }
+
+  Future<void> _captureReferenceSelfie() async {
+    if (_enrollingReference || _referenceReady) return;
+    try {
+      if (!await confirmFaceVerificationConsent(context)) return;
+      final selfie = await ImagePicker().pickImage(
+        source: ImageSource.camera,
+        preferredCameraDevice: CameraDevice.front,
+        imageQuality: 85,
+        maxWidth: 1600,
+        maxHeight: 1600,
+      );
+      if (selfie == null) return;
+      if (mounted) setState(() => _enrollingReference = true);
+      await MapLovRepository.instance.enrollFaceReference(
+        bytes: await selfie.readAsBytes(),
+        extension: selfie.name.split('.').last.toLowerCase(),
+      );
+      if (mounted) {
+        setState(() => _referenceReady = true);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Private reference selfie verified.')),
+        );
+      }
+    } on FaceVerificationException catch (error) {
+      if (mounted) _showError(error.message);
+    } catch (error) {
+      if (mounted) _showError('Unable to verify the reference selfie: $error');
+    } finally {
+      if (mounted) setState(() => _enrollingReference = false);
     }
   }
 
@@ -97,6 +152,24 @@ class _ManagePhotosScreenState extends State<ManagePhotosScreen> {
       return;
     }
     _refreshPhotos();
+  }
+
+  Future<void> _setPrimaryPhoto(Map<String, dynamic> photo) async {
+    if (photo['moderation_status'] == 'under_review' ||
+        photo['is_primary'] == true) {
+      return;
+    }
+    try {
+      await MapLovRepository.instance.setPrimaryPhoto(photo['id'] as String);
+      _refreshPhotos();
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Profile photo updated.')));
+      }
+    } catch (error) {
+      if (mounted) _showError('Unable to update the profile photo: $error');
+    }
   }
 
   Future<void> _openPhoto(
@@ -143,8 +216,42 @@ class _ManagePhotosScreenState extends State<ManagePhotosScreen> {
   Widget build(BuildContext context) => _AppPage(
     title: 'Manage photos',
     children: [
+      Card(
+        color: AppColors.palePink,
+        child: ListTile(
+          key: const Key('photo_manager_reference_selfie'),
+          leading: Icon(
+            _referenceReady
+                ? Icons.verified_user_outlined
+                : Icons.face_retouching_natural_outlined,
+            color: _referenceReady ? Colors.green.shade700 : AppColors.coral,
+          ),
+          title: const Text(
+            'Private reference selfie',
+            style: TextStyle(fontWeight: FontWeight.w800),
+          ),
+          subtitle: Text(
+            _referenceReady
+                ? 'Ready to verify new profile photos.'
+                : 'Required before adding a profile photo.',
+          ),
+          trailing: _loadingReference || _enrollingReference
+              ? const SizedBox.square(
+                  dimension: 22,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : _referenceReady
+              ? const Icon(Icons.check_circle, color: Colors.green)
+              : FilledButton(
+                  key: const Key('photo_manager_capture_selfie'),
+                  onPressed: _captureReferenceSelfie,
+                  child: const Text('Take selfie'),
+                ),
+        ),
+      ),
+      const SizedBox(height: 12),
       const Text(
-        'Your first photo is your main profile photo. Photos are stored privately and served with temporary secure links.',
+        'Your profile photo is shown first. The other photos belong to your public album. You can choose any visible album photo as your profile photo.',
         style: TextStyle(color: AppColors.grayText),
       ),
       const SizedBox(height: 18),
@@ -192,6 +299,31 @@ class _ManagePhotosScreenState extends State<ManagePhotosScreen> {
                                   ),
                                 ),
                               ),
+                            ),
+                          ),
+                        if (photo['is_primary'] == true)
+                          const Positioned(
+                            left: 8,
+                            bottom: 8,
+                            child: Chip(
+                              avatar: Icon(Icons.person, size: 16),
+                              label: Text('Profile photo'),
+                            ),
+                          )
+                        else if (!underReview)
+                          Positioned(
+                            left: 7,
+                            bottom: 7,
+                            child: IconButton.filled(
+                              key: Key('set_primary_photo_$id'),
+                              tooltip: 'Use as profile photo',
+                              onPressed: () => _setPrimaryPhoto(photo),
+                              constraints: const BoxConstraints.tightFor(
+                                width: 40,
+                                height: 40,
+                              ),
+                              padding: EdgeInsets.zero,
+                              icon: const Icon(Icons.person_outline, size: 21),
                             ),
                           ),
                         if (_deleteControls.contains(id))

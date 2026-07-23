@@ -37,6 +37,7 @@ import 'pages/onboarding/onboarding_page.dart';
 import 'pages/splash/splash_page.dart';
 
 part 'routes/app_router.dart';
+part 'data/geography_data.dart';
 part 'pages/auth/login_page.dart';
 part 'pages/auth/register_page.dart';
 part 'pages/auth/age_gate_page.dart';
@@ -90,6 +91,7 @@ part 'pages/admin/admin_dashboard_page.dart';
 part 'pages/admin/moderation_reports_page.dart';
 part 'pages/admin/admin_users_page.dart';
 part 'pages/admin/admin_audit_page.dart';
+part 'pages/admin/admin_operations_page.dart';
 part 'shared/widgets/app_widgets.dart';
 
 /// Keeps every plain screen label on the same bilingual translation path.
@@ -434,3 +436,27 @@ Future<List<XFile>> pickImagesForUpload(
   );
   return image == null ? const [] : [image];
 }
+
+Future<bool> confirmFaceVerificationConsent(BuildContext context) async =>
+    await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: const Text('Private selfie verification'),
+        content: const Text(
+          'MapLov will securely store this selfie as private biometric reference data and send it to AWS Rekognition whenever you add a profile photo. The selfie is never displayed to members and is deleted with your account. Face comparison is probabilistic; if a photo is rejected, you can try another clear photo or contact support.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Not now'),
+          ),
+          FilledButton(
+            key: const Key('accept_face_verification'),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('I agree'),
+          ),
+        ],
+      ),
+    ) ??
+    false;

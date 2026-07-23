@@ -166,7 +166,7 @@ class _LegalDocumentScreen extends StatelessWidget {
     title: title,
     children: [
       const Text(
-        'Effective date: July 16, 2026 • MVP draft',
+        'Effective date: July 20, 2026 • MVP draft',
         style: TextStyle(color: AppColors.grayText),
       ),
       ...sections.expand(
@@ -207,19 +207,19 @@ const _termsSections = [
 const _privacySections = [
   _LegalSection(
     'Data we process',
-    'Account identifiers, age and profile details, photos, messages, approximate or precise device location when requested, preferences, safety reports, subscription status and technical security records.',
+    'Account identifiers, age and profile details, photos, a private reference selfie and face-comparison results, messages, approximate or precise device location when requested, preferences, safety reports, subscription status and technical security records.',
   ),
   _LegalSection(
     'Why we process it',
-    'To create accounts, recommend compatible profiles, enable communication, prevent abuse, moderate content, provide subscriptions and satisfy legal obligations.',
+    'To create accounts, verify that profile photos match the consenting account holder, recommend compatible profiles, enable communication, prevent abuse, moderate content, provide subscriptions and satisfy legal obligations.',
   ),
   _LegalSection(
     'Sharing',
-    'Profile content is shared according to your visibility choices. Service providers process data only to operate MapLov. We do not sell precise location or private messages.',
+    'Profile content is shared according to your visibility choices. The private reference selfie is sent to AWS Rekognition only for face detection and comparison and is never displayed to members. Service providers process data only to operate MapLov. We do not sell biometric data, precise location or private messages.',
   ),
   _LegalSection(
     'Retention and deletion',
-    'A deletion request immediately hides the account. Unless retention is legally required, associated account data is scheduled for permanent erasure after 30 days.',
+    'A deletion request immediately hides the account. Unless retention is legally required, associated account data, including the private reference selfie and face-comparison records, is scheduled for permanent erasure after 30 days.',
   ),
   _LegalSection(
     'Your choices',

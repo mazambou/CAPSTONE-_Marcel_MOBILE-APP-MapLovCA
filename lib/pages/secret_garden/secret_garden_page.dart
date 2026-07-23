@@ -31,6 +31,13 @@ class _SecretGardenScreenState extends State<SecretGardenScreen> {
       (album.expiresAt == null || album.expiresAt!.isAfter(DateTime.now()));
 
   Future<void> _request(GardenAlbumItem album) async {
+    if (!await _requireSubscriptionFeature(
+      context,
+      requirement: _SubscriptionRequirement.premiumPlus,
+      feature: 'Requesting access to secret albums',
+    )) {
+      return;
+    }
     try {
       await MapLovRepository.instance.requestGardenAccess(album.id, seconds);
       if (mounted) {
@@ -121,7 +128,9 @@ class _SecretGardenScreenState extends State<SecretGardenScreen> {
                             builder: (_) => GardenViewerScreen(album: album),
                           ),
                         )
-                      : null,
+                      : album.accessStatus == 'pending'
+                      ? null
+                      : () => _request(album),
                 ),
               );
             }).toList(),

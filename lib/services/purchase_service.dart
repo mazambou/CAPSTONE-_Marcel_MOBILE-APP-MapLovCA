@@ -1,7 +1,10 @@
 import 'dart:async';
+import 'dart:convert';
 
+import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../config/supabase_config.dart';
 
@@ -63,12 +66,36 @@ class PurchaseService extends ChangeNotifier {
       notifyListeners();
       return false;
     }
+    final userId = SupabaseConfig.client?.auth.currentUser?.id;
+    if (userId == null) {
+      error = 'Sign in before purchasing a subscription.';
+      notifyListeners();
+      return false;
+    }
+    final opaqueAccountId = sha256.convert(utf8.encode(userId)).toString();
     return InAppPurchase.instance.buyNonConsumable(
-      purchaseParam: PurchaseParam(productDetails: selected),
+      purchaseParam: PurchaseParam(
+        productDetails: selected,
+        applicationUserName: opaqueAccountId,
+      ),
     );
   }
 
   Future<void> restore() => InAppPurchase.instance.restorePurchases();
+
+  Future<bool> openSubscriptionManagement() async {
+    final uri = switch (defaultTargetPlatform) {
+      TargetPlatform.android => Uri.parse(
+        'https://play.google.com/store/account/subscriptions?package=ca.maplov.app',
+      ),
+      TargetPlatform.iOS => Uri.parse(
+        'https://apps.apple.com/account/subscriptions',
+      ),
+      _ => null,
+    };
+    if (uri == null) return false;
+    return launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
 
   Future<void> _handlePurchases(List<PurchaseDetails> updates) async {
     for (final purchase in updates) {
@@ -103,6 +130,7 @@ class PurchaseService extends ChangeNotifier {
         'productId': purchase.productID,
         'purchaseId': purchase.purchaseID,
         'source': purchase.verificationData.source,
+        'restored': purchase.status == PurchaseStatus.restored,
         'serverVerificationData':
             purchase.verificationData.serverVerificationData,
       },

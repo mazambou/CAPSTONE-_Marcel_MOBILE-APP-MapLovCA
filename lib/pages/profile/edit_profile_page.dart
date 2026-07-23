@@ -17,7 +17,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   String gender = 'Prefer not to say';
   String country = 'Canada';
+  String region = 'Ontario';
   String originCountry = 'Canada';
+  String originRegion = 'Ontario';
+  String citySelection = 'Toronto';
+  String originCitySelection = 'Toronto';
   String goal = 'Long-term relationship';
   String religion = 'Prefer not to say';
   String childrenPreference = 'Not sure yet';
@@ -84,8 +88,27 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         birthDate.text = values['date_of_birth'] as String? ?? birthDate.text;
         gender = values['gender'] as String? ?? gender;
         country = values['country_name'] as String? ?? country;
+        region =
+            values['residence_region'] as String? ??
+            _regionForKnownCity(country, city.text) ??
+            _firstRegionForCountry(country);
         originCountry =
             values['origin_country_name'] as String? ?? originCountry;
+        originRegion =
+            values['origin_region'] as String? ??
+            _regionForKnownCity(originCountry, originCity.text) ??
+            _firstRegionForCountry(originCountry);
+        citySelection = _cityBelongsToSelection(country, region, city.text)
+            ? city.text
+            : 'Other city';
+        originCitySelection =
+            _cityBelongsToSelection(
+              originCountry,
+              originRegion,
+              originCity.text,
+            )
+            ? originCity.text
+            : 'Other city';
         goal = values['relationship_goal'] as String? ?? goal;
         religion = values['religion'] as String? ?? religion;
         childrenPreference =
@@ -209,6 +232,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         'gender': gender,
         'city': city.text.trim(),
         'residence_city': city.text.trim(),
+        'residence_region': region,
         'profession': profession.text.trim(),
         'education_level': educationLevel,
         'height_cm': height.round(),
@@ -302,8 +326,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       const _SectionTitle('Profile information'),
       _textField(name, 'First name', Icons.person_outline),
       const SizedBox(height: 12),
-      _textField(city, 'City', Icons.location_city_outlined),
-      const SizedBox(height: 12),
       _dropdown(
         'Country of residence',
         country,
@@ -312,6 +334,35 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         enabled: false,
         helperText: 'Change and re-verify your phone number to update it.',
       ),
+      const SizedBox(height: 12),
+      _dropdown(
+        'Region',
+        region,
+        {
+          ...?_regionsByCountry[country],
+          if (!(_regionsByCountry[country] ?? const []).contains(region))
+            region,
+        }.toList(),
+        (value) {
+          region = value;
+          citySelection = _firstCityForCountryRegion(country, region);
+          if (citySelection != 'Other city') city.text = citySelection;
+        },
+      ),
+      const SizedBox(height: 12),
+      _dropdown(
+        'City',
+        citySelection,
+        [..._citiesForCountryRegion(country, region), 'Other city'],
+        (value) {
+          citySelection = value;
+          if (value != 'Other city') city.text = value;
+        },
+      ),
+      if (citySelection == 'Other city') ...[
+        const SizedBox(height: 12),
+        _textField(city, 'City name', Icons.location_city_outlined),
+      ],
       const _SectionTitle('Origin'),
       _dropdown(
         'Country of origin',
@@ -322,10 +373,34 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         helperText: 'Country of origin is chosen once during registration.',
       ),
       const SizedBox(height: 12),
-      _textField(
-        originCity,
+      _dropdown(
+        'Region of origin',
+        originRegion,
+        {
+          ...?_regionsByCountry[originCountry],
+          if (!(_regionsByCountry[originCountry] ?? const []).contains(
+            originRegion,
+          ))
+            originRegion,
+        }.toList(),
+        (value) => originRegion = value,
+        enabled: false,
+        helperText: 'Region of origin is chosen once during registration.',
+      ),
+      const SizedBox(height: 12),
+      _dropdown(
         'City of origin',
-        Icons.travel_explore_outlined,
+        originCitySelection,
+        [
+          ..._citiesForCountryRegion(originCountry, originRegion),
+          if (!_cityBelongsToSelection(
+            originCountry,
+            originRegion,
+            originCity.text,
+          ))
+            'Other city',
+        ],
+        (value) => originCitySelection = value,
         enabled: false,
         helperText: 'City of origin is chosen once during registration.',
       ),

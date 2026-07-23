@@ -15,7 +15,29 @@ class _SubscriptionManagementScreenState
   @override
   void initState() {
     super.initState();
+    _reload();
+    PurchaseService.instance.addListener(_purchaseUpdated);
+  }
+
+  String? _lastVerifiedPurchase;
+
+  void _reload() {
     subscription = MapLovRepository.instance.subscriptionInfo();
+  }
+
+  void _purchaseUpdated() {
+    final verified = PurchaseService.instance.lastVerifiedProductId;
+    if (!mounted || verified == null || verified == _lastVerifiedPurchase) {
+      return;
+    }
+    _lastVerifiedPurchase = verified;
+    setState(_reload);
+  }
+
+  @override
+  void dispose() {
+    PurchaseService.instance.removeListener(_purchaseUpdated);
+    super.dispose();
   }
 
   @override
@@ -48,9 +70,30 @@ class _SubscriptionManagementScreenState
                   Text(
                     info.renewsAt == null
                         ? 'No renewal date'
-                        : 'Renews ${DateFormat.yMMMd().format(info.renewsAt!)}',
+                        : info.autoRenewEnabled
+                        ? 'Renews ${DateFormat.yMMMd().format(info.renewsAt!)}'
+                        : 'Access until ${DateFormat.yMMMd().format(info.renewsAt!)}',
                   ),
-                  Text('Status: ${info.status}'),
+                  Text.rich(
+                    TextSpan(
+                      text: 'Status: ',
+                      children: [
+                        TextSpan(
+                          text: info.status == 'active'
+                              ? 'Active'
+                              : info.status,
+                          style: TextStyle(
+                            color: info.status == 'active'
+                                ? Colors.green.shade700
+                                : null,
+                            fontWeight: info.status == 'active'
+                                ? FontWeight.w800
+                                : null,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -63,6 +106,26 @@ class _SubscriptionManagementScreenState
         title: const Text('Explore Premium plans'),
         trailing: const Icon(Icons.chevron_right),
         onTap: () => Navigator.pushNamed(context, AppRoutes.premium),
+      ),
+      ListTile(
+        leading: const Icon(Icons.cancel_outlined),
+        title: const Text('Cancel automatic renewal'),
+        subtitle: const Text(
+          'Open your store subscription settings. Benefits remain active until the paid period ends.',
+        ),
+        onTap: () async {
+          final opened = await PurchaseService.instance
+              .openSubscriptionManagement();
+          if (!opened && context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text(
+                  'Unable to open the store subscription settings.',
+                ),
+              ),
+            );
+          }
+        },
       ),
       ListTile(
         leading: const Icon(Icons.restore),
@@ -93,9 +156,14 @@ class _SubscriptionManagementScreenState
                 : history
                       .map(
                         (item) => ListTile(
-                          title: Text('${item['tier']} • ${item['status']}'),
+                          title: Text(
+                            '${item['tier']} • ${item['event_type']} • ${item['status']}',
+                          ),
                           subtitle: Text(
-                            '${item['created_at'] ?? ''}'.split('T').first,
+                            '${item['provider']} • '
+                                    '${item['created_at'] ?? ''}'
+                                .split('T')
+                                .first,
                           ),
                         ),
                       )

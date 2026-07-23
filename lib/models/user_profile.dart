@@ -39,7 +39,9 @@ class UserProfile {
     this.isOnline = true,
     this.isNew = false,
     this.country = 'Canada',
+    this.region = '',
     this.originCountry = '',
+    this.originRegion = '',
     this.originCity = '',
     this.bio = '',
     this.photoUrls = const [],
@@ -67,6 +69,7 @@ class UserProfile {
     this.incomeLevel = '',
     this.isPhotoVerified = false,
     this.allowsInternationalDiscovery = true,
+    this.showsOriginOnProfile = false,
     this.compatibilityBreakdown = const {},
     this.likedByMe = false,
     this.lastActiveAt,
@@ -85,7 +88,9 @@ class UserProfile {
   final bool isOnline;
   final bool isNew;
   final String country;
+  final String region;
   final String originCountry;
+  final String originRegion;
   final String originCity;
   final String bio;
   final List<String> photoUrls;
@@ -113,6 +118,7 @@ class UserProfile {
   final String incomeLevel;
   final bool isPhotoVerified;
   final bool allowsInternationalDiscovery;
+  final bool showsOriginOnProfile;
   final Map<String, dynamic> compatibilityBreakdown;
   final bool likedByMe;
   final DateTime? lastActiveAt;

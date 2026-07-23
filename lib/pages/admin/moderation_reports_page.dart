@@ -9,6 +9,7 @@ class ModerationReportsScreen extends StatefulWidget {
 
 class _ModerationReportsScreenState extends State<ModerationReportsScreen> {
   late Future<List<Map<String, dynamic>>> reports;
+  late Future<List<Map<String, dynamic>>> moderatedProfiles;
   late Future<List<Map<String, dynamic>>> moderatedPhotos;
   @override
   void initState() {
@@ -18,6 +19,7 @@ class _ModerationReportsScreenState extends State<ModerationReportsScreen> {
 
   void _reload() {
     reports = MapLovRepository.instance.moderationReports();
+    moderatedProfiles = MapLovRepository.instance.moderatedProfileQueue();
     moderatedPhotos = MapLovRepository.instance.moderatedPhotoQueue();
   }
 
@@ -65,6 +67,20 @@ class _ModerationReportsScreenState extends State<ModerationReportsScreen> {
     if (notes == null) return;
     await MapLovRepository.instance.approveModeratedPhoto(
       photoId,
+      notes: notes.isEmpty ? null : notes,
+    );
+    _refresh();
+  }
+
+  Future<void> _decideProfile(String profileId, String decision) async {
+    final title = decision == 'approved'
+        ? 'Approve and restore this profile?'
+        : 'Confirm this profile suspension?';
+    final notes = await _decisionNotes(title);
+    if (notes == null) return;
+    await MapLovRepository.instance.decideModeratedProfile(
+      profileId,
+      decision,
       notes: notes.isEmpty ? null : notes,
     );
     _refresh();
@@ -134,6 +150,100 @@ class _ModerationReportsScreenState extends State<ModerationReportsScreen> {
         style: TextStyle(color: AppColors.grayText),
       ),
       const SizedBox(height: 14),
+      const _SectionTitle('Profiles awaiting validation'),
+      FutureBuilder<List<Map<String, dynamic>>>(
+        future: moderatedProfiles,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (snapshot.hasError) {
+            return Text('Unable to load profile moderation: ${snapshot.error}');
+          }
+          final profiles = snapshot.data ?? const <Map<String, dynamic>>[];
+          if (profiles.isEmpty) {
+            return const Text('No profiles are awaiting validation.');
+          }
+          return Column(
+            children: profiles.map((item) {
+              final profile = item['profile'] as Map<String, dynamic>;
+              final profileReports =
+                  item['reports'] as List<Map<String, dynamic>>;
+              final profileId = profile['id'] as String;
+              final location = [profile['city'], profile['country_name']]
+                  .whereType<String>()
+                  .where((value) => value.isNotEmpty)
+                  .join(', ');
+              return Card(
+                key: Key('moderated_profile_$profileId'),
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: const CircleAvatar(
+                          child: Icon(Icons.person_off_outlined),
+                        ),
+                        title: Text(
+                          profile['first_name'] as String? ?? 'MapLov member',
+                          style: const TextStyle(fontWeight: FontWeight.w800),
+                        ),
+                        subtitle: Text(
+                          location.isEmpty
+                              ? 'Frozen and removed from Discover'
+                              : '$location • Frozen and removed from Discover',
+                        ),
+                      ),
+                      Text(
+                        '${item['report_count']} distinct reports',
+                        style: const TextStyle(fontWeight: FontWeight.w800),
+                      ),
+                      ...profileReports.map(
+                        (report) => ListTile(
+                          dense: true,
+                          contentPadding: EdgeInsets.zero,
+                          leading: const Icon(
+                            Icons.flag_outlined,
+                            color: AppColors.error,
+                          ),
+                          title: Text(report['reason'] as String),
+                          subtitle: report['comment'] == null
+                              ? null
+                              : Text(report['comment'] as String),
+                        ),
+                      ),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: () =>
+                                  _decideProfile(profileId, 'suspended'),
+                              icon: const Icon(Icons.lock_person_outlined),
+                              label: const Text('Keep suspended'),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: FilledButton.icon(
+                              onPressed: () =>
+                                  _decideProfile(profileId, 'approved'),
+                              icon: const Icon(Icons.verified_user_outlined),
+                              label: const Text('Approve profile'),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }).toList(),
+          );
+        },
+      ),
+      const SizedBox(height: 18),
       const _SectionTitle('Photos awaiting review'),
       FutureBuilder<List<Map<String, dynamic>>>(
         future: moderatedPhotos,

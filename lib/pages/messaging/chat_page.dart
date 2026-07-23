@@ -144,17 +144,12 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _confirmDelete(MapLovMessage message) async {
-    final subscription = await MapLovRepository.instance.subscriptionInfo();
-    if (!mounted) return;
-    final canDeleteForEveryone = !message.read || subscription.isVip;
     final scope = await showDialog<_DeletionScope>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Delete message?'),
-        content: Text(
-          canDeleteForEveryone
-              ? 'Choose whether to remove this message only from your account or from both accounts.'
-              : 'This message has already been read. Premium VIP is required to remove it from both accounts.',
+        content: const Text(
+          'Choose whether to remove this message only from your account or from both accounts.',
         ),
         actions: [
           TextButton(
@@ -166,32 +161,31 @@ class _ChatScreenState extends State<ChatScreen> {
             child: const Text('Delete for me'),
           ),
           FilledButton(
-            onPressed: canDeleteForEveryone
-                ? () => Navigator.pop(context, _DeletionScope.everyone)
-                : null,
+            onPressed: () => Navigator.pop(context, _DeletionScope.everyone),
             child: const Text('Delete for everyone'),
           ),
         ],
       ),
     );
-    if (scope != null) {
-      await _delete(message, forEveryone: scope == _DeletionScope.everyone);
+    if (scope == null || !mounted) return;
+    if (scope == _DeletionScope.everyone && message.read) {
+      final allowed = await _requireSubscriptionFeature(
+        context,
+        requirement: _SubscriptionRequirement.vip,
+        feature: 'Deleting a read message for everyone',
+      );
+      if (!allowed) return;
     }
+    await _delete(message, forEveryone: scope == _DeletionScope.everyone);
   }
 
   Future<void> _clearChat() async {
-    final subscription = await MapLovRepository.instance.subscriptionInfo();
-    if (!mounted) return;
     final scope = await showDialog<_DeletionScope>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Clear chat?'),
-        content: Text(
-          subscription.isVip
-              ? 'Clear for me hides this history only on your account. Clear for everyone removes the full conversation from both accounts.'
-              : subscription.isPremium
-              ? 'Clear for everyone removes the chat from your account and removes only your unread messages from ${profile.name}’s account.'
-              : 'You can clear this history from your account. Clearing an entire chat for everyone requires Premium Plus.',
+        content: const Text(
+          'Choose whether to clear this history only from your account or from both accounts.',
         ),
         actions: [
           TextButton(
@@ -203,15 +197,21 @@ class _ChatScreenState extends State<ChatScreen> {
             child: const Text('Clear for me'),
           ),
           FilledButton(
-            onPressed: subscription.isPremium
-                ? () => Navigator.pop(context, _DeletionScope.everyone)
-                : null,
+            onPressed: () => Navigator.pop(context, _DeletionScope.everyone),
             child: const Text('Clear for everyone'),
           ),
         ],
       ),
     );
-    if (scope == null) return;
+    if (scope == null || !mounted) return;
+    if (scope == _DeletionScope.everyone) {
+      final allowed = await _requireSubscriptionFeature(
+        context,
+        requirement: _SubscriptionRequirement.premiumPlus,
+        feature: 'Clearing a chat for everyone',
+      );
+      if (!allowed) return;
+    }
     try {
       final clearedAt = await MapLovRepository.instance.clearConversation(
         conversationId,

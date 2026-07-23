@@ -20,13 +20,15 @@ begin
     and table_name = 'profiles'
     and column_name in (
       'residence_country_name',
+      'residence_region',
       'residence_city',
       'origin_country_name',
+      'origin_region',
       'origin_city'
     );
 
-  if geography_column_count <> 4 then
-    raise exception 'The four profile geography columns are not available';
+  if geography_column_count <> 6 then
+    raise exception 'The six profile geography columns are not available';
   end if;
 
   if not exists (

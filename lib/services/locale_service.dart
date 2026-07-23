@@ -291,6 +291,12 @@ class MapLovLocalizations {
     'Renewal date': 'Date de renouvellement',
     'Subscription history': 'Historique des abonnements',
     'Invisible mode': 'Mode invisible',
+    'Navigation invisible': 'Navigation invisible',
+    'Reserved for VIP': 'Réservé aux VIP',
+    'Hide me from Discover': 'Me masquer dans Découvrir',
+    'VIP feature': 'Fonctionnalité VIP',
+    'This feature is reserved for Premium VIP subscribers.':
+        'Cette fonctionnalité est réservée aux abonnés Premium VIP.',
     'Profile views': 'Vues du profil',
     'Search users': 'Rechercher des utilisateurs',
     'Verify profile': 'Vérifier le profil',
@@ -540,6 +546,34 @@ class MapLovLocalizations {
     'Back to dating preferences': 'Retour aux préférences de rencontre',
     'Create your profile': 'Créer votre profil',
     'Add profile photo': 'Ajouter une photo de profil',
+    'Profile photo': 'Photo de profil',
+    'Private reference selfie': 'Selfie privé de référence',
+    'Take selfie': 'Prendre un selfie',
+    'Private selfie verification': 'Vérification par selfie privé',
+    'I agree': 'J’accepte',
+    'Create your private reference selfie first.':
+        'Créez d’abord votre selfie privé de référence.',
+    'A private reference selfie is required.':
+        'Un selfie privé de référence est requis.',
+    'Private reference selfie verified.': 'Selfie privé de référence vérifié.',
+    'The reference selfie must contain exactly one face.':
+        'Le selfie de référence doit contenir exactement un visage.',
+    'Use a clear, front-facing selfie in good light.':
+        'Utilisez un selfie clair, de face et bien éclairé.',
+    'The face does not match the private reference selfie.':
+        'Le visage ne correspond pas au selfie privé de référence.',
+    'Use a clear profile photo where your face is visible.':
+        'Utilisez une photo de profil claire où votre visage est visible.',
+    'Verified and kept private. It is never shown on your profile.':
+        'Vérifié et conservé en privé. Il n’est jamais affiché sur votre profil.',
+    'Take a clear front-facing selfie. It will only be used to verify your profile photos.':
+        'Prenez un selfie clair de face. Il servira uniquement à vérifier vos photos de profil.',
+    'Ready to verify new profile photos.':
+        'Prêt à vérifier les nouvelles photos de profil.',
+    'Required before adding a profile photo.':
+        'Requis avant d’ajouter une photo de profil.',
+    'MapLov will securely store this selfie as private biometric reference data and send it to AWS Rekognition whenever you add a profile photo. The selfie is never displayed to members and is deleted with your account. Face comparison is probabilistic; if a photo is rejected, you can try another clear photo or contact support.':
+        'MapLov conservera ce selfie de façon sécurisée comme donnée biométrique privée de référence et l’enverra à AWS Rekognition chaque fois que vous ajouterez une photo de profil. Le selfie n’est jamais affiché aux membres et sera supprimé avec votre compte. La comparaison faciale est probabiliste; si une photo est refusée, essayez une autre photo claire ou contactez le soutien.',
     'Your name and birth date are already saved. Confirm your current residence, then tell MapLov where you are originally from.':
         'Votre nom et votre date de naissance sont déjà enregistrés. Confirmez votre résidence actuelle, puis indiquez à MapLov d’où vous venez.',
     'Enable location for Discover': 'Activer la localisation pour Découvrir',
@@ -632,6 +666,10 @@ class MapLovLocalizations {
     'Country of residence (from phone)':
         'Pays de résidence (selon le téléphone)',
     'City of residence': 'Ville de résidence',
+    'Region': 'Région',
+    'Region name': 'Nom de la région',
+    'Region of origin': 'Région d’origine',
+    'Region of origin name': 'Nom de la région d’origine',
     'Country of origin': 'Pays d’origine',
     'City of origin': 'Ville d’origine',
     'City in Canada': 'Ville au Canada',
@@ -658,6 +696,24 @@ class MapLovLocalizations {
     'Any': 'Tous',
     'Any city': 'Toute ville',
     'Any country': 'Tout pays',
+    'Any region': 'Toute région',
+    'Other region': 'Autre région',
+    'Choose a region.': 'Choisissez une région.',
+    'Choose a city.': 'Choisissez une ville.',
+    'Adamawa': 'Adamaoua',
+    'East': 'Est',
+    'Far North': 'Extrême-Nord',
+    'North': 'Nord',
+    'North-West': 'Nord-Ouest',
+    'South': 'Sud',
+    'South-West': 'Sud-Ouest',
+    'West': 'Ouest',
+    'Choose a country before choosing a region.':
+        'Choisissez d’abord un pays avant de choisir une région.',
+    'Premium Plus required': 'Premium Plus requis',
+    'International search is available with Premium Plus and VIP.':
+        'La recherche internationale est accessible avec Premium Plus et VIP.',
+    'View Premium Plus': 'Voir Premium Plus',
     'Other city': 'Autre ville',
     'Any profession': 'Toute profession',
     'Any income level': 'Tout niveau de revenu',
@@ -669,6 +725,10 @@ class MapLovLocalizations {
         'Déterminé par votre numéro de téléphone vérifié.',
     'Country of origin can only be chosen once.':
         'Le pays d’origine ne peut être choisi qu’une seule fois.',
+    'Region of origin can only be chosen once.':
+        'La région d’origine ne peut être choisie qu’une seule fois.',
+    'Region of origin is chosen once during registration.':
+        'La région d’origine est choisie une seule fois pendant l’inscription.',
     'City of origin can only be chosen once.':
         'La ville d’origine ne peut être choisie qu’une seule fois.',
     'Continue to preferences': 'Continuer vers les préférences',
@@ -820,6 +880,8 @@ class MapLovLocalizations {
         'Chez MapLov, nous protégeons votre vie privée et vos données.\n',
     'Effective date: July 16, 2026 • MVP draft':
         'Date d’entrée en vigueur : 16 juillet 2026 • Ébauche MVP',
+    'Effective date: July 20, 2026 • MVP draft':
+        'Date d’entrée en vigueur : 20 juillet 2026 • Ébauche MVP',
     'General support: support@maplov.ca\n':
         'Soutien général : support@maplov.ca\n',
     'MapLov applies privacy-by-design controls inspired by PIPEDA, Québec Law 25 and GDPR principles. Legal compliance depends on final policies and operational practices.':
@@ -863,12 +925,20 @@ class MapLovLocalizations {
         'Les forfaits payants sont facturés par la boutique d’applications concernée. Le renouvellement, l’annulation et les remboursements suivent les conditions de la boutique et les lois applicables en matière de protection du consommateur.',
     'Account identifiers, age and profile details, photos, messages, approximate or precise device location when requested, preferences, safety reports, subscription status and technical security records.':
         'Identifiants de compte, âge et détails du profil, photos, messages, position approximative ou précise de l’appareil lorsque demandée, préférences, signalements de sécurité, état de l’abonnement et registres techniques de sécurité.',
+    'Account identifiers, age and profile details, photos, a private reference selfie and face-comparison results, messages, approximate or precise device location when requested, preferences, safety reports, subscription status and technical security records.':
+        'Identifiants de compte, âge et détails du profil, photos, selfie privé de référence et résultats de comparaison faciale, messages, position approximative ou précise de l’appareil lorsque demandée, préférences, signalements de sécurité, état de l’abonnement et registres techniques de sécurité.',
     'To create accounts, recommend compatible profiles, enable communication, prevent abuse, moderate content, provide subscriptions and satisfy legal obligations.':
         'Pour créer des comptes, recommander des profils compatibles, permettre les communications, prévenir les abus, modérer le contenu, fournir les abonnements et respecter les obligations légales.',
+    'To create accounts, verify that profile photos match the consenting account holder, recommend compatible profiles, enable communication, prevent abuse, moderate content, provide subscriptions and satisfy legal obligations.':
+        'Pour créer des comptes, vérifier que les photos de profil correspondent au titulaire consentant, recommander des profils compatibles, permettre les communications, prévenir les abus, modérer le contenu, fournir les abonnements et respecter les obligations légales.',
     'Profile content is shared according to your visibility choices. Service providers process data only to operate MapLov. We do not sell precise location or private messages.':
         'Le contenu du profil est partagé selon vos choix de visibilité. Les fournisseurs de services traitent les données uniquement pour exploiter MapLov. Nous ne vendons ni la position précise ni les messages privés.',
+    'Profile content is shared according to your visibility choices. The private reference selfie is sent to AWS Rekognition only for face detection and comparison and is never displayed to members. Service providers process data only to operate MapLov. We do not sell biometric data, precise location or private messages.':
+        'Le contenu du profil est partagé selon vos choix de visibilité. Le selfie privé de référence est envoyé à AWS Rekognition uniquement pour la détection et la comparaison faciales et n’est jamais affiché aux membres. Les fournisseurs traitent les données uniquement pour exploiter MapLov. Nous ne vendons ni données biométriques, ni position précise, ni messages privés.',
     'A deletion request immediately hides the account. Unless retention is legally required, associated account data is scheduled for permanent erasure after 30 days.':
         'Une demande de suppression masque immédiatement le compte. Sauf obligation légale de conservation, les données associées au compte sont supprimées définitivement après 30 jours.',
+    'A deletion request immediately hides the account. Unless retention is legally required, associated account data, including the private reference selfie and face-comparison records, is scheduled for permanent erasure after 30 days.':
+        'Une demande de suppression masque immédiatement le compte. Sauf obligation légale de conservation, les données associées, y compris le selfie privé de référence et les registres de comparaison faciale, sont supprimées définitivement après 30 jours.',
     'You can change visibility, location display and notification preferences, request an export, block members, report content and request account deletion from Settings.':
         'Vous pouvez modifier la visibilité, l’affichage de la position et les préférences de notification, demander une exportation, bloquer des membres, signaler du contenu et demander la suppression du compte dans les paramètres.',
     'Treat every member with dignity. Consent must be voluntary, informed and reversible. Stop contact immediately when asked.':
@@ -920,8 +990,8 @@ class MapLovLocalizations {
         'Le blocage interrompt la découverte, les messages et les notifications entre les deux comptes. Le signalement déclenche un examen confidentiel de sécurité. En cas de danger immédiat, contactez les services d’urgence locaux.',
     'MapLov requests foreground location during registration to initialize Discover and refreshes it when you open Nearby. It stores coordinates for discovery but displays only approximate distance. It never requests background location.':
         'MapLov demande la localisation au premier plan pendant l’inscription afin d’initialiser Découvrir et l’actualise lorsque vous ouvrez À proximité. L’application conserve les coordonnées pour la découverte, mais affiche uniquement une distance approximative. Elle ne demande jamais la localisation en arrière-plan.',
-    'Manage or cancel billing through Google Play. Restoring purchases reconnects an eligible store subscription to the signed-in MapLov account.':
-        'Gérez ou annulez la facturation dans Google Play. La restauration des achats reconnecte un abonnement admissible de la boutique au compte MapLov connecté.',
+    'Manage or cancel billing through Google Play or the Apple App Store. Restoring purchases securely reconnects an eligible store subscription to the signed-in MapLov account.':
+        'Gérez ou annulez la facturation dans Google Play ou l’App Store d’Apple. La restauration des achats reconnecte de façon sécurisée un abonnement admissible au compte MapLov connecté.',
     'Open Settings, then Legal & consent to request a data export. Delete Account immediately hides your profile and schedules permanent account erasure after the stated retention period.':
         'Ouvrez Paramètres, puis Juridique et consentement pour demander une exportation des données. Supprimer le compte masque immédiatement votre profil et planifie la suppression définitive du compte après la période de conservation indiquée.',
     'General support: support@maplov.ca\nPrivacy: privacy@maplov.ca\nChild safety: child-safety@maplov.ca\n\nInclude your account email, device model and a short description. Never send your password or SMS code.':

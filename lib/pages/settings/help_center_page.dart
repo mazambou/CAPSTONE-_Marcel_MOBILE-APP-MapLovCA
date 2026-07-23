@@ -136,7 +136,7 @@ const _helpArticles = [
   ),
   _HelpArticle(
     'Premium subscriptions',
-    'Manage or cancel billing through Google Play. Restoring purchases reconnects an eligible store subscription to the signed-in MapLov account.',
+    'Manage or cancel billing through Google Play or the Apple App Store. Restoring purchases securely reconnects an eligible store subscription to the signed-in MapLov account.',
     Icons.workspace_premium_outlined,
   ),
   _HelpArticle(

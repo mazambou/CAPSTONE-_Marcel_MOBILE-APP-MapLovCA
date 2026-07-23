@@ -13,7 +13,10 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
   double distance = 50;
   String selectedCity = 'Any city';
   String preferredCountry = 'Canada';
+  String preferredRegion = 'Any region';
   String residenceCountry = 'Canada';
+  String residenceRegion = 'Any region';
+  String residenceCity = 'Any city';
   String gender = 'Everyone';
   String relationshipGoal = 'Long-term';
   String language = 'Any language';
@@ -23,7 +26,9 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
   bool requiredGoal = false;
   bool loading = true;
   bool saving = false;
+  bool premiumPlus = false;
   List<String> savedOriginCountries = const [];
+  List<String> savedOriginRegions = const [];
   List<String> savedOriginCities = const [];
 
   @override
@@ -35,17 +40,19 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
   Future<void> _load() async {
     final saved = await MapLovRepository.instance.myPreferences();
     final profile = await MapLovRepository.instance.myProfileDetails();
+    final subscription = await MapLovRepository.instance.subscriptionInfo();
     if (!mounted) return;
     setState(() {
       ages = RangeValues(
         saved.minimumAge.toDouble(),
         saved.maximumAge.toDouble(),
       );
-      searchMode = switch (saved.locationMode) {
+      final savedSearchMode = switch (saved.locationMode) {
         'my_country' => 'My country',
         'specific_country' || 'worldwide' => 'International',
         _ => 'Near me',
       };
+      searchMode = subscription.isPremium ? savedSearchMode : 'Near me';
       distance = saved.distanceKm.toDouble().clamp(1, 100);
       selectedCity = saved.cities.firstOrNull ?? 'Any city';
       gender = _displayGenderFilterValue(
@@ -55,12 +62,18 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
       language = saved.languages.firstOrNull ?? 'Any language';
       personality = saved.personalities.firstOrNull ?? 'Any personality';
       preferredCountry = saved.countries.firstOrNull ?? 'Canada';
+      preferredRegion = saved.regions.firstOrNull ?? 'Any region';
       residenceCountry =
           profile?['country_name'] as String? ?? residenceCountry;
+      residenceRegion =
+          profile?['residence_region'] as String? ?? residenceRegion;
+      residenceCity = profile?['city'] as String? ?? residenceCity;
       requiredGender = saved.requiredGenders;
       requiredLanguage = saved.requiredLanguages;
       requiredGoal = saved.requiredRelationshipGoal;
+      premiumPlus = subscription.isPremium;
       savedOriginCountries = saved.originCountries;
+      savedOriginRegions = saved.originRegions;
       savedOriginCities = saved.originCities;
       loading = false;
     });
@@ -143,6 +156,17 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
         AuthService.instance.requiresPreferencesCompletion;
     setState(() => saving = true);
     try {
+      if (searchMode != 'Near me' && !premiumPlus) {
+        setState(() => saving = false);
+        await _requireSubscriptionFeature(
+          context,
+          requirement: _SubscriptionRequirement.premiumPlus,
+          feature: searchMode == 'International'
+              ? 'International discovery'
+              : 'Country discovery',
+        );
+        return;
+      }
       await MapLovRepository.instance.savePreferences(
         DiscoveryFilters(
           minimumAge: ages.start.round(),
@@ -158,7 +182,10 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
             'International' => [preferredCountry],
             _ => const [],
           },
-          cities: searchMode == 'My country' && selectedCity != 'Any city'
+          regions: searchMode == 'Near me' || preferredRegion == 'Any region'
+              ? const []
+              : [preferredRegion],
+          cities: searchMode != 'Near me' && selectedCity != 'Any city'
               ? [selectedCity]
               : const [],
           genders: gender == 'Everyone'
@@ -174,6 +201,7 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
               ? const []
               : [personality],
           originCountries: savedOriginCountries,
+          originRegions: savedOriginRegions,
           originCities: savedOriginCities,
           requiredGenders: requiredGender,
           requiredLocation: true,
@@ -209,6 +237,37 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
     } finally {
       if (mounted) setState(() => saving = false);
     }
+  }
+
+  Future<void> _changeSearchMode(String value) async {
+    if (value == 'Near me' || premiumPlus) {
+      setState(() {
+        if (searchMode != value) {
+          preferredRegion = 'Any region';
+          selectedCity = 'Any city';
+        }
+        searchMode = value;
+      });
+      return;
+    }
+    await _requireSubscriptionFeature(
+      context,
+      requirement: _SubscriptionRequirement.premiumPlus,
+      feature: value == 'International'
+          ? 'International discovery'
+          : 'Country discovery',
+    );
+    final subscription = await MapLovRepository.instance.subscriptionInfo();
+    if (subscription.isPremium && mounted) {
+      setState(() {
+        premiumPlus = true;
+        preferredRegion = 'Any region';
+        selectedCity = 'Any city';
+        searchMode = value;
+      });
+      return;
+    }
+    return;
   }
 
   @override
@@ -249,12 +308,23 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
         distance: distance,
         selectedCity: selectedCity,
         selectedCountry: preferredCountry,
-        onModeChanged: (value) => setState(() => searchMode = value),
+        selectedRegion: preferredRegion,
+        residenceCountry: residenceCountry,
+        residenceRegion: residenceRegion,
+        residenceCity: residenceCity,
+        onModeChanged: (value) => unawaited(_changeSearchMode(value)),
         onDistanceChanged: (value) => setState(() => distance = value),
         onCityChanged: (value) =>
             setState(() => selectedCity = value ?? 'Any city'),
-        onCountryChanged: (value) =>
-            setState(() => preferredCountry = value ?? 'Canada'),
+        onCountryChanged: (value) => setState(() {
+          preferredCountry = value ?? 'Canada';
+          preferredRegion = 'Any region';
+          selectedCity = 'Any city';
+        }),
+        onRegionChanged: (value) => setState(() {
+          preferredRegion = value ?? 'Any region';
+          selectedCity = 'Any city';
+        }),
       ),
       const _SectionTitle('Compatibility priorities'),
       DropdownButtonFormField<String>(

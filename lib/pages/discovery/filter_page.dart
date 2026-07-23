@@ -25,8 +25,12 @@ class _FilterScreenState extends State<FilterScreen> {
   double distance = 10;
   String selectedCity = 'Any city';
   String selectedCountry = 'Canada';
+  String selectedRegion = 'Any region';
   String residenceCountry = 'Canada';
+  String residenceRegion = 'Any region';
+  String residenceCity = 'Any city';
   String originCountry = 'Any country';
+  String originRegion = 'Any region';
   String originCity = 'Any city';
   RangeValues standardAges = const RangeValues(22, 30);
   double standardDistance = 50;
@@ -37,6 +41,11 @@ class _FilterScreenState extends State<FilterScreen> {
   bool photoVerified = false;
   bool activeToday = false;
   bool applyingFilters = false;
+  bool premiumPlus = false;
+  bool vipAvailable = false;
+  bool vipOnly = false;
+  bool premiumOnly = false;
+  bool mostLikedFirst = false;
   String selectedGender = 'Everyone';
   String quickLanguage = 'Any';
   String quickRelationshipGoal = 'Any';
@@ -80,9 +89,24 @@ class _FilterScreenState extends State<FilterScreen> {
   Future<void> _loadResidenceCountry() async {
     try {
       final profile = await MapLovRepository.instance.myProfileDetails();
+      final subscription = await MapLovRepository.instance.subscriptionInfo();
       final country = profile?['country_name'] as String?;
-      if (mounted && country != null && country.trim().isNotEmpty) {
-        setState(() => residenceCountry = country.trim());
+      final region = profile?['residence_region'] as String?;
+      final city = profile?['city'] as String?;
+      if (mounted) {
+        setState(() {
+          premiumPlus = subscription.isPremium;
+          vipAvailable = subscription.isVip;
+          if (country != null && country.trim().isNotEmpty) {
+            residenceCountry = country.trim();
+          }
+          if (region != null && region.trim().isNotEmpty) {
+            residenceRegion = region.trim();
+          }
+          if (city != null && city.trim().isNotEmpty) {
+            residenceCity = city.trim();
+          }
+        });
       }
     } catch (_) {
       // The filter can still be applied with the locally known default.
@@ -102,7 +126,9 @@ class _FilterScreenState extends State<FilterScreen> {
       distance = 10;
       selectedCity = 'Any city';
       selectedCountry = 'Canada';
+      selectedRegion = 'Any region';
       originCountry = 'Any country';
+      originRegion = 'Any region';
       originCity = 'Any city';
       standardAges = const RangeValues(22, 30);
       standardDistance = 50;
@@ -112,6 +138,9 @@ class _FilterScreenState extends State<FilterScreen> {
       advancedVerified = false;
       photoVerified = false;
       activeToday = false;
+      premiumOnly = false;
+      vipOnly = false;
+      mostLikedFirst = false;
       selectedGender = 'Everyone';
       quickLanguage = 'Any';
       quickRelationshipGoal = 'Any';
@@ -137,12 +166,52 @@ class _FilterScreenState extends State<FilterScreen> {
     if (tab == 2) {
       final subscription = await MapLovRepository.instance.subscriptionInfo();
       if (!subscription.isPremium && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Advanced filters require Premium Plus.'),
-          ),
+        await _requireSubscriptionFeature(
+          context,
+          requirement: _SubscriptionRequirement.premiumPlus,
+          feature: 'Advanced filters',
         );
-        await Navigator.pushNamed(context, AppRoutes.premium);
+        return;
+      }
+    }
+    if (!mounted) return;
+    if (vipOnly && !vipAvailable) {
+      await _requireSubscriptionFeature(
+        context,
+        requirement: _SubscriptionRequirement.vip,
+        feature: 'Showing VIP profiles only',
+      );
+      return;
+    }
+    if (premiumOnly && !premiumPlus) {
+      await _requireSubscriptionFeature(
+        context,
+        requirement: _SubscriptionRequirement.premiumPlus,
+        feature: 'Showing Premium Plus and Premium VIP profiles',
+      );
+      return;
+    }
+    if ((originCountry != 'Any country' ||
+            originRegion != 'Any region' ||
+            originCity != 'Any city') &&
+        !premiumPlus) {
+      await _requireSubscriptionFeature(
+        context,
+        requirement: _SubscriptionRequirement.premiumPlus,
+        feature: 'Using origin filters',
+      );
+      return;
+    }
+    if (locationMode != 'Near me') {
+      final subscription = await MapLovRepository.instance.subscriptionInfo();
+      if (!subscription.isPremium && mounted) {
+        await _requireSubscriptionFeature(
+          context,
+          requirement: _SubscriptionRequirement.premiumPlus,
+          feature: locationMode == 'International'
+              ? 'International discovery'
+              : 'Country discovery',
+        );
         return;
       }
     }
@@ -204,12 +273,16 @@ class _FilterScreenState extends State<FilterScreen> {
           'International' => [selectedCountry],
           _ => const [],
         },
+        regions: locationMode == 'Near me' || selectedRegion == 'Any region'
+            ? const []
+            : [selectedRegion],
         cities: locationMode != 'Near me' && selectedCity != 'Any city'
             ? [selectedCity]
             : const [],
         originCountries: originCountry == 'Any country'
             ? const []
             : [originCountry],
+        originRegions: originRegion == 'Any region' ? const [] : [originRegion],
         originCities: originCity == 'Any city' ? const [] : [originCity],
         languages: language == null || language == 'Any'
             ? const []
@@ -265,6 +338,9 @@ class _FilterScreenState extends State<FilterScreen> {
         requiredLocation: mode != 'worldwide',
         requiredLanguages: language != null && language != 'Any',
         requiredRelationshipGoal: goal != null && goal != 'Any',
+        premiumOnly: premiumOnly,
+        vipOnly: vipOnly,
+        mostLikedFirst: mostLikedFirst,
       );
       await _persistFilters(filters);
       if (mounted) Navigator.pop(context, filters);
@@ -278,6 +354,103 @@ class _FilterScreenState extends State<FilterScreen> {
       if (mounted) setState(() => applyingFilters = false);
     }
   }
+
+  Future<void> _changeLocationMode(String value) async {
+    if (value == 'Near me' || premiumPlus) {
+      setState(() {
+        if (locationMode != value) {
+          selectedRegion = 'Any region';
+          selectedCity = 'Any city';
+        }
+        locationMode = value;
+      });
+      return;
+    }
+    await _requireSubscriptionFeature(
+      context,
+      requirement: _SubscriptionRequirement.premiumPlus,
+      feature: value == 'International'
+          ? 'International discovery'
+          : 'Country discovery',
+    );
+    final subscription = await MapLovRepository.instance.subscriptionInfo();
+    if (subscription.isPremium && mounted) {
+      setState(() {
+        premiumPlus = true;
+        selectedRegion = 'Any region';
+        selectedCity = 'Any city';
+        locationMode = value;
+      });
+      return;
+    }
+    return;
+  }
+
+  Future<void> _showVipUpgrade() async {
+    await _requireSubscriptionFeature(
+      context,
+      requirement: _SubscriptionRequirement.vip,
+      feature: 'Showing VIP profiles only',
+    );
+    final subscription = await MapLovRepository.instance.subscriptionInfo();
+    if (mounted) setState(() => vipAvailable = subscription.isVip);
+  }
+
+  Future<void> _showOriginUpgrade() async {
+    await _requireSubscriptionFeature(
+      context,
+      requirement: _SubscriptionRequirement.premiumPlus,
+      feature: 'Using origin filters',
+    );
+    final subscription = await MapLovRepository.instance.subscriptionInfo();
+    if (mounted) setState(() => premiumPlus = subscription.isPremium);
+  }
+
+  List<Widget> _vipDiscoveryFilters({bool nested = false}) => [
+    _FilterSwitchCard(
+      key: const Key('vip_only_filter'),
+      title: 'Show VIP Profiles Only',
+      subtitle: 'Show only members with Premium VIP.',
+      icon: Icons.diamond_outlined,
+      value: vipOnly,
+      locked: !vipAvailable,
+      onLockedTap: _showVipUpgrade,
+      onChanged: (value) => setState(() {
+        vipOnly = value;
+        if (value) premiumOnly = false;
+      }),
+      nested: nested,
+    ),
+    _FilterSwitchCard(
+      key: const Key('premium_only_filter'),
+      title: 'Show Premium Plus & Premium VIP',
+      subtitle: 'Show all paid members.',
+      icon: Icons.workspace_premium_outlined,
+      value: premiumOnly,
+      locked: !premiumPlus,
+      onLockedTap: () => unawaited(
+        _requireSubscriptionFeature(
+          context,
+          requirement: _SubscriptionRequirement.premiumPlus,
+          feature: 'Premium profile discovery',
+        ),
+      ),
+      onChanged: (value) => setState(() {
+        premiumOnly = value;
+        if (value) vipOnly = false;
+      }),
+      nested: nested,
+    ),
+    _FilterSwitchCard(
+      key: const Key('most_liked_filter'),
+      title: 'Show Most Liked Profiles',
+      subtitle: 'Available to every MapLov member.',
+      icon: Icons.favorite_border,
+      value: mostLikedFirst,
+      onChanged: (value) => setState(() => mostLikedFirst = value),
+      nested: nested,
+    ),
+  ];
 
   void _setStandardSelection(String title, String value) {
     setState(() => standardSelections[title] = value);
@@ -370,27 +543,46 @@ class _FilterScreenState extends State<FilterScreen> {
           max: 80,
           onChanged: (value) => setState(() => ages = value),
         ),
+        const _SectionTitle('Main Profile Discovery'),
+        ..._vipDiscoveryFilters(),
         const _SectionTitle('Place of residence'),
         _SearchLocationSelector(
           mode: locationMode,
           distance: distance,
           selectedCity: selectedCity,
           selectedCountry: selectedCountry,
-          onModeChanged: (value) => setState(() => locationMode = value),
+          selectedRegion: selectedRegion,
+          residenceCountry: residenceCountry,
+          residenceRegion: residenceRegion,
+          residenceCity: residenceCity,
+          onModeChanged: (value) => unawaited(_changeLocationMode(value)),
           onDistanceChanged: (value) => setState(() => distance = value),
           onCityChanged: (value) =>
               setState(() => selectedCity = value ?? 'Any city'),
           onCountryChanged: (value) => setState(() {
             selectedCountry = value ?? 'Canada';
+            selectedRegion = 'Any region';
+            selectedCity = 'Any city';
+          }),
+          onRegionChanged: (value) => setState(() {
+            selectedRegion = value ?? 'Any region';
             selectedCity = 'Any city';
           }),
         ),
         const _SectionTitle('Origin'),
         _OriginFilter(
+          available: premiumPlus,
+          onLockedTap: _showOriginUpgrade,
           country: originCountry,
+          region: originRegion,
           city: originCity,
           onCountryChanged: (value) => setState(() {
             originCountry = value ?? 'Any country';
+            originRegion = 'Any region';
+            originCity = 'Any city';
+          }),
+          onRegionChanged: (value) => setState(() {
+            originRegion = value ?? 'Any region';
             originCity = 'Any city';
           }),
           onCityChanged: (value) =>
@@ -470,10 +662,51 @@ class _FilterScreenState extends State<FilterScreen> {
           max: 60,
           onChanged: (value) => setState(() => standardAges = value),
         ),
-        _DistanceFilterCard(
+        const _SectionTitle('Place of residence'),
+        _SearchLocationSelector(
+          mode: locationMode,
           distance: standardDistance,
-          onChanged: (value) => setState(() => standardDistance = value),
+          selectedCity: selectedCity,
+          selectedCountry: selectedCountry,
+          selectedRegion: selectedRegion,
+          residenceCountry: residenceCountry,
+          residenceRegion: residenceRegion,
+          residenceCity: residenceCity,
+          onModeChanged: (value) => unawaited(_changeLocationMode(value)),
+          onDistanceChanged: (value) =>
+              setState(() => standardDistance = value),
+          onCityChanged: (value) =>
+              setState(() => selectedCity = value ?? 'Any city'),
+          onCountryChanged: (value) => setState(() {
+            selectedCountry = value ?? 'Canada';
+            selectedRegion = 'Any region';
+            selectedCity = 'Any city';
+          }),
+          onRegionChanged: (value) => setState(() {
+            selectedRegion = value ?? 'Any region';
+            selectedCity = 'Any city';
+          }),
         ),
+        const _SectionTitle('Origin'),
+        _OriginFilter(
+          available: premiumPlus,
+          onLockedTap: _showOriginUpgrade,
+          country: originCountry,
+          region: originRegion,
+          city: originCity,
+          onCountryChanged: (value) => setState(() {
+            originCountry = value ?? 'Any country';
+            originRegion = 'Any region';
+            originCity = 'Any city';
+          }),
+          onRegionChanged: (value) => setState(() {
+            originRegion = value ?? 'Any region';
+            originCity = 'Any city';
+          }),
+          onCityChanged: (value) =>
+              setState(() => originCity = value ?? 'Any city'),
+        ),
+        ..._vipDiscoveryFilters(),
         _ChoiceFilterCard(
           title: 'Language',
           icon: Icons.language,
@@ -610,10 +843,63 @@ class _FilterScreenState extends State<FilterScreen> {
               max: 60,
               onChanged: (value) => setState(() => advancedAges = value),
             ),
-            _DistanceFilterCard(
-              distance: advancedDistance,
-              onChanged: (value) => setState(() => advancedDistance = value),
+            const Padding(
+              padding: EdgeInsets.all(10),
+              child: Text(
+                'Place of residence',
+                style: TextStyle(fontWeight: FontWeight.w800),
+              ),
             ),
+            _SearchLocationSelector(
+              mode: locationMode,
+              distance: advancedDistance,
+              selectedCity: selectedCity,
+              selectedCountry: selectedCountry,
+              selectedRegion: selectedRegion,
+              residenceCountry: residenceCountry,
+              residenceRegion: residenceRegion,
+              residenceCity: residenceCity,
+              onModeChanged: (value) => unawaited(_changeLocationMode(value)),
+              onDistanceChanged: (value) =>
+                  setState(() => advancedDistance = value),
+              onCityChanged: (value) =>
+                  setState(() => selectedCity = value ?? 'Any city'),
+              onCountryChanged: (value) => setState(() {
+                selectedCountry = value ?? 'Canada';
+                selectedRegion = 'Any region';
+                selectedCity = 'Any city';
+              }),
+              onRegionChanged: (value) => setState(() {
+                selectedRegion = value ?? 'Any region';
+                selectedCity = 'Any city';
+              }),
+            ),
+            const Padding(
+              padding: EdgeInsets.all(10),
+              child: Text(
+                'Origin',
+                style: TextStyle(fontWeight: FontWeight.w800),
+              ),
+            ),
+            _OriginFilter(
+              available: premiumPlus,
+              onLockedTap: _showOriginUpgrade,
+              country: originCountry,
+              region: originRegion,
+              city: originCity,
+              onCountryChanged: (value) => setState(() {
+                originCountry = value ?? 'Any country';
+                originRegion = 'Any region';
+                originCity = 'Any city';
+              }),
+              onRegionChanged: (value) => setState(() {
+                originRegion = value ?? 'Any region';
+                originCity = 'Any city';
+              }),
+              onCityChanged: (value) =>
+                  setState(() => originCity = value ?? 'Any city'),
+            ),
+            ..._vipDiscoveryFilters(nested: true),
             _ChoiceFilterCard(
               title: 'Language',
               icon: Icons.language,
@@ -765,7 +1051,6 @@ class _FilterScreenState extends State<FilterScreen> {
               onSelected: (value) =>
                   _setAdvancedSelection('Income level', value),
               nested: true,
-              premium: true,
             ),
           ],
         ),
@@ -931,54 +1216,6 @@ class _RangeFilterCard extends StatelessWidget {
   }
 }
 
-class _DistanceFilterCard extends StatelessWidget {
-  const _DistanceFilterCard({required this.distance, required this.onChanged});
-
-  final double distance;
-  final ValueChanged<double> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(14, 14, 14, 8),
-        child: Column(
-          children: [
-            Row(
-              children: [
-                const Icon(Icons.location_on_outlined, color: AppColors.coral),
-                const SizedBox(width: 10),
-                const Expanded(
-                  child: Text(
-                    'Distance',
-                    style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
-                  ),
-                ),
-                Text(
-                  '${distance.round()} km',
-                  style: const TextStyle(
-                    color: AppColors.deepPink,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
-            ),
-            Slider(
-              value: distance,
-              min: 5,
-              max: 150,
-              divisions: 29,
-              label: '${distance.round()} km',
-              onChanged: onChanged,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 class _ChoiceFilterCard extends StatelessWidget {
   const _ChoiceFilterCard({
     required this.title,
@@ -987,7 +1224,6 @@ class _ChoiceFilterCard extends StatelessWidget {
     required this.selected,
     required this.onSelected,
     this.nested = false,
-    this.premium = false,
   });
 
   final String title;
@@ -996,7 +1232,6 @@ class _ChoiceFilterCard extends StatelessWidget {
   final String selected;
   final ValueChanged<String> onSelected;
   final bool nested;
-  final bool premium;
 
   @override
   Widget build(BuildContext context) {
@@ -1024,10 +1259,6 @@ class _ChoiceFilterCard extends StatelessWidget {
                   fontWeight: FontWeight.w700,
                 ),
               ),
-              if (premium) ...[
-                const SizedBox(width: 5),
-                const Icon(Icons.workspace_premium, color: AppColors.warning),
-              ],
             ],
           ),
           const SizedBox(height: 10),
@@ -1206,18 +1437,25 @@ class _HeightFilterCard extends StatelessWidget {
 
 class _FilterSwitchCard extends StatelessWidget {
   const _FilterSwitchCard({
+    super.key,
     required this.title,
     required this.icon,
     required this.value,
     required this.onChanged,
     this.nested = false,
+    this.subtitle,
+    this.locked = false,
+    this.onLockedTap,
   });
 
   final String title;
   final IconData icon;
   final bool value;
-  final ValueChanged<bool> onChanged;
+  final ValueChanged<bool>? onChanged;
   final bool nested;
+  final String? subtitle;
+  final bool locked;
+  final VoidCallback? onLockedTap;
 
   @override
   Widget build(BuildContext context) {
@@ -1225,8 +1463,15 @@ class _FilterSwitchCard extends StatelessWidget {
       contentPadding: EdgeInsets.symmetric(horizontal: nested ? 10 : 14),
       secondary: Icon(icon, color: AppColors.coral),
       title: Text(title, style: const TextStyle(fontWeight: FontWeight.w800)),
+      subtitle: subtitle == null ? null : Text(subtitle!),
       value: value,
-      onChanged: onChanged,
+      onChanged: (next) {
+        if (locked) {
+          onLockedTap?.call();
+        } else {
+          onChanged?.call(next);
+        }
+      },
     );
     if (nested) return tile;
     return Card(margin: const EdgeInsets.only(bottom: 12), child: tile);
@@ -1322,10 +1567,10 @@ class _AdvancedNotice extends StatelessWidget {
       child: const ListTile(
         leading: CircleAvatar(
           backgroundColor: AppColors.blush,
-          child: Icon(Icons.lock_outline, color: AppColors.coral),
+          child: Icon(Icons.tune, color: AppColors.coral),
         ),
         title: Text('Advanced filters help you find better matches.'),
-        subtitle: Text('Some options are available with MapLov Premium.'),
+        subtitle: Text('Refine the profiles shown in Discover.'),
       ),
     );
   }
@@ -1383,20 +1628,30 @@ class _SearchLocationSelector extends StatelessWidget {
     required this.distance,
     required this.selectedCity,
     required this.selectedCountry,
+    required this.selectedRegion,
+    required this.residenceCountry,
+    required this.residenceRegion,
+    required this.residenceCity,
     required this.onModeChanged,
     required this.onDistanceChanged,
     required this.onCityChanged,
     required this.onCountryChanged,
+    required this.onRegionChanged,
   });
 
   final String mode;
   final double distance;
   final String selectedCity;
   final String selectedCountry;
+  final String selectedRegion;
+  final String residenceCountry;
+  final String residenceRegion;
+  final String residenceCity;
   final ValueChanged<String> onModeChanged;
   final ValueChanged<double> onDistanceChanged;
   final ValueChanged<String?> onCityChanged;
   final ValueChanged<String?> onCountryChanged;
+  final ValueChanged<String?> onRegionChanged;
 
   @override
   Widget build(BuildContext context) => Column(
@@ -1436,18 +1691,26 @@ class _SearchLocationSelector extends StatelessWidget {
           'My country' => _MyCountryFilter(
             key: const ValueKey('my_country_filter'),
             selectedCity: selectedCity,
+            selectedRegion: selectedRegion,
+            country: residenceCountry,
             onCityChanged: onCityChanged,
+            onRegionChanged: onRegionChanged,
           ),
           'International' => _InternationalFilter(
             key: const ValueKey('international_filter'),
             selectedCountry: selectedCountry,
             selectedCity: selectedCity,
+            selectedRegion: selectedRegion,
             onCountryChanged: onCountryChanged,
             onCityChanged: onCityChanged,
+            onRegionChanged: onRegionChanged,
           ),
           _ => _NearMeFilter(
             key: const ValueKey('near_me_filter'),
             distance: distance,
+            country: residenceCountry,
+            region: residenceRegion,
+            city: residenceCity,
             onDistanceChanged: onDistanceChanged,
           ),
         },
@@ -1460,10 +1723,16 @@ class _NearMeFilter extends StatelessWidget {
   const _NearMeFilter({
     super.key,
     required this.distance,
+    required this.country,
+    required this.region,
+    required this.city,
     required this.onDistanceChanged,
   });
 
   final double distance;
+  final String country;
+  final String region;
+  final String city;
   final ValueChanged<double> onDistanceChanged;
 
   @override
@@ -1474,6 +1743,27 @@ class _NearMeFilter extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          _ReadOnlyLocationField(
+            key: const Key('near_me_country'),
+            label: 'Country',
+            value: country,
+            icon: Icons.flag_outlined,
+          ),
+          const SizedBox(height: 12),
+          _ReadOnlyLocationField(
+            key: const Key('near_me_region'),
+            label: 'Region',
+            value: region,
+            icon: Icons.map_outlined,
+          ),
+          const SizedBox(height: 12),
+          _ReadOnlyLocationField(
+            key: const Key('near_me_city'),
+            label: 'City',
+            value: city,
+            icon: Icons.location_city_outlined,
+          ),
+          const SizedBox(height: 16),
           const Row(
             children: [
               Icon(Icons.my_location, color: AppColors.coral),
@@ -1520,15 +1810,44 @@ class _NearMeFilter extends StatelessWidget {
   }
 }
 
+class _ReadOnlyLocationField extends StatelessWidget {
+  const _ReadOnlyLocationField({
+    super.key,
+    required this.label,
+    required this.value,
+    required this.icon,
+  });
+
+  final String label;
+  final String value;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) => InputDecorator(
+    decoration: InputDecoration(
+      labelText: context.tr(label),
+      prefixIcon: Icon(icon),
+      enabled: false,
+    ),
+    child: Text(value.isEmpty ? 'Not specified' : value),
+  );
+}
+
 class _MyCountryFilter extends StatelessWidget {
   const _MyCountryFilter({
     super.key,
     required this.selectedCity,
+    required this.selectedRegion,
+    required this.country,
     required this.onCityChanged,
+    required this.onRegionChanged,
   });
 
   final String selectedCity;
+  final String selectedRegion;
+  final String country;
   final ValueChanged<String?> onCityChanged;
+  final ValueChanged<String?> onRegionChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -1538,29 +1857,66 @@ class _MyCountryFilter extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const ListTile(
+          ListTile(
+            key: const Key('my_country_country'),
             contentPadding: EdgeInsets.zero,
             leading: CircleAvatar(
               backgroundColor: AppColors.palePink,
               child: Icon(Icons.flag_outlined, color: AppColors.coral),
             ),
             title: Text(
-              'Canada',
-              style: TextStyle(fontWeight: FontWeight.w800),
+              country,
+              style: const TextStyle(fontWeight: FontWeight.w800),
             ),
             subtitle: Text('Your profile country'),
           ),
           DropdownButtonFormField<String>(
-            key: const Key('my_country_city_dropdown'),
-            initialValue: selectedCity,
+            key: ValueKey('my_country_region_$country'),
+            initialValue: _regionOptions(country).contains(selectedRegion)
+                ? selectedRegion
+                : 'Any region',
             isExpanded: true,
             decoration: InputDecoration(
-              labelText: context.tr('City in Canada'),
+              labelText: context.tr('Region'),
+              prefixIcon: const Icon(Icons.map_outlined),
+            ),
+            items: _regionOptions(country)
+                .map(
+                  (region) => DropdownMenuItem(
+                    value: region,
+                    child: Text(region, overflow: TextOverflow.ellipsis),
+                  ),
+                )
+                .toList(),
+            onChanged: onRegionChanged,
+          ),
+          const SizedBox(height: 12),
+          DropdownButtonFormField<String>(
+            key: const Key('my_country_city_dropdown'),
+            initialValue:
+                [
+                  'Any city',
+                  ..._citiesForCountryRegion(country, selectedRegion),
+                ].contains(selectedCity)
+                ? selectedCity
+                : 'Any city',
+            isExpanded: true,
+            decoration: InputDecoration(
+              labelText: context.tr(
+                country == 'Canada' ? 'City in Canada' : 'City',
+              ),
               prefixIcon: const Icon(Icons.location_city_outlined),
             ),
-            items: _canadianCities
-                .map((city) => DropdownMenuItem(value: city, child: Text(city)))
-                .toList(),
+            items:
+                [
+                      'Any city',
+                      ..._citiesForCountryRegion(country, selectedRegion),
+                    ]
+                    .map(
+                      (city) =>
+                          DropdownMenuItem(value: city, child: Text(city)),
+                    )
+                    .toList(),
             onChanged: onCityChanged,
           ),
           const SizedBox(height: 10),
@@ -1579,14 +1935,18 @@ class _InternationalFilter extends StatelessWidget {
     super.key,
     required this.selectedCountry,
     required this.selectedCity,
+    required this.selectedRegion,
     required this.onCountryChanged,
     required this.onCityChanged,
+    required this.onRegionChanged,
   });
 
   final String selectedCountry;
   final String selectedCity;
+  final String selectedRegion;
   final ValueChanged<String?> onCountryChanged;
   final ValueChanged<String?> onCityChanged;
+  final ValueChanged<String?> onRegionChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -1630,11 +1990,36 @@ class _InternationalFilter extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           DropdownButtonFormField<String>(
+            key: ValueKey('international_region_$selectedCountry'),
+            initialValue:
+                _regionOptions(selectedCountry).contains(selectedRegion)
+                ? selectedRegion
+                : 'Any region',
+            isExpanded: true,
+            decoration: InputDecoration(
+              labelText: context.tr('Region'),
+              prefixIcon: const Icon(Icons.map_outlined),
+              helperText: context.tr(
+                'Choose a country before choosing a region.',
+              ),
+            ),
+            items: _regionOptions(selectedCountry)
+                .map(
+                  (region) => DropdownMenuItem(
+                    value: region,
+                    child: Text(region, overflow: TextOverflow.ellipsis),
+                  ),
+                )
+                .toList(),
+            onChanged: onRegionChanged,
+          ),
+          const SizedBox(height: 12),
+          DropdownButtonFormField<String>(
             key: ValueKey('international_city_$selectedCountry'),
             initialValue:
                 [
                   'Any city',
-                  ...?_registrationCitiesByCountry[selectedCountry],
+                  ..._citiesForCountryRegion(selectedCountry, selectedRegion),
                 ].contains(selectedCity)
                 ? selectedCity
                 : 'Any city',
@@ -1644,7 +2029,13 @@ class _InternationalFilter extends StatelessWidget {
               prefixIcon: const Icon(Icons.location_city_outlined),
             ),
             items:
-                ['Any city', ...?_registrationCitiesByCountry[selectedCountry]]
+                [
+                      'Any city',
+                      ..._citiesForCountryRegion(
+                        selectedCountry,
+                        selectedRegion,
+                      ),
+                    ]
                     .map(
                       (city) =>
                           DropdownMenuItem(value: city, child: Text(city)),
@@ -1665,23 +2056,31 @@ class _InternationalFilter extends StatelessWidget {
 
 class _OriginFilter extends StatelessWidget {
   const _OriginFilter({
+    required this.available,
+    required this.onLockedTap,
     required this.country,
+    required this.region,
     required this.city,
     required this.onCountryChanged,
+    required this.onRegionChanged,
     required this.onCityChanged,
   });
 
   final String country;
+  final String region;
   final String city;
   final ValueChanged<String?> onCountryChanged;
+  final ValueChanged<String?> onRegionChanged;
   final ValueChanged<String?> onCityChanged;
+  final bool available;
+  final VoidCallback onLockedTap;
 
   @override
   Widget build(BuildContext context) {
     final cityOptions = country == 'Any country'
         ? const ['Any city']
-        : ['Any city', ...?_registrationCitiesByCountry[country]];
-    return Container(
+        : ['Any city', ..._citiesForCountryRegion(country, region)];
+    final content = Container(
       padding: const EdgeInsets.all(16),
       decoration: _locationFilterDecoration,
       child: Column(
@@ -1703,7 +2102,51 @@ class _OriginFilter extends StatelessWidget {
                   ),
                 )
                 .toList(),
-            onChanged: onCountryChanged,
+            onChanged: (value) {
+              if (!available) {
+                onLockedTap();
+                return;
+              }
+              onCountryChanged(value);
+            },
+          ),
+          const SizedBox(height: 12),
+          DropdownButtonFormField<String>(
+            key: ValueKey('origin_region_${country}_$region'),
+            initialValue: country == 'Any country'
+                ? 'Any region'
+                : _regionOptions(country).contains(region)
+                ? region
+                : 'Any region',
+            isExpanded: true,
+            decoration: InputDecoration(
+              labelText: context.tr('Region of origin'),
+              prefixIcon: const Icon(Icons.map_outlined),
+            ),
+            items: country == 'Any country'
+                ? const [
+                    DropdownMenuItem(
+                      value: 'Any region',
+                      child: Text('Any region'),
+                    ),
+                  ]
+                : _regionOptions(country)
+                      .map(
+                        (value) => DropdownMenuItem(
+                          value: value,
+                          child: Text(value, overflow: TextOverflow.ellipsis),
+                        ),
+                      )
+                      .toList(),
+            onChanged: country == 'Any country'
+                ? null
+                : (value) {
+                    if (!available) {
+                      onLockedTap();
+                      return;
+                    }
+                    onRegionChanged(value);
+                  },
           ),
           const SizedBox(height: 12),
           DropdownButtonFormField<String>(
@@ -1719,11 +2162,20 @@ class _OriginFilter extends StatelessWidget {
                   (value) => DropdownMenuItem(value: value, child: Text(value)),
                 )
                 .toList(),
-            onChanged: country == 'Any country' ? null : onCityChanged,
+            onChanged: country == 'Any country'
+                ? null
+                : (value) {
+                    if (!available) {
+                      onLockedTap();
+                      return;
+                    }
+                    onCityChanged(value);
+                  },
           ),
         ],
       ),
     );
+    return content;
   }
 }
 
@@ -1732,8 +2184,6 @@ final _locationFilterDecoration = BoxDecoration(
   borderRadius: BorderRadius.circular(18),
   border: Border.all(color: AppColors.blush),
 );
-
-const _canadianCities = ['Any city', ..._canadianCitiesWithoutAny];
 
 const _worldCountries = [
   'Afghanistan',

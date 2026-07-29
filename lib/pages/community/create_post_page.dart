@@ -13,6 +13,16 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   bool publishing = false;
   final List<Uint8List> images = [];
   final List<String> imageExtensions = [];
+  late final Future<UserProfile?> _author;
+
+  @override
+  void initState() {
+    super.initState();
+    final userId = MapLovRepository.instance.currentUserId;
+    _author = userId == null
+        ? Future.value(demoProfileOrUnavailable)
+        : MapLovRepository.instance.getProfile(userId);
+  }
 
   @override
   void dispose() {
@@ -69,24 +79,34 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   Widget build(BuildContext context) => _AppPage(
     title: 'Create post',
     children: [
-      const ListTile(
-        contentPadding: EdgeInsets.zero,
-        leading: CircleAvatar(
-          backgroundImage: AssetImage(
-            'assets/profile/profile_user_placeholder.png',
-          ),
-        ),
-        title: Text(
-          'My profile',
-          style: TextStyle(fontWeight: FontWeight.w700),
-        ),
-        subtitle: Row(
-          children: [
-            Icon(Icons.people_outline, size: 16),
-            SizedBox(width: 5),
-            Text('Friends only'),
-          ],
-        ),
+      FutureBuilder<UserProfile?>(
+        future: _author,
+        builder: (context, snapshot) {
+          final author = snapshot.data;
+          return ListTile(
+            key: const Key('create_post_author'),
+            contentPadding: EdgeInsets.zero,
+            leading: CircleAvatar(
+              backgroundImage: author == null
+                  ? const AssetImage(
+                          'assets/profile/profile_user_placeholder.png',
+                        )
+                        as ImageProvider
+                  : profileImageProvider(author),
+            ),
+            title: Text(
+              author?.name ?? 'My profile',
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+            subtitle: const Row(
+              children: [
+                Icon(Icons.people_outline, size: 16),
+                SizedBox(width: 5),
+                Text('Friends only'),
+              ],
+            ),
+          );
+        },
       ),
       TextField(
         controller: _body,

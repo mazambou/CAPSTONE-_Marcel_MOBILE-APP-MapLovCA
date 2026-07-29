@@ -135,7 +135,7 @@ Deno.serve(async (request) => {
   }
 
   if (action === 'enroll') {
-    if (payload.consentVersion !== 'face-verification-v1') {
+    if (payload.consentVersion !== 'face-verification-v3-global-dedup') {
       await admin.storage.from('identity-selfies').remove([storagePath]);
       return response(400, { code: 'face_consent_required' });
     }
@@ -165,7 +165,8 @@ Deno.serve(async (request) => {
     }
 
     try {
-      const detection = await rekognitionClient().send(
+      const client = rekognitionClient();
+      const detection = await client.send(
         new DetectFacesCommand({
           Image: { Bytes: bytes },
           Attributes: ['DEFAULT'],
@@ -205,6 +206,149 @@ Deno.serve(async (request) => {
         return response(422, {
           code: 'low_face_confidence',
           message: 'Use a clear, front-facing selfie in good light.',
+        });
+      }
+      const { data: profile, error: profileError } = await admin
+        .from('profiles')
+        .select(
+          'country_name, residence_location_verified_at, profile_completed_at',
+        )
+        .eq('id', user.id)
+        .maybeSingle();
+      if (profile?.profile_completed_at) {
+        await admin.storage.from('identity-selfies').remove([storagePath]);
+        return response(409, {
+          code: 'reference_enrollment_closed',
+          message:
+            'The private reference selfie can only be created during registration.',
+        });
+      }
+      const residenceCountry = profile?.country_name?.trim() ?? '';
+      const residenceVerifiedAt = Date.parse(
+        profile?.residence_location_verified_at ?? '',
+      );
+      const recentResidence =
+        Number.isFinite(residenceVerifiedAt) &&
+        residenceVerifiedAt >= Date.now() - 10 * 60 * 1000;
+      if (profileError || !residenceCountry || !recentResidence) {
+        await admin.storage.from('identity-selfies').remove([storagePath]);
+        return response(422, {
+          code: 'residence_verification_required',
+          message:
+            'Verify your current country of residence before enrolling the private selfie.',
+        });
+      }
+
+      const duplicateThresholdValue = Number(
+        Deno.env.get('REKOGNITION_DUPLICATE_ACCOUNT_THRESHOLD') ?? '98',
+      );
+      const duplicateThreshold = Number.isFinite(duplicateThresholdValue)
+        ? Math.min(100, Math.max(95, duplicateThresholdValue))
+        : 98;
+      let duplicate:
+        | {
+          userId: string;
+          similarity: number;
+          requestId?: string;
+        }
+        | undefined;
+      const pageSize = 100;
+      let page = 0;
+      while (!duplicate) {
+        const { data: references, error: referencesError } = await admin
+          .from('face_references')
+          .select('user_id, storage_path')
+          .neq('user_id', user.id)
+          .order('user_id')
+          .range(page * pageSize, (page + 1) * pageSize - 1);
+        if (referencesError) throw new Error(referencesError.message);
+
+        for (const reference of references ?? []) {
+          const referenceDownload = await admin.storage
+            .from('identity-selfies')
+            .download(reference.storage_path);
+          if (referenceDownload.error || !referenceDownload.data) continue;
+          const referenceBytes = new Uint8Array(
+            await referenceDownload.data.arrayBuffer(),
+          );
+          if (
+            referenceBytes.length === 0 ||
+            referenceBytes.length > maxImageBytes
+          ) {
+            continue;
+          }
+          try {
+            const comparison = await client.send(
+              new CompareFacesCommand({
+                SourceImage: { Bytes: bytes },
+                TargetImage: { Bytes: referenceBytes },
+                SimilarityThreshold: duplicateThreshold,
+                QualityFilter: 'HIGH',
+              }),
+            );
+            const similarity = (comparison.FaceMatches ?? []).reduce(
+              (highest, match) =>
+                Math.max(highest, Number(match.Similarity ?? 0)),
+              0,
+            );
+            if (similarity >= duplicateThreshold) {
+              duplicate = {
+                userId: reference.user_id,
+                similarity,
+                requestId: comparison.$metadata.requestId,
+              };
+              break;
+            }
+          } catch (error) {
+            const comparisonError = normalizeRekognitionError(error);
+            if (!comparisonError.code.includes('InvalidParameterException')) {
+              throw error;
+            }
+          }
+        }
+        if ((references?.length ?? 0) < pageSize) break;
+        page += 1;
+      }
+
+      if (duplicate) {
+        const { error: duplicateLogError } = await admin
+          .from('duplicate_account_checks')
+          .insert({
+            candidate_user_id: user.id,
+            matched_user_id: duplicate.userId,
+            residence_country: residenceCountry,
+            similarity: duplicate.similarity,
+            threshold: duplicateThreshold,
+            provider_request_id: duplicate.requestId,
+          });
+        if (duplicateLogError) throw new Error(duplicateLogError.message);
+        await admin.from('profile_photo_face_checks').insert({
+          user_id: user.id,
+          check_type: 'reference_selfie',
+          status: 'rejected',
+          similarity: duplicate.similarity,
+          threshold: duplicateThreshold,
+          provider_request_id: duplicate.requestId,
+          failure_reason: 'duplicate_account_detected',
+        });
+        await admin
+          .from('profiles')
+          .update({ status: 'suspended', is_discoverable: false })
+          .eq('id', user.id);
+        await admin.from('notifications').insert({
+          user_id: user.id,
+          kind: 'security',
+          title: 'Account already exists',
+          body:
+            'A MapLov account already exists for this person. Use account recovery or contact support.',
+          entity_type: 'profile',
+          entity_id: user.id,
+        });
+        await admin.storage.from('identity-selfies').remove([storagePath]);
+        return response(409, {
+          code: 'duplicate_account_detected',
+          message:
+            'A MapLov account already exists for this person. Use account recovery or contact support.',
         });
       }
       const { error } = await admin.from('face_references').insert({

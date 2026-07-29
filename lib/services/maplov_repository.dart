@@ -467,6 +467,10 @@ class MapLovRepository {
   final List<MapLovMessage> _demoMessages = [];
   final StreamController<List<MapLovMessage>> _demoMessageStream =
       StreamController<List<MapLovMessage>>.broadcast();
+  final StreamController<List<MapLovNotification>> _demoNotificationStream =
+      StreamController<List<MapLovNotification>>.broadcast();
+  final StreamController<void> _messageCountRefresh =
+      StreamController<void>.broadcast();
   final Set<String> _demoBlockedIds = {};
   final Set<String> _demoFriendIds = mockProfiles
       .take(1)
@@ -839,7 +843,11 @@ class MapLovRepository {
       return false;
     }
     if (filters.bodyTypes.isNotEmpty &&
-        !_matchesFilterValue(profile.bodyType, filters.bodyTypes)) {
+        !filters.bodyTypes.any(
+          (filter) =>
+              _normalizedBodyTypeValue(profile.bodyType) ==
+              _normalizedBodyTypeValue(filter),
+        )) {
       return false;
     }
     if (filters.eyeColors.isNotEmpty &&
@@ -930,6 +938,20 @@ class MapLovRepository {
   }
 
   String _normalizedFilterValue(String value) => value.trim().toLowerCase();
+
+  String _normalizedBodyTypeValue(String value) {
+    return switch (_normalizedFilterValue(
+      value,
+    ).replaceAll('-', '_').replaceAll(' ', '_')) {
+      'lean_/_toned' || 'toned' => 'toned',
+      'average' || 'fit' => 'fit',
+      'muscular_/_built' || 'muscular' => 'muscular',
+      'stocky' || 'robust' => 'robust',
+      'curvy' || 'round' => 'round',
+      'full_figured' || 'plus_size' || 'very_round' => 'very_round',
+      final normalized => normalized,
+    };
+  }
 
   bool _professionMatchesCategory(String profession, String category) {
     final value = _normalizedFilterValue(profession);
@@ -1272,6 +1294,24 @@ class MapLovRepository {
     );
   }
 
+  Future<void> syncResidenceFromLocation({
+    required String country,
+    required String countryCode,
+    required String region,
+    required String city,
+  }) async {
+    if (!isLive) return;
+    await _client!.rpc(
+      'sync_my_residence_from_location',
+      params: {
+        'detected_country': country,
+        'detected_country_code': countryCode,
+        'detected_region': region,
+        'detected_city': city,
+      },
+    );
+  }
+
   Future<String?> uploadProfilePhoto({
     required Uint8List bytes,
     required String extension,
@@ -1342,7 +1382,7 @@ class MapLovRepository {
     await _invokeFaceVerification(
       action: 'enroll',
       storagePath: path,
-      consentVersion: 'face-verification-v1',
+      consentVersion: 'face-verification-v3-global-dedup',
     );
   }
 
@@ -1905,6 +1945,66 @@ class MapLovRepository {
     return result;
   }
 
+  Future<int> unreadMessageCount() async {
+    if (!isLive) {
+      final items = await conversations();
+      return items.fold<int>(0, (total, item) => total + item.unread);
+    }
+    final result = await _client!.rpc('my_unread_message_count');
+    return (result as num?)?.toInt() ?? 0;
+  }
+
+  Stream<int> watchUnreadMessageCount() {
+    if (!isLive) {
+      return Stream<int>.multi((controller) {
+        Future<void> emit() async => controller.add(await unreadMessageCount());
+        unawaited(emit());
+        final messages = _demoMessageStream.stream.listen((_) => emit());
+        final refreshes = _messageCountRefresh.stream.listen((_) => emit());
+        controller.onCancel = () {
+          unawaited(messages.cancel());
+          unawaited(refreshes.cancel());
+        };
+      });
+    }
+    return Stream<int>.multi((controller) {
+      var active = true;
+      Future<void> emit() async {
+        try {
+          final count = await unreadMessageCount();
+          if (active) controller.add(count);
+        } catch (error, stackTrace) {
+          if (active) controller.addError(error, stackTrace);
+        }
+      }
+
+      unawaited(emit());
+      final messages = _client!
+          .from('messages')
+          .stream(primaryKey: ['id'])
+          .listen((_) => unawaited(emit()));
+      final reads = _client!
+          .from('conversation_reads')
+          .stream(primaryKey: ['conversation_id', 'user_id'])
+          .eq('user_id', currentUserId!)
+          .listen((_) => unawaited(emit()));
+      final refreshes = _messageCountRefresh.stream.listen(
+        (_) => unawaited(emit()),
+      );
+      final timer = Timer.periodic(
+        const Duration(seconds: 30),
+        (_) => unawaited(emit()),
+      );
+      controller.onCancel = () {
+        active = false;
+        timer.cancel();
+        unawaited(messages.cancel());
+        unawaited(reads.cancel());
+        unawaited(refreshes.cancel());
+      };
+    });
+  }
+
   Stream<List<MapLovMessage>> watchMessages(String conversationId) {
     if (!isLive) {
       return Stream<List<MapLovMessage>>.multi((controller) {
@@ -2093,13 +2193,26 @@ class MapLovRepository {
   Future<void> markConversationRead(String conversationId) async {
     if (!isLive) {
       _demoReadConversations.add(conversationId);
+      _messageCountRefresh.add(null);
       return;
     }
-    await _client!.from('conversation_reads').upsert({
-      'conversation_id': conversationId,
-      'user_id': currentUserId!,
-      'last_read_at': DateTime.now().toUtc().toIso8601String(),
-    });
+    final readAt = DateTime.now().toUtc().toIso8601String();
+    await Future.wait([
+      _client!.from('conversation_reads').upsert({
+        'conversation_id': conversationId,
+        'user_id': currentUserId!,
+        'last_read_at': readAt,
+      }),
+      _client!
+          .from('notifications')
+          .update({'read_at': readAt})
+          .eq('user_id', currentUserId!)
+          .eq('kind', 'message')
+          .eq('entity_type', 'conversation')
+          .eq('entity_id', conversationId)
+          .isFilter('read_at', null),
+    ]);
+    _messageCountRefresh.add(null);
   }
 
   Future<void> deleteMessage(
@@ -2238,15 +2351,16 @@ class MapLovRepository {
       );
       return;
     }
-    final row = await _client!
-        .from('posts')
-        .insert({
-          'author_id': currentUserId!,
-          'body': body.trim().isEmpty ? null : body.trim(),
-          'comments_enabled': commentsEnabled,
-        })
-        .select('id')
-        .single();
+    final postId = await _client!.rpc(
+      'create_my_post',
+      params: {
+        'post_body': body.trim().isEmpty ? null : body.trim(),
+        'allow_comments': commentsEnabled,
+      },
+    );
+    if (postId is! String || postId.isEmpty) {
+      throw StateError('The post could not be created.');
+    }
     final selectedImages = images.isNotEmpty
         ? images
         : image == null
@@ -2254,7 +2368,6 @@ class MapLovRepository {
         : [image];
     final selectedExtensions = extensions.isNotEmpty ? extensions : [extension];
     if (selectedImages.isNotEmpty) {
-      final postId = row['id'] as String;
       for (var index = 0; index < selectedImages.length; index++) {
         final ext = index < selectedExtensions.length
             ? selectedExtensions[index]
@@ -3132,7 +3245,15 @@ class MapLovRepository {
   }
 
   Stream<List<MapLovNotification>> watchNotifications() {
-    if (!isLive) return Stream.value(List.unmodifiable(_demoNotifications));
+    if (!isLive) {
+      return Stream<List<MapLovNotification>>.multi((controller) {
+        controller.add(List.unmodifiable(_demoNotifications));
+        final subscription = _demoNotificationStream.stream.listen(
+          controller.add,
+        );
+        controller.onCancel = subscription.cancel;
+      });
+    }
     return _client!
         .from('notifications')
         .stream(primaryKey: ['id'])
@@ -3169,8 +3290,12 @@ class MapLovRepository {
           kind: item.kind,
           createdAt: item.createdAt,
           isRead: true,
+          entityType: item.entityType,
+          entityId: item.entityId,
+          archived: item.archived,
         );
       }
+      _demoNotificationStream.add(List.unmodifiable(_demoNotifications));
       return;
     }
     await _client!
@@ -3181,7 +3306,25 @@ class MapLovRepository {
   }
 
   Future<void> markNotificationRead(String id) async {
-    if (!isLive) return;
+    if (!isLive) {
+      final index = _demoNotifications.indexWhere((item) => item.id == id);
+      if (index >= 0) {
+        final item = _demoNotifications[index];
+        _demoNotifications[index] = MapLovNotification(
+          id: item.id,
+          title: item.title,
+          body: item.body,
+          kind: item.kind,
+          createdAt: item.createdAt,
+          isRead: true,
+          entityType: item.entityType,
+          entityId: item.entityId,
+          archived: item.archived,
+        );
+        _demoNotificationStream.add(List.unmodifiable(_demoNotifications));
+      }
+      return;
+    }
     await _client!
         .from('notifications')
         .update({'read_at': DateTime.now().toUtc().toIso8601String()})
@@ -3192,6 +3335,7 @@ class MapLovRepository {
   Future<void> archiveNotification(String id) async {
     if (!isLive) {
       _demoNotifications.removeWhere((item) => item.id == id);
+      _demoNotificationStream.add(List.unmodifiable(_demoNotifications));
       return;
     }
     await _client!
@@ -3204,6 +3348,7 @@ class MapLovRepository {
   Future<void> deleteNotification(String id) async {
     if (!isLive) {
       _demoNotifications.removeWhere((item) => item.id == id);
+      _demoNotificationStream.add(List.unmodifiable(_demoNotifications));
       return;
     }
     await _client!
@@ -3526,7 +3671,7 @@ class MapLovRepository {
       isPhotoVerified: row['is_photo_verified'] as bool? ?? false,
       allowsInternationalDiscovery:
           row['allow_international_discovery'] as bool? ?? true,
-      showsOriginOnProfile: row['show_origin_on_profile'] as bool? ?? false,
+      showsOriginOnProfile: row['show_origin_on_profile'] as bool? ?? true,
       lastActiveAt: lastActive,
       createdAt: createdAt,
     );

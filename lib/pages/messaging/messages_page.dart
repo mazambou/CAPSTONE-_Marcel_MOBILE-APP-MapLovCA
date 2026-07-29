@@ -16,6 +16,21 @@ class _MessagesScreenState extends State<MessagesScreen> {
     _conversations = MapLovRepository.instance.conversations();
   }
 
+  Future<void> _openConversation(ConversationItem item) async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) =>
+            ChatScreen(conversationId: item.id, profile: item.profile),
+      ),
+    );
+    if (mounted) {
+      setState(
+        () => _conversations = MapLovRepository.instance.conversations(),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) => _MainPage(
     index: 3,
@@ -43,15 +58,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
             children: items
                 .map(
                   (item) => ListTile(
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => ChatScreen(
-                          conversationId: item.id,
-                          profile: item.profile,
-                        ),
-                      ),
-                    ),
+                    onTap: () => unawaited(_openConversation(item)),
                     leading: CircleAvatar(
                       backgroundImage: profileImageProvider(item.profile),
                     ),

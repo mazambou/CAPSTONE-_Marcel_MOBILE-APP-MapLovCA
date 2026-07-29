@@ -13,6 +13,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   final residenceRegionOther = TextEditingController();
   final originRegionOther = TextEditingController();
   String gender = 'Prefer not to say';
+  String? bodyType;
   String residenceCountry = 'Canada';
   String residenceCity = 'Toronto';
   String residenceRegion = 'Ontario';
@@ -21,6 +22,9 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   String originCity = 'Toronto';
   bool saving = false;
   bool loadingProfile = true;
+  bool detectingResidence = MapLovRepository.instance.isLive;
+  bool residenceDetected = !MapLovRepository.instance.isLive;
+  String? residenceDetectionError;
   bool originCountryLocked = false;
   bool originRegionLocked = false;
   bool originCityLocked = false;
@@ -53,72 +57,159 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   Future<void> _loadGeography() async {
     try {
       final profile = await MapLovRepository.instance.myProfileDetails();
-      if (profile == null || !mounted) return;
-      final savedResidenceCountry =
-          profile['residence_country_name'] as String? ??
-          profile['country_name'] as String? ??
-          'Canada';
-      final savedResidenceCity =
-          profile['residence_city'] as String? ??
-          profile['city'] as String? ??
-          'Toronto';
-      final savedResidenceRegion =
-          profile['residence_region'] as String? ??
-          _regionForKnownCity(savedResidenceCountry, savedResidenceCity) ??
-          _firstRegionForCountry(savedResidenceCountry);
-      setState(() {
-        residenceCountry = _worldCountries.contains(savedResidenceCountry)
-            ? savedResidenceCountry
-            : 'Canada';
-        final regions = _regionsByCountry[residenceCountry] ?? const [];
-        if (regions.contains(savedResidenceRegion)) {
-          residenceRegion = savedResidenceRegion;
-        } else {
-          residenceRegion = 'Other region';
-          residenceRegionOther.text = savedResidenceRegion;
-        }
-        residenceCity = _citySelection(
-          residenceCountry,
-          residenceRegion,
-          savedResidenceCity,
-          residenceCityOther,
-        );
-        final savedOriginCountry = profile['origin_country_name'] as String?;
-        if (savedOriginCountry != null &&
-            _worldCountries.contains(savedOriginCountry)) {
-          originCountry = savedOriginCountry;
-          originCountryLocked = true;
-        }
-        final savedOriginCity = profile['origin_city'] as String?;
-        final savedOriginRegion =
-            profile['origin_region'] as String? ??
-            (savedOriginCity == null
-                ? null
-                : _regionForKnownCity(originCountry, savedOriginCity));
-        if (savedOriginRegion != null && savedOriginRegion.trim().isNotEmpty) {
-          final regions = _regionsByCountry[originCountry] ?? const [];
-          if (regions.contains(savedOriginRegion)) {
-            originRegion = savedOriginRegion;
-          } else {
-            originRegion = 'Other region';
-            originRegionOther.text = savedOriginRegion;
-          }
-          originRegionLocked = true;
-        } else {
-          originRegion = _firstRegionForCountry(originCountry);
-        }
-        if (savedOriginCity != null && savedOriginCity.trim().isNotEmpty) {
-          originCity = _citySelection(
-            originCountry,
-            originRegion,
-            savedOriginCity,
-            originCityOther,
+      if (profile != null && mounted) {
+        final savedResidenceCountry =
+            profile['residence_country_name'] as String? ??
+            profile['country_name'] as String? ??
+            'Canada';
+        final savedResidenceCity =
+            profile['residence_city'] as String? ??
+            profile['city'] as String? ??
+            'Toronto';
+        final savedResidenceRegion =
+            profile['residence_region'] as String? ??
+            _regionForKnownCity(savedResidenceCountry, savedResidenceCity) ??
+            _firstRegionForCountry(savedResidenceCountry);
+        final savedGender = profile['gender'] as String? ?? gender;
+        setState(() {
+          gender = savedGender;
+          bodyType = _normalizedProfileBodyType(
+            profile['body_type'] as String?,
+            savedGender,
           );
-          originCityLocked = true;
-        }
-      });
+          residenceCountry = _worldCountries.contains(savedResidenceCountry)
+              ? savedResidenceCountry
+              : 'Canada';
+          final regions = _regionsByCountry[residenceCountry] ?? const [];
+          if (regions.contains(savedResidenceRegion)) {
+            residenceRegion = savedResidenceRegion;
+          } else {
+            residenceRegion = 'Other region';
+            residenceRegionOther.text = savedResidenceRegion;
+          }
+          residenceCity = _citySelection(
+            residenceCountry,
+            residenceRegion,
+            savedResidenceCity,
+            residenceCityOther,
+          );
+          final savedOriginCountry = profile['origin_country_name'] as String?;
+          if (savedOriginCountry != null &&
+              savedOriginCountry.trim().isNotEmpty &&
+              _worldCountries.contains(savedOriginCountry)) {
+            originCountry = savedOriginCountry;
+            originCountryLocked = true;
+          }
+          final savedOriginCity = profile['origin_city'] as String?;
+          final savedOriginRegion =
+              profile['origin_region'] as String? ??
+              (savedOriginCity == null || savedOriginCity.trim().isEmpty
+                  ? null
+                  : _regionForKnownCity(originCountry, savedOriginCity));
+          if (savedOriginRegion != null &&
+              savedOriginRegion.trim().isNotEmpty) {
+            final regions = _regionsByCountry[originCountry] ?? const [];
+            if (regions.contains(savedOriginRegion)) {
+              originRegion = savedOriginRegion;
+            } else {
+              originRegion = 'Other region';
+              originRegionOther.text = savedOriginRegion;
+            }
+            originRegionLocked = true;
+          } else {
+            originRegion = _firstRegionForCountry(originCountry);
+          }
+          if (savedOriginCity != null && savedOriginCity.trim().isNotEmpty) {
+            originCity = _citySelection(
+              originCountry,
+              originRegion,
+              savedOriginCity,
+              originCityOther,
+            );
+            originCityLocked = true;
+          }
+        });
+      }
+      if (MapLovRepository.instance.isLive) {
+        await _detectResidence();
+      }
     } finally {
       if (mounted) setState(() => loadingProfile = false);
+    }
+  }
+
+  String? _supportedResidenceCountry(String detected) {
+    if (_worldCountries.contains(detected)) return detected;
+    return const {
+      'United States of America': 'United States',
+      'Ivory Coast': 'Côte d’Ivoire',
+      'Democratic Republic of Congo': 'Democratic Republic of the Congo',
+      'Republic of the Congo': 'Congo',
+    }[detected];
+  }
+
+  Future<void> _detectResidence() async {
+    if (mounted) {
+      setState(() {
+        detectingResidence = true;
+        residenceDetectionError = null;
+      });
+    }
+    try {
+      final detected = await LocationService.instance.detectResidence();
+      final country = _supportedResidenceCountry(detected.country);
+      if (country == null) {
+        throw ResidenceDetectionFailure(
+          'MapLov does not yet support profiles from ${detected.country}.',
+        );
+      }
+      final regions = _regionsByCountry[country] ?? const <String>[];
+      final exactRegion = regions
+          .where(
+            (region) => region.toLowerCase() == detected.region.toLowerCase(),
+          )
+          .firstOrNull;
+      final selectedRegion =
+          exactRegion ??
+          _regionForKnownCity(country, detected.city) ??
+          (regions.isEmpty ? 'Other region' : regions.first);
+      final cities = _citiesForCountryRegion(country, selectedRegion);
+      final selectedCity = cities
+          .where((city) => city.toLowerCase() == detected.city.toLowerCase())
+          .firstOrNull;
+
+      await MapLovRepository.instance.updateLocation(
+        latitude: detected.position.latitude,
+        longitude: detected.position.longitude,
+        accuracy: detected.position.accuracy,
+      );
+      await MapLovRepository.instance.syncResidenceFromLocation(
+        country: country,
+        countryCode: detected.countryCode,
+        region: detected.region,
+        city: detected.city,
+      );
+      if (!mounted) return;
+      setState(() {
+        residenceCountry = country;
+        residenceRegion = selectedRegion;
+        residenceRegionOther.text = selectedRegion == 'Other region'
+            ? detected.region
+            : '';
+        residenceCity = selectedCity ?? 'Other city';
+        residenceCityOther.text = selectedCity == null ? detected.city : '';
+        residenceDetected = true;
+        detectingResidence = false;
+        residenceDetectionError = null;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        residenceDetected = false;
+        detectingResidence = false;
+        residenceDetectionError =
+            'GPS location is required to verify your country of residence.';
+      });
     }
   }
 
@@ -207,6 +298,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       );
       if (selfie == null) return;
       if (mounted) setState(() => enrollingFaceReference = true);
+      await LocationService.instance.updateMyLocation();
       await MapLovRepository.instance.enrollFaceReference(
         bytes: await selfie.readAsBytes(),
         extension: selfie.name.split('.').last.toLowerCase(),
@@ -245,6 +337,16 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       );
       return;
     }
+    if (MapLovRepository.instance.isLive && !residenceDetected) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Verify your country of residence with GPS before continuing.',
+          ),
+        ),
+      );
+      return;
+    }
     final savedResidenceRegion = residenceRegion == 'Other region'
         ? residenceRegionOther.text.trim()
         : residenceRegion;
@@ -269,11 +371,10 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     try {
       await MapLovRepository.instance.saveMyProfile({
         'gender': gender,
+        'body_type': bodyType,
         'bio': bio.text.trim(),
         'spoken_languages': const ['English'],
-        'country_name': residenceCountry,
         'city': savedResidenceCity,
-        'residence_country_name': residenceCountry,
         'residence_city': savedResidenceCity,
         'residence_region': savedResidenceRegion,
         'origin_country_name': originCountry,
@@ -300,43 +401,91 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       const LinearProgressIndicator(value: 0.35),
       const SizedBox(height: 22),
       Card(
-        color: AppColors.palePink,
-        child: ListTile(
-          key: const Key('private_reference_selfie'),
-          leading: CircleAvatar(
-            backgroundColor: faceReferenceReady
-                ? Colors.green.shade100
-                : AppColors.blush,
-            child: Icon(
-              faceReferenceReady
-                  ? Icons.verified_user_outlined
-                  : Icons.face_retouching_natural_outlined,
-              color: faceReferenceReady
-                  ? Colors.green.shade700
-                  : AppColors.coral,
-            ),
-          ),
-          title: const Text(
-            'Private reference selfie',
-            style: TextStyle(fontWeight: FontWeight.w800),
-          ),
-          subtitle: Text(
-            faceReferenceReady
-                ? 'Verified and kept private. It is never shown on your profile.'
-                : 'Take a clear front-facing selfie. It will only be used to verify your profile photos.',
-          ),
-          trailing: loadingFaceReference || enrollingFaceReference
-              ? const SizedBox.square(
-                  dimension: 22,
-                  child: CircularProgressIndicator(strokeWidth: 2),
+        key: const Key('private_reference_selfie'),
+        color: faceReferenceReady ? Colors.green.shade50 : AppColors.palePink,
+        child: Padding(
+          padding: const EdgeInsets.all(18),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  CircleAvatar(
+                    radius: 25,
+                    backgroundColor: faceReferenceReady
+                        ? Colors.green.shade100
+                        : AppColors.blush,
+                    child: Icon(
+                      faceReferenceReady
+                          ? Icons.verified_user_outlined
+                          : Icons.face_retouching_natural_outlined,
+                      color: faceReferenceReady
+                          ? Colors.green.shade700
+                          : AppColors.coral,
+                      size: 29,
+                    ),
+                  ),
+                  const SizedBox(width: 13),
+                  Expanded(
+                    child: Text(
+                      faceReferenceReady
+                          ? 'Identity selfie verified'
+                          : 'Verify your identity with a private selfie',
+                      style: const TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                  if (faceReferenceReady)
+                    const Icon(Icons.check_circle, color: Colors.green),
+                ],
+              ),
+              const SizedBox(height: 14),
+              Text(
+                faceReferenceReady
+                    ? 'Your reference selfie is verified, kept private and never displayed on your profile.'
+                    : 'Take one clear, front-facing selfie. MapLov keeps it private, compares it with existing private reference selfies to prevent duplicate accounts, and uses it to confirm your profile photos. It never appears on your profile.',
+                style: const TextStyle(color: AppColors.grayText, height: 1.35),
+              ),
+              if (!faceReferenceReady) ...[
+                const SizedBox(height: 12),
+                const Row(
+                  children: [
+                    Icon(Icons.lock_outline, size: 18, color: AppColors.coral),
+                    SizedBox(width: 7),
+                    Expanded(
+                      child: Text(
+                        'Private • Security verification only',
+                        style: TextStyle(
+                          color: AppColors.coral,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+              const SizedBox(height: 16),
+              if (loadingFaceReference || enrollingFaceReference)
+                const Center(
+                  child: SizedBox.square(
+                    dimension: 28,
+                    child: CircularProgressIndicator(strokeWidth: 2.5),
+                  ),
                 )
-              : faceReferenceReady
-              ? const Icon(Icons.check_circle, color: Colors.green)
-              : FilledButton(
+              else if (!faceReferenceReady)
+                FilledButton.icon(
                   key: const Key('capture_reference_selfie'),
                   onPressed: _captureReferenceSelfie,
-                  child: const Text('Take selfie'),
+                  icon: const Icon(Icons.camera_alt_outlined),
+                  label: const Text('Take my private selfie'),
+                  style: FilledButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
                 ),
+            ],
+          ),
         ),
       ),
       const SizedBox(height: 18),
@@ -437,6 +586,10 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
         }),
         regionOtherController: residenceRegionOther,
         countryReadOnly: true,
+        countryUsesGps: true,
+        countryRefreshing: detectingResidence,
+        countryError: residenceDetectionError,
+        onRefreshCountry: () => unawaited(_detectResidence()),
       ),
       const _SectionTitle('Your origin'),
       _geographyFields(
@@ -468,11 +621,27 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       DropdownButtonFormField<String>(
         initialValue: gender,
         isExpanded: true,
-        decoration: InputDecoration(labelText: context.tr('Gender')),
+        decoration: InputDecoration(
+          labelText: context.tr('Gender'),
+          helperText: context.tr(
+            'Your gender sets your default dating preference. You can change that preference later.',
+          ),
+        ),
         items: const ['Woman', 'Man', 'Non-binary', 'Prefer not to say']
             .map((value) => DropdownMenuItem(value: value, child: Text(value)))
             .toList(),
-        onChanged: (value) => setState(() => gender = value ?? gender),
+        onChanged: (value) => setState(() {
+          gender = value ?? gender;
+          if (!_bodyTypeAllowedForProfileGender(bodyType, gender)) {
+            bodyType = null;
+          }
+        }),
+      ),
+      const SizedBox(height: 12),
+      _BodyTypeSelector(
+        selected: bodyType == null ? const {} : {bodyType!},
+        enabledGalleries: _profileBodyGalleries(gender),
+        onChanged: (value) => setState(() => bodyType = value.firstOrNull),
       ),
       const SizedBox(height: 12),
       TextField(
@@ -511,6 +680,10 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     bool countryReadOnly = false,
     bool regionReadOnly = false,
     bool cityReadOnly = false,
+    bool countryUsesGps = false,
+    bool countryRefreshing = false,
+    String? countryError,
+    VoidCallback? onRefreshCountry,
   }) {
     final cities = [
       ..._citiesForCountryRegion(country, region ?? 'Any region'),
@@ -526,10 +699,31 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
           decoration: InputDecoration(
             labelText: context.tr(countryLabel),
             prefixIcon: const Icon(Icons.public),
+            errorText: countryError,
             helperText: countryReadOnly
-                ? countryLabel.contains('residence')
-                      ? context.tr('Determined by your verified phone number.')
+                ? countryUsesGps
+                      ? context.tr(
+                          countryRefreshing
+                              ? 'Detecting from your current GPS location…'
+                              : 'Detected automatically by GPS. The country cannot be changed manually.',
+                        )
                       : context.tr('Country of origin can only be chosen once.')
+                : null,
+            suffixIcon: countryUsesGps
+                ? countryRefreshing
+                      ? const Padding(
+                          padding: EdgeInsets.all(13),
+                          child: SizedBox.square(
+                            dimension: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                        )
+                      : IconButton(
+                          key: const Key('profile_setup_refresh_residence'),
+                          tooltip: 'Refresh GPS residence',
+                          onPressed: saving ? null : onRefreshCountry,
+                          icon: const Icon(Icons.my_location),
+                        )
                 : null,
           ),
           items: _worldCountries

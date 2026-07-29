@@ -26,8 +26,9 @@ class AppRouter {
     AppRoutes.discover: (_) => _protected(const HomeScreen()),
     AppRoutes.nearMe: (_) => _protected(const HomeScreen(initialTab: 'Nearby')),
     AppRoutes.filters: (_) => _protected(const FilterScreen()),
-    AppRoutes.matches: (_) => _protected(const MatchScreen()),
-    AppRoutes.likes: (_) => _protected(const LikesScreen()),
+    AppRoutes.matches: (_) =>
+        _protected(const ConnectionsScreen(initialTab: 1)),
+    AppRoutes.likes: (_) => _protected(const ConnectionsScreen()),
     AppRoutes.newMatch: (_) => _protected(const MatchScreen()),
     AppRoutes.messages: (_) => _protected(const MessagesScreen()),
     AppRoutes.chat: (_) => _protected(const MessagesScreen()),

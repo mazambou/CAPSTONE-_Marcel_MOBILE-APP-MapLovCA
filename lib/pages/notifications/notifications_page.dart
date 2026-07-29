@@ -43,6 +43,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           onPressed: () async {
             await MapLovRepository.instance.markNotificationsRead();
             if (context.mounted) {
+              setState(() {});
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text('Notifications marked as read.')),
               );

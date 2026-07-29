@@ -1,3 +1,6 @@
+import 'dart:ui';
+
+import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
 
 import 'maplov_repository.dart';
@@ -21,11 +24,36 @@ class MapLovLocationFailure implements Exception {
   };
 }
 
+class DetectedResidence {
+  const DetectedResidence({
+    required this.position,
+    required this.country,
+    required this.countryCode,
+    required this.region,
+    required this.city,
+  });
+
+  final Position position;
+  final String country;
+  final String countryCode;
+  final String region;
+  final String city;
+}
+
+class ResidenceDetectionFailure implements Exception {
+  const ResidenceDetectionFailure(this.message);
+
+  final String message;
+
+  @override
+  String toString() => message;
+}
+
 class LocationService {
   const LocationService._();
   static const instance = LocationService._();
 
-  Future<Position> updateMyLocation() async {
+  Future<Position> _currentPosition() async {
     if (!await Geolocator.isLocationServiceEnabled()) {
       throw const MapLovLocationFailure(
         MapLovLocationFailureReason.serviceDisabled,
@@ -46,11 +74,59 @@ class LocationService {
     final position = await Geolocator.getCurrentPosition(
       locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
     );
+    return position;
+  }
+
+  Future<DetectedResidence> _reverseGeocode(Position position) async {
+    final placemarks = await Geocoding(
+      locale: const Locale('en'),
+    ).placemarkFromCoordinates(position.latitude, position.longitude);
+    if (placemarks.isEmpty) {
+      throw const ResidenceDetectionFailure(
+        'Unable to determine the residence from this location.',
+      );
+    }
+    final place = placemarks.first;
+    final country = place.country?.trim() ?? '';
+    final countryCode = place.isoCountryCode?.trim().toUpperCase() ?? '';
+    if (country.isEmpty || countryCode.length != 2) {
+      throw const ResidenceDetectionFailure(
+        'Unable to determine the residence country.',
+      );
+    }
+    return DetectedResidence(
+      position: position,
+      country: country,
+      countryCode: countryCode,
+      region: (place.administrativeArea ?? place.subAdministrativeArea ?? '')
+          .trim(),
+      city: (place.locality ?? place.subAdministrativeArea ?? place.name ?? '')
+          .trim(),
+    );
+  }
+
+  Future<DetectedResidence> detectResidence() async =>
+      _reverseGeocode(await _currentPosition());
+
+  Future<Position> updateMyLocation() async {
+    final position = await _currentPosition();
     await MapLovRepository.instance.updateLocation(
       latitude: position.latitude,
       longitude: position.longitude,
       accuracy: position.accuracy,
     );
+    try {
+      final residence = await _reverseGeocode(position);
+      await MapLovRepository.instance.syncResidenceFromLocation(
+        country: residence.country,
+        countryCode: residence.countryCode,
+        region: residence.region,
+        city: residence.city,
+      );
+    } catch (_) {
+      // Nearby distance remains usable if the native reverse-geocoder is
+      // temporarily unavailable. Registration performs the strict check.
+    }
     return position;
   }
 

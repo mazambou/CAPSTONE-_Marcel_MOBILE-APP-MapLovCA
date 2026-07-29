@@ -83,7 +83,7 @@ class _MapLovNavigationBar extends StatelessWidget {
       onDestinationSelected: (index) {
         const routes = [
           AppRoutes.home,
-          AppRoutes.likes,
+          AppRoutes.posts,
           AppRoutes.matches,
           AppRoutes.messages,
           AppRoutes.profile,
@@ -99,23 +99,32 @@ class _MapLovNavigationBar extends StatelessWidget {
           label: MapLovLocalizations.of(context).text('discover'),
         ),
         NavigationDestination(
+          icon: const Icon(Icons.dynamic_feed_outlined),
+          selectedIcon: const Icon(Icons.dynamic_feed),
+          label: context.tr('Posts'),
+        ),
+        NavigationDestination(
           icon: const Icon(Icons.favorite_border),
           selectedIcon: const Icon(Icons.favorite),
-          label: MapLovLocalizations.of(context).text('likes'),
+          label: context.tr('Likes & Matches'),
         ),
         NavigationDestination(
-          icon: const Icon(Icons.handshake_outlined),
-          selectedIcon: const Icon(Icons.handshake),
-          label: MapLovLocalizations.of(context).text('matches'),
-        ),
-        NavigationDestination(
-          icon: const Badge(
-            label: Text('2'),
-            child: Icon(Icons.chat_bubble_outline),
+          icon: StreamBuilder<int>(
+            stream: MapLovRepository.instance.watchUnreadMessageCount(),
+            builder: (context, snapshot) => Badge(
+              key: const Key('messages_navigation_badge'),
+              label: Text('${snapshot.data ?? 0}'),
+              isLabelVisible: (snapshot.data ?? 0) > 0,
+              child: const Icon(Icons.chat_bubble_outline),
+            ),
           ),
-          selectedIcon: const Badge(
-            label: Text('2'),
-            child: Icon(Icons.chat_bubble),
+          selectedIcon: StreamBuilder<int>(
+            stream: MapLovRepository.instance.watchUnreadMessageCount(),
+            builder: (context, snapshot) => Badge(
+              label: Text('${snapshot.data ?? 0}'),
+              isLabelVisible: (snapshot.data ?? 0) > 0,
+              child: const Icon(Icons.chat_bubble),
+            ),
           ),
           label: MapLovLocalizations.of(context).text('messages'),
         ),

@@ -38,6 +38,7 @@ import 'pages/splash/splash_page.dart';
 
 part 'routes/app_router.dart';
 part 'data/geography_data.dart';
+part 'data/body_type_data.dart';
 part 'pages/auth/login_page.dart';
 part 'pages/auth/register_page.dart';
 part 'pages/auth/age_gate_page.dart';
@@ -93,6 +94,7 @@ part 'pages/admin/admin_users_page.dart';
 part 'pages/admin/admin_audit_page.dart';
 part 'pages/admin/admin_operations_page.dart';
 part 'shared/widgets/app_widgets.dart';
+part 'shared/widgets/body_type_selector.dart';
 
 /// Keeps every plain screen label on the same bilingual translation path.
 /// User-generated values that are not present in the catalogue stay unchanged.
@@ -444,7 +446,7 @@ Future<bool> confirmFaceVerificationConsent(BuildContext context) async =>
       builder: (context) => AlertDialog(
         title: const Text('Private selfie verification'),
         content: const Text(
-          'MapLov will securely store this selfie as private biometric reference data and send it to AWS Rekognition whenever you add a profile photo. The selfie is never displayed to members and is deleted with your account. Face comparison is probabilistic; if a photo is rejected, you can try another clear photo or contact support.',
+          'MapLov will securely store this one-time registration selfie as private biometric reference data and send it to AWS Rekognition to compare it with existing private reference selfies, prevent duplicate accounts, and verify your profile photos. The selfie is never displayed to members and is deleted with your account. Face comparison is probabilistic; if a photo or account is rejected, you can contact support.',
         ),
         actions: [
           TextButton(

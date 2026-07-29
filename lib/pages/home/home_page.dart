@@ -139,6 +139,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     if (state == AppLifecycleState.resumed) {
       _isForeground = true;
       _syncOnlineRefreshTimer();
+      if (MapLovRepository.instance.isLive) {
+        unawaited(_refreshResidenceLocation());
+      }
       if (selectedTab == 'Online') {
         unawaited(_refreshOnlineProfiles());
       } else if (_locationFailure != null && !_loading) {
@@ -152,6 +155,15 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       _isForeground = false;
       _onlineRefreshTimer?.cancel();
       _onlineRefreshTimer = null;
+    }
+  }
+
+  Future<void> _refreshResidenceLocation() async {
+    try {
+      await LocationService.instance.updateMyLocation();
+    } catch (_) {
+      // Automatic residence refresh is retried on the next resume and must not
+      // interrupt an already authenticated session.
     }
   }
 

@@ -15,7 +15,6 @@ class _ManagePhotosScreenState extends State<ManagePhotosScreen> {
   int _uploadTotal = 0;
   bool _referenceReady = !MapLovRepository.instance.isLive;
   bool _loadingReference = MapLovRepository.instance.isLive;
-  bool _enrollingReference = false;
 
   @override
   void initState() {
@@ -49,8 +48,14 @@ class _ManagePhotosScreenState extends State<ManagePhotosScreen> {
 
   Future<void> _addPhoto() async {
     if (_uploading) return;
+    if (_loadingReference) {
+      _showError('Identity verification is still loading. Try again.');
+      return;
+    }
     if (!_referenceReady) {
-      _showError('Create your private reference selfie first.');
+      _showError(
+        'Identity verification must be completed during registration. Contact support.',
+      );
       return;
     }
     List<XFile> photos;
@@ -88,38 +93,6 @@ class _ManagePhotosScreenState extends State<ManagePhotosScreen> {
       if (mounted) _showError('Photo upload failed: $error');
     } finally {
       if (mounted) setState(() => _uploading = false);
-    }
-  }
-
-  Future<void> _captureReferenceSelfie() async {
-    if (_enrollingReference || _referenceReady) return;
-    try {
-      if (!await confirmFaceVerificationConsent(context)) return;
-      final selfie = await ImagePicker().pickImage(
-        source: ImageSource.camera,
-        preferredCameraDevice: CameraDevice.front,
-        imageQuality: 85,
-        maxWidth: 1600,
-        maxHeight: 1600,
-      );
-      if (selfie == null) return;
-      if (mounted) setState(() => _enrollingReference = true);
-      await MapLovRepository.instance.enrollFaceReference(
-        bytes: await selfie.readAsBytes(),
-        extension: selfie.name.split('.').last.toLowerCase(),
-      );
-      if (mounted) {
-        setState(() => _referenceReady = true);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Private reference selfie verified.')),
-        );
-      }
-    } on FaceVerificationException catch (error) {
-      if (mounted) _showError(error.message);
-    } catch (error) {
-      if (mounted) _showError('Unable to verify the reference selfie: $error');
-    } finally {
-      if (mounted) setState(() => _enrollingReference = false);
     }
   }
 
@@ -210,46 +183,12 @@ class _ManagePhotosScreenState extends State<ManagePhotosScreen> {
 
   void _showError(String message) => ScaffoldMessenger.of(
     context,
-  ).showSnackBar(SnackBar(content: Text(message)));
+  ).showSnackBar(SnackBar(content: Text(context.tr(message))));
 
   @override
   Widget build(BuildContext context) => _AppPage(
     title: 'Manage photos',
     children: [
-      Card(
-        color: AppColors.palePink,
-        child: ListTile(
-          key: const Key('photo_manager_reference_selfie'),
-          leading: Icon(
-            _referenceReady
-                ? Icons.verified_user_outlined
-                : Icons.face_retouching_natural_outlined,
-            color: _referenceReady ? Colors.green.shade700 : AppColors.coral,
-          ),
-          title: const Text(
-            'Private reference selfie',
-            style: TextStyle(fontWeight: FontWeight.w800),
-          ),
-          subtitle: Text(
-            _referenceReady
-                ? 'Ready to verify new profile photos.'
-                : 'Required before adding a profile photo.',
-          ),
-          trailing: _loadingReference || _enrollingReference
-              ? const SizedBox.square(
-                  dimension: 22,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : _referenceReady
-              ? const Icon(Icons.check_circle, color: Colors.green)
-              : FilledButton(
-                  key: const Key('photo_manager_capture_selfie'),
-                  onPressed: _captureReferenceSelfie,
-                  child: const Text('Take selfie'),
-                ),
-        ),
-      ),
-      const SizedBox(height: 12),
       const Text(
         'Your profile photo is shown first. The other photos belong to your public album. You can choose any visible album photo as your profile photo.',
         style: TextStyle(color: AppColors.grayText),

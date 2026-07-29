@@ -198,18 +198,10 @@ void main() {
     );
 
     final registrationScrollable = find.byType(Scrollable).first;
-    await tester.scrollUntilVisible(
-      find.byKey(const Key('registration_geography_group')),
-      300,
-      scrollable: registrationScrollable,
-    );
-    expect(
-      find.byKey(const Key('registration_geography_group')),
-      findsOneWidget,
-    );
+    expect(find.byKey(const Key('registration_geography_group')), findsNothing);
     await tester.scrollUntilVisible(
       find.byKey(const Key('toggle_password')),
-      -300,
+      200,
       scrollable: registrationScrollable,
     );
 
@@ -225,144 +217,42 @@ void main() {
     expect(tester.widget<TextField>(password).obscureText, isFalse);
   });
 
-  testWidgets('phone country controls the locked residence dropdown', (
-    tester,
-  ) async {
-    tester.view.physicalSize = const Size(390, 1400);
-    tester.view.devicePixelRatio = 1;
-    addTearDown(tester.view.resetPhysicalSize);
-    addTearDown(tester.view.resetDevicePixelRatio);
+  testWidgets(
+    'registration hides geography and locks the phone code to GPS residence',
+    (tester) async {
+      tester.view.physicalSize = const Size(390, 1400);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
 
-    await tester.pumpWidget(
-      MaterialApp(home: RegisterScreen(dateOfBirth: DateTime(1990, 1, 1))),
-    );
+      await tester.pumpWidget(
+        MaterialApp(home: RegisterScreen(dateOfBirth: DateTime(1990, 1, 1))),
+      );
 
-    expect(
-      find.byKey(const Key('registration_country_dropdown')),
-      findsOneWidget,
-    );
-    final countryDropdown = tester.widget<DropdownButton<String>>(
-      find.descendant(
-        of: find.byKey(const Key('registration_country_dropdown')),
-        matching: find.byType(DropdownButton<String>),
-      ),
-    );
-    expect(countryDropdown.items!.length, greaterThanOrEqualTo(190));
-    expect(countryDropdown.onChanged, isNull);
-    expect(
-      find.byKey(const ValueKey('registration_city_dropdown_Canada')),
-      findsOneWidget,
-    );
-    expect(
-      find.descendant(
-        of: find.byKey(const ValueKey('registration_city_dropdown_Canada')),
-        matching: find.text('Toronto'),
-      ),
-      findsOneWidget,
-    );
-    final canadianCityDropdown = tester.widget<DropdownButton<String>>(
-      find.descendant(
-        of: find.byKey(const ValueKey('registration_city_dropdown_Canada')),
-        matching: find.byType(DropdownButton<String>),
-      ),
-    );
-    expect(
-      canadianCityDropdown.items!.map((item) => item.value),
-      contains('Toronto'),
-    );
-    expect(
-      canadianCityDropdown.items!.map((item) => item.value),
-      isNot(contains('Montréal')),
-    );
-
-    final canadianRegionDropdown = tester.widget<DropdownButton<String>>(
-      find.descendant(
-        of: find.byKey(const ValueKey('registration_region_dropdown_Canada')),
-        matching: find.byType(DropdownButton<String>),
-      ),
-    );
-    canadianRegionDropdown.onChanged!('Quebec');
-    await tester.pumpAndSettle();
-    final quebecCityDropdown = tester.widget<DropdownButton<String>>(
-      find.descendant(
-        of: find.byKey(const ValueKey('registration_city_dropdown_Canada')),
-        matching: find.byType(DropdownButton<String>),
-      ),
-    );
-    expect(quebecCityDropdown.value, 'Alma');
-    expect(
-      quebecCityDropdown.items!.map((item) => item.value),
-      containsAll(['Montréal', 'Québec City']),
-    );
-    expect(
-      quebecCityDropdown.items!.map((item) => item.value),
-      isNot(contains('Toronto')),
-    );
-
-    final phoneIndicator = tester.widget<DropdownButton<String>>(
-      find.descendant(
-        of: find.byKey(const Key('phone_country_indicator')),
-        matching: find.byType(DropdownButton<String>),
-      ),
-    );
-    phoneIndicator.onChanged!('France');
-    await tester.pumpAndSettle();
-
-    expect(
-      find.byKey(const ValueKey('registration_city_dropdown_France')),
-      findsOneWidget,
-    );
-    expect(find.text('Lyon'), findsOneWidget);
-    expect(find.text('Paris'), findsNothing);
-    final frenchPhoneIndicator = tester.widget<DropdownButton<String>>(
-      find.descendant(
-        of: find.byKey(const Key('phone_country_indicator')),
-        matching: find.byType(DropdownButton<String>),
-      ),
-    );
-    expect(frenchPhoneIndicator.value, 'France');
-    expect(find.text('+33'), findsOneWidget);
-
-    frenchPhoneIndicator.onChanged!('Cameroon');
-    await tester.pumpAndSettle();
-    final synchronizedCountry = tester.widget<DropdownButton<String>>(
-      find.descendant(
-        of: find.byKey(const Key('registration_country_dropdown')),
-        matching: find.byType(DropdownButton<String>),
-      ),
-    );
-    expect(synchronizedCountry.value, 'Cameroon');
-    expect(find.text('+237'), findsOneWidget);
-    final cameroonRegionDropdown = tester.widget<DropdownButton<String>>(
-      find.descendant(
-        of: find.byKey(const ValueKey('registration_region_dropdown_Cameroon')),
-        matching: find.byType(DropdownButton<String>),
-      ),
-    );
-    expect(cameroonRegionDropdown.value, 'Adamawa');
-    cameroonRegionDropdown.onChanged!('Littoral');
-    await tester.pumpAndSettle();
-    final cameroonCityDropdown = tester.widget<DropdownButton<String>>(
-      find.descendant(
-        of: find.byKey(const ValueKey('registration_city_dropdown_Cameroon')),
-        matching: find.byType(DropdownButton<String>),
-      ),
-    );
-    expect(
-      cameroonCityDropdown.items!.map((item) => item.value).toList(),
-      const [
-        'Douala',
-        'Nkongsamba',
-        'Edéa',
-        'Loum',
-        'Manjo',
-        'Melong',
-        'Mbanga',
-        'Dibombari',
-        'Other city',
-      ],
-    );
-  });
+      expect(
+        find.byKey(const Key('registration_geography_group')),
+        findsNothing,
+      );
+      expect(find.text('Country of residence'), findsNothing);
+      expect(find.text('Country of origin'), findsNothing);
+      expect(find.byKey(const Key('phone_country_indicator')), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('phone_country_indicator')),
+          matching: find.byType(DropdownButton<String>),
+        ),
+        findsNothing,
+      );
+      expect(find.text('+1'), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('phone_country_indicator')),
+          matching: find.byIcon(Icons.lock_outline),
+        ),
+        findsOneWidget,
+      );
+    },
+  );
 
   testWidgets('phone verification requires a six-digit code', (tester) async {
     await tester.pumpWidget(
@@ -397,6 +287,11 @@ void main() {
   testWidgets('profile setup reuses residence and asks for origin', (
     tester,
   ) async {
+    tester.view.physicalSize = const Size(390, 1800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
     await tester.pumpWidget(const MaterialApp(home: ProfileSetupScreen()));
     await tester.pumpAndSettle();
 
@@ -411,12 +306,19 @@ void main() {
     expect(find.text('Country of origin', skipOffstage: false), findsOneWidget);
     expect(find.text('City of origin', skipOffstage: false), findsOneWidget);
     expect(
+      find.text(
+        'Your gender sets your default dating preference. You can change that preference later.',
+        skipOffstage: false,
+      ),
+      findsOneWidget,
+    );
+    expect(
       find.byKey(const Key('private_reference_selfie'), skipOffstage: false),
       findsOneWidget,
     );
     expect(
       find.text(
-        'Verified and kept private. It is never shown on your profile.',
+        'Your reference selfie is verified, kept private and never displayed on your profile.',
         skipOffstage: false,
       ),
       findsOneWidget,
@@ -428,9 +330,29 @@ void main() {
       ),
       findsOneWidget,
     );
+    final residenceCountry = tester.widget<DropdownButton<String>>(
+      find.descendant(
+        of: find.byKey(
+          const ValueKey<String>('Current country of residence_Canada'),
+          skipOffstage: false,
+        ),
+        matching: find.byType(DropdownButton<String>),
+      ),
+    );
+    expect(residenceCountry.onChanged, isNull);
+    final residenceRegion = tester.widget<DropdownButton<String>>(
+      find.descendant(
+        of: find.byKey(
+          const ValueKey<String>('Current country of residence_region_Canada'),
+          skipOffstage: false,
+        ),
+        matching: find.byType(DropdownButton<String>),
+      ),
+    );
+    expect(residenceRegion.onChanged, isNotNull);
   });
 
-  testWidgets('registration saves country and city of origin together', (
+  testWidgets('registration defers origin choices to profile setup', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(390, 1400);
@@ -441,22 +363,15 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(home: RegisterScreen(dateOfBirth: DateTime(1990, 1, 1))),
     );
-
-    final originCountry = tester.widget<DropdownButton<String>>(
-      find.descendant(
-        of: find.byKey(const Key('registration_origin_country_dropdown')),
-        matching: find.byType(DropdownButton<String>),
-      ),
-    );
-    originCountry.onChanged!('France');
     await tester.pumpAndSettle();
 
-    expect(
-      find.byKey(const ValueKey('registration_origin_city_dropdown_France')),
-      findsOneWidget,
-    );
+    expect(find.text('Country of origin'), findsNothing);
+    expect(find.text('City of origin'), findsNothing);
+
+    await tester.pumpWidget(const MaterialApp(home: ProfileSetupScreen()));
+    await tester.pumpAndSettle();
+    expect(find.text('Country of origin'), findsOneWidget);
     expect(find.text('City of origin'), findsOneWidget);
-    expect(find.text('Lyon'), findsOneWidget);
   });
 
   testWidgets('profile setup can continue without uploading a photo', (
@@ -474,6 +389,10 @@ void main() {
       find.byType(ListView).first,
       const Offset(0, -250),
     );
+    await tester.ensureVisible(
+      find.byKey(const Key('profile_setup_continue')),
+    );
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('profile_setup_continue')));
     await tester.pumpAndSettle();
 
@@ -655,7 +574,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('My Friends'), findsOneWidget);
-    expect(find.text('Friends Posts'), findsOneWidget);
+    expect(find.text('Friends Posts'), findsNothing);
     expect(find.text('Recent activity'), findsOneWidget);
   });
 
@@ -671,6 +590,14 @@ void main() {
     final finder = find.byKey(const Key('international_discovery_switch'));
     expect(finder, findsOneWidget);
     expect(tester.widget<SwitchListTile>(finder).value, isTrue);
+    expect(
+      tester
+          .widget<SwitchListTile>(
+            find.byKey(const Key('origin_profile_visibility_switch')),
+          )
+          .value,
+      isTrue,
+    );
 
     await tester.tap(finder);
     await tester.pump();
@@ -757,8 +684,372 @@ void main() {
     expect(find.text('Search radius'), findsOneWidget);
     await tester.scrollUntilVisible(find.text('Next'), 300);
     expect(find.text('Next'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('preferences_back_to_profile')),
+      200,
+    );
     expect(
       find.byKey(const Key('preferences_back_to_profile')),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('preferences require one exclusive gender without Everyone', (
+    tester,
+  ) async {
+    await tester.pumpWidget(const MaterialApp(home: PreferencesScreen()));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('gender_everyone')), findsNothing);
+    for (final key in const [
+      'gender_women',
+      'gender_men',
+      'gender_non_binary',
+    ]) {
+      expect(tester.widget<ChoiceChip>(find.byKey(Key(key))).selected, isFalse);
+    }
+
+    await tester.tap(find.byKey(const Key('gender_women')));
+    await tester.pump();
+    expect(
+      tester.widget<ChoiceChip>(find.byKey(const Key('gender_women'))).selected,
+      isTrue,
+    );
+
+    await tester.tap(find.byKey(const Key('gender_men')));
+    await tester.pump();
+    expect(
+      tester.widget<ChoiceChip>(find.byKey(const Key('gender_women'))).selected,
+      isFalse,
+    );
+    expect(
+      tester.widget<ChoiceChip>(find.byKey(const Key('gender_men'))).selected,
+      isTrue,
+    );
+  });
+
+  testWidgets('profile silhouette selection is optional and single', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 1200);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(const MaterialApp(home: ProfileSetupScreen()));
+    await tester.pumpAndSettle();
+
+    final profileList = find.byType(ListView).first;
+    await tester.dragUntilVisible(
+      find.byKey(const Key('body_gallery_women')),
+      profileList,
+      const Offset(0, -300),
+    );
+    await tester.ensureVisible(find.byKey(const Key('body_gallery_women')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('body_gallery_women')));
+    await tester.pumpAndSettle();
+
+    await tester.dragUntilVisible(
+      find.byKey(const Key('body_type_women_slim')),
+      profileList,
+      const Offset(0, -250),
+    );
+    await tester.ensureVisible(find.byKey(const Key('body_type_women_slim')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('body_type_women_slim')));
+    await tester.pump();
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('body_type_women_slim')),
+        matching: find.byIcon(Icons.check),
+      ),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.byKey(const Key('body_type_women_toned')));
+    await tester.pump();
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('body_type_women_slim')),
+        matching: find.byIcon(Icons.check),
+      ),
+      findsNothing,
+    );
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('body_type_women_toned')),
+        matching: find.byIcon(Icons.check),
+      ),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.byKey(const Key('body_type_women_toned')));
+    await tester.pump();
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('body_type_women_toned')),
+        matching: find.byIcon(Icons.check),
+      ),
+      findsNothing,
+    );
+  });
+
+  testWidgets(
+    'advanced silhouettes are distinct, validated, gated and reset together',
+    (tester) async {
+      tester.view.physicalSize = const Size(390, 1200);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: FilterScreen(
+            initialFilters: DiscoveryFilters(genders: ['Non-binary']),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Standard Filter'));
+      await tester.pumpAndSettle();
+      expect(find.text('Body type'), findsNothing);
+
+      await tester.tap(find.text('Advanced Filter'));
+      await tester.pumpAndSettle();
+      expect(find.text('18 – 80'), findsOneWidget);
+      final advancedList = find.descendant(
+        of: find.byKey(const Key('advanced_filter_tab')),
+        matching: find.byType(ListView),
+      );
+      await tester.dragUntilVisible(
+        find.byKey(const Key('body_gallery_all_silhouettes')),
+        advancedList,
+        const Offset(0, -350),
+      );
+      await tester.ensureVisible(
+        find.byKey(const Key('body_gallery_all_silhouettes')),
+      );
+      await tester.pumpAndSettle();
+
+      final womenGallery = tester.widget<OutlinedButton>(
+        find.byKey(const Key('body_gallery_women')),
+      );
+      final menGallery = tester.widget<OutlinedButton>(
+        find.byKey(const Key('body_gallery_men')),
+      );
+      final allGallery = tester.widget<OutlinedButton>(
+        find.byKey(const Key('body_gallery_all_silhouettes')),
+      );
+      expect(womenGallery.onPressed, isNull);
+      expect(menGallery.onPressed, isNull);
+      expect(allGallery.onPressed, isNotNull);
+      await tester.tap(find.byKey(const Key('body_gallery_all_silhouettes')));
+      await tester.pumpAndSettle();
+
+      await tester.dragUntilVisible(
+        find.byKey(const Key('body_type_all_women_slim')),
+        advancedList,
+        const Offset(0, -250),
+      );
+      await tester.ensureVisible(
+        find.byKey(const Key('body_type_all_women_slim')),
+      );
+      await tester.pumpAndSettle();
+      final bodyImages = tester.widgetList<Image>(find.byType(Image)).where((
+        image,
+      ) {
+        final provider = image.image;
+        return provider is AssetImage &&
+            provider.assetName.startsWith('assets/body_types/');
+      });
+      expect(bodyImages, hasLength(16));
+
+      final grid = tester.widget<GridView>(find.byType(GridView));
+      final delegate =
+          grid.gridDelegate as SliverGridDelegateWithFixedCrossAxisCount;
+      expect(delegate.childAspectRatio, 0.75);
+
+      Future<void> tapBody(String key) async {
+        await tester.ensureVisible(find.byKey(Key(key)));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(Key(key)));
+        await tester.pump();
+      }
+
+      await tapBody('body_type_all_women_slim');
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('body_type_all_women_slim')),
+          matching: find.byIcon(Icons.check),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('body_type_all_men_slim')),
+          matching: find.byIcon(Icons.check),
+        ),
+        findsNothing,
+      );
+
+      await tapBody('body_type_all_men_slim');
+      await tapBody('body_type_all_women_toned');
+      await tester.pump();
+      for (final key in const [
+        'body_type_all_women_slim',
+        'body_type_all_men_slim',
+        'body_type_all_women_toned',
+      ]) {
+        expect(
+          find.descendant(
+            of: find.byKey(Key(key)),
+            matching: find.byIcon(Icons.check),
+          ),
+          findsOneWidget,
+        );
+      }
+      expect(
+        tester
+            .widget<ChoiceChip>(
+              find.byKey(const Key('body_type_no_preference')),
+            )
+            .selected,
+        isFalse,
+      );
+
+      await tester.ensureVisible(
+        find.byKey(const Key('body_type_validate_selection')),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('body_type_validate_selection')));
+      await tester.pumpAndSettle();
+      expect(find.byType(GridView), findsNothing);
+
+      await tester.dragUntilVisible(
+        find.byKey(const Key('body_gallery_all_silhouettes')),
+        advancedList,
+        const Offset(0, 500),
+      );
+      tester
+          .widget<OutlinedButton>(
+            find.byKey(const Key('body_gallery_all_silhouettes')),
+          )
+          .onPressed!();
+      await tester.pumpAndSettle();
+      expect(find.byType(GridView), findsOneWidget);
+      tester
+          .widget<ChoiceChip>(find.byKey(const Key('body_type_no_preference')))
+          .onSelected!(true);
+      await tester.pump();
+      expect(find.byType(GridView), findsNothing);
+      expect(
+        tester
+            .widget<ChoiceChip>(
+              find.byKey(const Key('body_type_no_preference')),
+            )
+            .selected,
+        isTrue,
+      );
+
+      await tester.dragUntilVisible(
+        find.byKey(const Key('body_gallery_all_silhouettes')),
+        advancedList,
+        const Offset(0, 500),
+      );
+      tester
+          .widget<OutlinedButton>(
+            find.byKey(const Key('body_gallery_all_silhouettes')),
+          )
+          .onPressed!();
+      await tester.pumpAndSettle();
+      expect(find.byType(GridView), findsOneWidget);
+      for (final key in const [
+        'body_type_all_women_slim',
+        'body_type_all_men_slim',
+        'body_type_all_women_toned',
+      ]) {
+        expect(
+          find.descendant(
+            of: find.byKey(Key(key)),
+            matching: find.byIcon(Icons.check),
+          ),
+          findsNothing,
+        );
+      }
+    },
+  );
+
+  testWidgets('advanced filter restores the last saved criteria', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 1200);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: FilterScreen(
+          initialFilters: DiscoveryFilters(
+            minimumAge: 26,
+            maximumAge: 64,
+            genders: ['Woman'],
+            bodyTypes: ['women_round'],
+            religions: ['Buddhist'],
+            eyeColors: ['Green'],
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Advanced Filter'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('26 – 64'), findsOneWidget);
+    final advancedList = find.descendant(
+      of: find.byKey(const Key('advanced_filter_tab')),
+      matching: find.byType(ListView),
+    );
+    await tester.dragUntilVisible(
+      find.byKey(const Key('body_gallery_women')),
+      advancedList,
+      const Offset(0, -350),
+    );
+    await tester.ensureVisible(find.byKey(const Key('body_gallery_women')));
+    await tester.pumpAndSettle();
+
+    expect(
+      tester
+          .widget<OutlinedButton>(find.byKey(const Key('body_gallery_women')))
+          .onPressed,
+      isNotNull,
+    );
+    expect(
+      tester
+          .widget<OutlinedButton>(find.byKey(const Key('body_gallery_men')))
+          .onPressed,
+      isNull,
+    );
+    expect(
+      tester
+          .widget<OutlinedButton>(
+            find.byKey(const Key('body_gallery_all_silhouettes')),
+          )
+          .onPressed,
+      isNull,
+    );
+
+    await tester.tap(find.byKey(const Key('body_gallery_women')));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.byKey(const Key('body_type_women_round')));
+    await tester.pumpAndSettle();
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('body_type_women_round')),
+        matching: find.byIcon(Icons.check),
+      ),
       findsOneWidget,
     );
   });
@@ -1107,6 +1398,7 @@ void main() {
       compatibilityScore: 87,
       imagePath: 'assets/avatars/story_02.png',
       photoDisplayStyle: PhotoDisplayStyle.profileDetails,
+      showsOriginOnProfile: false,
     );
     await tester.pumpWidget(
       const MaterialApp(home: ChatScreen(profile: profile)),
@@ -1335,6 +1627,7 @@ void main() {
       compatibilityScore: 90,
       imagePath: 'assets/profile/profile_user_placeholder.png',
       photoDisplayStyle: PhotoDisplayStyle.profileDetails,
+      showsOriginOnProfile: false,
     );
     await tester.pumpWidget(
       const MaterialApp(home: PublicProfileScreen(profile: privateOrigin)),
@@ -1418,6 +1711,12 @@ void main() {
     );
     expect(find.text('Basic matching information'), findsOneWidget);
     expect(find.text('Gender'), findsOneWidget);
+    expect(
+      find.text(
+        'Changing your gender resets your dating preference to the corresponding default.',
+      ),
+      findsOneWidget,
+    );
     final detailsList = find.byKey(
       const Key('edit_profile_filter_details_tab'),
     );
@@ -1474,17 +1773,56 @@ void main() {
   });
 
   testWidgets(
-    'navigation uses search for Discover and replaces Map with Matches',
+    'navigation exposes Posts and one combined Likes and Matches page',
     (tester) async {
       await tester.pumpWidget(const MaterialApp(home: HomeScreen()));
+      await tester.pump();
 
       expect(find.byIcon(Icons.search), findsOneWidget);
       expect(find.text('Map'), findsNothing);
-      expect(find.text('Matches'), findsOneWidget);
       expect(find.byType(NavigationDestination), findsNWidgets(5));
-      expect(find.text('Likes'), findsOneWidget);
+      expect(find.text('Posts'), findsOneWidget);
+      expect(find.text('Likes & Matches'), findsOneWidget);
+      final badge = tester.widget<Badge>(
+        find.byKey(const Key('messages_navigation_badge')),
+      );
+      expect(badge.isLabelVisible, isFalse);
     },
   );
+
+  testWidgets('Likes and Matches share one page with two tabs', (tester) async {
+    await tester.pumpWidget(const MaterialApp(home: ConnectionsScreen()));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('likes_matches_tabs')), findsOneWidget);
+    expect(find.text('Likes'), findsOneWidget);
+    expect(find.text('Matches'), findsOneWidget);
+    expect(
+      find.textContaining('People who liked your profile'),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.text('Matches'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Compatibility helps you'), findsOneWidget);
+  });
+
+  testWidgets('Create Post displays the current profile identity', (
+    tester,
+  ) async {
+    await tester.pumpWidget(const MaterialApp(home: CreatePostScreen()));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('create_post_author')), findsOneWidget);
+    expect(find.text('Sophie'), findsOneWidget);
+    expect(find.text('My profile'), findsNothing);
+    expect(find.byKey(const Key('private_reference_selfie')), findsNothing);
+    expect(
+      find.byKey(const Key('photo_manager_reference_selfie')),
+      findsNothing,
+    );
+    expect(find.textContaining('selfie'), findsNothing);
+  });
 
   testWidgets('main discovery exposes the three subscription filters', (
     tester,
@@ -1617,6 +1955,7 @@ void main() {
       'genders': ['Women'],
       'personalities': ['Creative'],
       'interest_slugs': ['travel'],
+      'body_types': ['women_slim', 'women_very_round'],
       'required_languages': true,
       'premium_only': true,
       'vip_only': true,
@@ -1628,6 +1967,7 @@ void main() {
     expect(filters.languages, ['French']);
     expect(filters.personalities, ['Creative']);
     expect(filters.interestSlugs, ['travel']);
+    expect(filters.bodyTypes, ['women_slim', 'women_very_round']);
     expect(filters.requiredLanguages, isTrue);
     expect(filters.premiumOnly, isTrue);
     expect(filters.vipOnly, isTrue);
@@ -1636,6 +1976,10 @@ void main() {
     expect(filters.toDatabase()['premium_only'], isTrue);
     expect(filters.toDatabase()['vip_only'], isTrue);
     expect(filters.toDatabase()['most_liked_first'], isTrue);
+    expect(filters.toDatabase()['body_types'], [
+      'women_slim',
+      'women_very_round',
+    ]);
   });
 
   test('stored age preferences are normalized to the slider limits', () {
@@ -1720,8 +2064,9 @@ void main() {
 
     expect(
       find.byKey(const Key('photo_manager_reference_selfie')),
-      findsOneWidget,
+      findsNothing,
     );
+    expect(find.byKey(const Key('photo_manager_capture_selfie')), findsNothing);
     expect(find.text('Main'), findsNothing);
     expect(find.text('Set main'), findsNothing);
     expect(find.byTooltip('Move later'), findsNothing);
@@ -1750,7 +2095,7 @@ void main() {
     expect(find.byKey(Key('delete_managed_photo_$photoId')), findsOneWidget);
   });
 
-  testWidgets('private selfie enrollment asks for explicit consent', (
+  testWidgets('registration selfie enrollment asks for explicit consent', (
     tester,
   ) async {
     bool? accepted;
@@ -1835,6 +2180,14 @@ void main() {
       'Impossible d’appliquer les filtres : network error',
     );
     expect(translations.translate('2 Comments'), '2 commentaires');
+    expect(
+      translations.translate('Feminine silhouette'),
+      'Silhouette féminine',
+    );
+    expect(
+      translations.translate('Masculine silhouette'),
+      'Silhouette masculine',
+    );
     expect(
       translations.translate('Unknown dynamic content'),
       'Unknown dynamic content',

@@ -69,7 +69,7 @@ class UserProfile {
     this.incomeLevel = '',
     this.isPhotoVerified = false,
     this.allowsInternationalDiscovery = true,
-    this.showsOriginOnProfile = false,
+    this.showsOriginOnProfile = true,
     this.compatibilityBreakdown = const {},
     this.likedByMe = false,
     this.lastActiveAt,

@@ -26,7 +26,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   String religion = 'Prefer not to say';
   String childrenPreference = 'Not sure yet';
   String relationshipStatus = 'Single';
-  String bodyType = 'Prefer not to say';
+  String? bodyType;
   String eyeColor = 'Prefer not to say';
   String hairColor = 'Prefer not to say';
   String beardStyle = 'Not applicable';
@@ -79,6 +79,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       final values = await MapLovRepository.instance.myProfileDetails();
       if (values == null || !mounted) return;
       final photos = await MapLovRepository.instance.myPhotos();
+      final savedGender = values['gender'] as String? ?? gender;
       setState(() {
         name.text = values['first_name'] as String? ?? name.text;
         city.text = values['city'] as String? ?? city.text;
@@ -86,7 +87,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         profession.text = values['profession'] as String? ?? profession.text;
         bio.text = values['bio'] as String? ?? bio.text;
         birthDate.text = values['date_of_birth'] as String? ?? birthDate.text;
-        gender = values['gender'] as String? ?? gender;
+        gender = savedGender;
         country = values['country_name'] as String? ?? country;
         region =
             values['residence_region'] as String? ??
@@ -115,7 +116,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             values['children_preference'] as String? ?? childrenPreference;
         relationshipStatus =
             values['relationship_status'] as String? ?? relationshipStatus;
-        bodyType = values['body_type'] as String? ?? bodyType;
+        bodyType = _normalizedProfileBodyType(
+          values['body_type'] as String?,
+          savedGender,
+        );
         eyeColor = values['eye_color'] as String? ?? eyeColor;
         hairColor = values['hair_color'] as String? ?? hairColor;
         beardStyle = values['beard_style'] as String? ?? beardStyle;
@@ -332,7 +336,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         _worldCountries,
         (value) => country = value,
         enabled: false,
-        helperText: 'Change and re-verify your phone number to update it.',
+        helperText:
+            'Updated automatically from your current location. It cannot be changed manually.',
       ),
       const SizedBox(height: 12),
       _dropdown(
@@ -431,12 +436,19 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         style: TextStyle(color: AppColors.grayText),
       ),
       const _SectionTitle('Basic matching information'),
-      _dropdown('Gender', gender, const [
-        'Woman',
-        'Man',
-        'Non-binary',
-        'Prefer not to say',
-      ], (value) => gender = value),
+      _dropdown(
+        'Gender',
+        gender,
+        const ['Woman', 'Man', 'Non-binary', 'Prefer not to say'],
+        (value) {
+          gender = value;
+          if (!_bodyTypeAllowedForProfileGender(bodyType, gender)) {
+            bodyType = null;
+          }
+        },
+        helperText:
+            'Changing your gender resets your dating preference to the corresponding default.',
+      ),
       const SizedBox(height: 12),
       TextField(
         controller: birthDate,
@@ -518,14 +530,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         ),
       ),
       const SizedBox(height: 12),
-      _dropdown('Body type', bodyType, const [
-        'Prefer not to say',
-        'Slim',
-        'Athletic',
-        'Average',
-        'Curvy',
-        'Full-figured',
-      ], (value) => bodyType = value),
+      _BodyTypeSelector(
+        selected: bodyType == null ? const {} : {bodyType!},
+        enabledGalleries: _profileBodyGalleries(gender),
+        onChanged: (value) => setState(() => bodyType = value.firstOrNull),
+      ),
       const SizedBox(height: 12),
       _dropdown('Eye color', eyeColor, const [
         'Prefer not to say',

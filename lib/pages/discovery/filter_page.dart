@@ -13,16 +13,18 @@ String _displayGenderFilterValue(String value) => switch (value) {
 };
 
 class FilterScreen extends StatefulWidget {
-  const FilterScreen({super.key});
+  const FilterScreen({super.key, this.initialFilters});
+
+  final DiscoveryFilters? initialFilters;
 
   @override
   State<FilterScreen> createState() => _FilterScreenState();
 }
 
 class _FilterScreenState extends State<FilterScreen> {
-  RangeValues ages = const RangeValues(24, 38);
+  RangeValues ages = const RangeValues(18, 80);
   String locationMode = 'Near me';
-  double distance = 10;
+  double distance = 50;
   String selectedCity = 'Any city';
   String selectedCountry = 'Canada';
   String selectedRegion = 'Any region';
@@ -32,9 +34,9 @@ class _FilterScreenState extends State<FilterScreen> {
   String originCountry = 'Any country';
   String originRegion = 'Any region';
   String originCity = 'Any city';
-  RangeValues standardAges = const RangeValues(22, 30);
+  RangeValues standardAges = const RangeValues(18, 80);
   double standardDistance = 50;
-  RangeValues advancedAges = const RangeValues(22, 30);
+  RangeValues advancedAges = const RangeValues(18, 80);
   double advancedDistance = 50;
   bool standardVerified = false;
   bool advancedVerified = false;
@@ -46,7 +48,8 @@ class _FilterScreenState extends State<FilterScreen> {
   bool vipOnly = false;
   bool premiumOnly = false;
   bool mostLikedFirst = false;
-  String selectedGender = 'Everyone';
+  final Set<String> selectedGenders = {};
+  final Set<String> selectedBodyTypes = {};
   String quickLanguage = 'Any';
   String quickRelationshipGoal = 'Any';
   final Set<String> quickInterests = {};
@@ -62,7 +65,6 @@ class _FilterScreenState extends State<FilterScreen> {
     'Relationship goal': 'Any',
     'Want children': 'Any',
     'Relationship status': 'Any',
-    'Body type': 'Any',
     'Education level': 'Any',
   };
   final Set<String> standardInterests = {};
@@ -72,7 +74,6 @@ class _FilterScreenState extends State<FilterScreen> {
     'Relationship goal': 'Any',
     'Want children': 'Any',
     'Relationship status': 'Any',
-    'Body type': 'Any',
     'Beard': 'Any',
     'Smoking': 'Any',
     'Education level': 'Any',
@@ -90,6 +91,9 @@ class _FilterScreenState extends State<FilterScreen> {
     try {
       final profile = await MapLovRepository.instance.myProfileDetails();
       final subscription = await MapLovRepository.instance.subscriptionInfo();
+      final preferences =
+          widget.initialFilters ??
+          await MapLovRepository.instance.myPreferences();
       final country = profile?['country_name'] as String?;
       final region = profile?['residence_region'] as String?;
       final city = profile?['city'] as String?;
@@ -97,6 +101,54 @@ class _FilterScreenState extends State<FilterScreen> {
         setState(() {
           premiumPlus = subscription.isPremium;
           vipAvailable = subscription.isVip;
+          final savedAges = RangeValues(
+            preferences.minimumAge.toDouble().clamp(18, 80),
+            preferences.maximumAge.toDouble().clamp(18, 80),
+          );
+          ages = savedAges;
+          standardAges = savedAges;
+          advancedAges = savedAges;
+          final savedDistance = preferences.distanceKm
+              .toDouble()
+              .clamp(1, 100)
+              .toDouble();
+          distance = savedDistance;
+          standardDistance = savedDistance;
+          advancedDistance = savedDistance;
+          locationMode = premiumPlus
+              ? switch (preferences.locationMode) {
+                  'my_country' => 'My country',
+                  'specific_country' || 'worldwide' => 'International',
+                  _ => 'Near me',
+                }
+              : 'Near me';
+          selectedGenders
+            ..clear()
+            ..addAll(
+              preferences.genders.take(1).map(_displayGenderFilterValue),
+            );
+          selectedBodyTypes.clear();
+          final legacyPresentation = switch (selectedGenders.firstOrNull) {
+            'Women' => 'women',
+            'Men' => 'men',
+            _ => null,
+          };
+          for (final value in preferences.bodyTypes) {
+            final normalized = _normalizedBodyType(value);
+            if (normalized == null) continue;
+            if (normalized.startsWith('women_') ||
+                normalized.startsWith('men_')) {
+              selectedBodyTypes.add(normalized);
+            } else if (legacyPresentation != null) {
+              selectedBodyTypes.add('${legacyPresentation}_$normalized');
+            }
+          }
+          final soughtGender = selectedGenders.firstOrNull;
+          selectedBodyTypes.removeWhere(
+            (value) =>
+                soughtGender == null ||
+                !_bodyTypeAllowedForSoughtGender(value, soughtGender),
+          );
           if (country != null && country.trim().isNotEmpty) {
             residenceCountry = country.trim();
           }
@@ -106,6 +158,70 @@ class _FilterScreenState extends State<FilterScreen> {
           if (city != null && city.trim().isNotEmpty) {
             residenceCity = city.trim();
           }
+          selectedCountry =
+              preferences.countries.firstOrNull ?? residenceCountry;
+          selectedRegion = preferences.regions.firstOrNull ?? 'Any region';
+          selectedCity = preferences.cities.firstOrNull ?? 'Any city';
+          originCountry =
+              preferences.originCountries.firstOrNull ?? 'Any country';
+          originRegion = preferences.originRegions.firstOrNull ?? 'Any region';
+          originCity = preferences.originCities.firstOrNull ?? 'Any city';
+          quickLanguage = preferences.languages.firstOrNull ?? 'Any';
+          standardSelections['Language'] = quickLanguage;
+          advancedSelections['Language'] = quickLanguage;
+          quickRelationshipGoal =
+              preferences.relationshipGoals.firstOrNull ?? 'Any';
+          standardSelections['Relationship goal'] = quickRelationshipGoal;
+          advancedSelections['Relationship goal'] = quickRelationshipGoal;
+          final savedReligion = preferences.religions.firstOrNull ?? 'Any';
+          standardSelections['Religion'] = savedReligion;
+          advancedSelections['Religion'] = savedReligion;
+          final savedChildren =
+              preferences.childrenPreferences.firstOrNull ?? 'Any';
+          standardSelections['Want children'] = savedChildren;
+          advancedSelections['Want children'] = savedChildren;
+          final savedRelationshipStatus =
+              preferences.relationshipStatuses.firstOrNull ?? 'Any';
+          standardSelections['Relationship status'] = savedRelationshipStatus;
+          advancedSelections['Relationship status'] = savedRelationshipStatus;
+          final savedEducation =
+              preferences.educationLevels.firstOrNull ?? 'Any';
+          standardSelections['Education level'] = savedEducation;
+          advancedSelections['Education level'] = savedEducation;
+          advancedSelections['Beard'] =
+              preferences.beardStyles.firstOrNull ?? 'Any';
+          advancedSelections['Smoking'] =
+              preferences.smokingStatuses.firstOrNull ?? 'Any';
+          advancedSelections['Profession'] =
+              preferences.professionCategories.firstOrNull ?? 'Any profession';
+          advancedSelections['Income level'] =
+              preferences.incomeLevels.firstOrNull ?? 'Any income level';
+          standardMinimumHeight = _heightFilterValue(
+            preferences.minimumHeightCm,
+          );
+          advancedMinimumHeight = standardMinimumHeight;
+          standardMaximumHeight = _heightFilterValue(
+            preferences.maximumHeightCm,
+          );
+          advancedMaximumHeight = standardMaximumHeight;
+          selectedEyeColor = preferences.eyeColors.firstOrNull;
+          selectedHairColor = preferences.hairColors.firstOrNull;
+          standardVerified = preferences.verifiedOnly;
+          advancedVerified = preferences.verifiedOnly;
+          photoVerified = preferences.photoVerifiedOnly;
+          activeToday = preferences.activeTodayOnly;
+          premiumOnly = preferences.premiumOnly && premiumPlus;
+          vipOnly = preferences.vipOnly && vipAvailable;
+          mostLikedFirst = preferences.mostLikedFirst;
+          final savedInterests = preferences.interestSlugs.map(
+            _displayInterestSlug,
+          );
+          quickInterests
+            ..clear()
+            ..addAll(savedInterests);
+          standardInterests
+            ..clear()
+            ..addAll(savedInterests);
         });
       }
     } catch (_) {
@@ -123,16 +239,16 @@ class _FilterScreenState extends State<FilterScreen> {
     setState(() {
       ages = const RangeValues(18, 80);
       locationMode = 'Near me';
-      distance = 10;
+      distance = 50;
       selectedCity = 'Any city';
       selectedCountry = 'Canada';
       selectedRegion = 'Any region';
       originCountry = 'Any country';
       originRegion = 'Any region';
       originCity = 'Any city';
-      standardAges = const RangeValues(22, 30);
+      standardAges = const RangeValues(18, 80);
       standardDistance = 50;
-      advancedAges = const RangeValues(22, 30);
+      advancedAges = const RangeValues(18, 80);
       advancedDistance = 50;
       standardVerified = false;
       advancedVerified = false;
@@ -141,7 +257,7 @@ class _FilterScreenState extends State<FilterScreen> {
       premiumOnly = false;
       vipOnly = false;
       mostLikedFirst = false;
-      selectedGender = 'Everyone';
+      selectedBodyTypes.clear();
       quickLanguage = 'Any';
       quickRelationshipGoal = 'Any';
       quickInterests.clear();
@@ -242,11 +358,6 @@ class _FilterScreenState extends State<FilterScreen> {
           : tab == 1
           ? standardSelections['Religion']
           : null;
-      final bodyType = tab == 2
-          ? advancedSelections['Body type']
-          : tab == 1
-          ? standardSelections['Body type']
-          : null;
       final selections = tab == 2 ? advancedSelections : standardSelections;
       final minimumHeight = tab == 2
           ? _heightInCentimeters(advancedMinimumHeight)
@@ -292,15 +403,15 @@ class _FilterScreenState extends State<FilterScreen> {
             ? advancedVerified
             : tab == 1 && standardVerified,
         activeTodayOnly: tab == 2 && activeToday,
-        genders: selectedGender == 'Everyone'
-            ? const []
-            : [_storedGenderFilterValue(selectedGender)],
+        genders: selectedGenders
+            .map(_storedGenderFilterValue)
+            .toList(growable: false),
         religions: religion == null || religion == 'Any'
             ? const []
             : [religion],
-        bodyTypes: bodyType == null || bodyType == 'Any'
-            ? const []
-            : [bodyType],
+        bodyTypes: tab == 2
+            ? selectedBodyTypes.toList(growable: false)
+            : const [],
         eyeColors: tab == 2 && selectedEyeColor != null
             ? [selectedEyeColor!]
             : const [],
@@ -334,7 +445,7 @@ class _FilterScreenState extends State<FilterScreen> {
         interestSlugs: (tab == 1 ? standardInterests : quickInterests)
             .map((value) => value.toLowerCase().replaceAll(' ', '-'))
             .toList(),
-        requiredGenders: selectedGender != 'Everyone',
+        requiredGenders: selectedGenders.isNotEmpty,
         requiredLocation: mode != 'worldwide',
         requiredLanguages: language != null && language != 'Any',
         requiredRelationshipGoal: goal != null && goal != 'Any',
@@ -470,6 +581,16 @@ class _FilterScreenState extends State<FilterScreen> {
     return int.tryParse(value.replaceAll(RegExp(r'[^0-9]'), ''));
   }
 
+  String _heightFilterValue(int? value) => value == null ? 'Any' : '$value cm';
+
+  String _displayInterestSlug(String value) => value
+      .split('-')
+      .where((part) => part.isNotEmpty)
+      .map(
+        (part) => '${part.substring(0, 1).toUpperCase()}${part.substring(1)}',
+      )
+      .join(' ');
+
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
@@ -524,16 +645,17 @@ class _FilterScreenState extends State<FilterScreen> {
       onShowResults: _showResults,
       applying: applyingFilters,
       children: [
-        DropdownButtonFormField<String>(
-          initialValue: selectedGender,
-          decoration: InputDecoration(labelText: context.tr('Gender')),
-          items: ['Everyone', 'Women', 'Men', 'Non-binary']
-              .map(
-                (value) => DropdownMenuItem(value: value, child: Text(value)),
-              )
-              .toList(),
-          onChanged: (value) =>
-              setState(() => selectedGender = value ?? selectedGender),
+        Card(
+          child: ListTile(
+            key: const Key('filter_gender_preference'),
+            leading: const Icon(Icons.people_outline),
+            title: const Text('Gender preference'),
+            subtitle: Text(
+              selectedGenders.firstOrNull ??
+                  'Choose a gender in Dating preferences',
+            ),
+            trailing: const Icon(Icons.lock_outline),
+          ),
         ),
         const SizedBox(height: 12),
         Text('Age ${ages.start.round()}–${ages.end.round()}'),
@@ -659,7 +781,7 @@ class _FilterScreenState extends State<FilterScreen> {
           icon: Icons.calendar_month_outlined,
           values: standardAges,
           min: 18,
-          max: 60,
+          max: 80,
           onChanged: (value) => setState(() => standardAges = value),
         ),
         const _SectionTitle('Place of residence'),
@@ -726,9 +848,11 @@ class _FilterScreenState extends State<FilterScreen> {
           icon: Icons.favorite_outline,
           options: const [
             'Any',
+            'Long-term relationship',
             'Marriage',
-            'Serious relationship',
+            'Dating',
             'Friendship',
+            'Networking',
           ],
           selected: standardSelections['Relationship goal']!,
           onSelected: (value) =>
@@ -741,7 +865,7 @@ class _FilterScreenState extends State<FilterScreen> {
             'Any',
             'Want children',
             'Have children',
-            'Don’t want',
+            'Don’t want children',
           ],
           selected: standardSelections['Want children']!,
           onSelected: (value) => _setStandardSelection('Want children', value),
@@ -761,20 +885,6 @@ class _FilterScreenState extends State<FilterScreen> {
               setState(() => standardMinimumHeight = value),
           onMaximumChanged: (value) =>
               setState(() => standardMaximumHeight = value),
-        ),
-        _ChoiceFilterCard(
-          title: 'Body type',
-          icon: Icons.accessibility_new,
-          options: const [
-            'Any',
-            'Slim',
-            'Athletic',
-            'Average',
-            'Curvy',
-            'Full-figured',
-          ],
-          selected: standardSelections['Body type']!,
-          onSelected: (value) => _setStandardSelection('Body type', value),
         ),
         _ChoiceFilterCard(
           title: 'Education level',
@@ -840,7 +950,7 @@ class _FilterScreenState extends State<FilterScreen> {
               icon: Icons.calendar_month_outlined,
               values: advancedAges,
               min: 18,
-              max: 60,
+              max: 80,
               onChanged: (value) => setState(() => advancedAges = value),
             ),
             const Padding(
@@ -903,7 +1013,15 @@ class _FilterScreenState extends State<FilterScreen> {
             _ChoiceFilterCard(
               title: 'Language',
               icon: Icons.language,
-              options: const ['Any', 'English', 'French', 'Spanish'],
+              options: const [
+                'Any',
+                'English',
+                'French',
+                'Spanish',
+                'Arabic',
+                'Mandarin',
+                'Other',
+              ],
               selected: advancedSelections['Language']!,
               onSelected: (value) => _setAdvancedSelection('Language', value),
               nested: true,
@@ -911,7 +1029,17 @@ class _FilterScreenState extends State<FilterScreen> {
             _ChoiceFilterCard(
               title: 'Religion',
               icon: Icons.self_improvement_outlined,
-              options: const ['Any', 'Christian', 'Muslim', 'Hindu'],
+              options: const [
+                'Any',
+                'Christian',
+                'Muslim',
+                'Hindu',
+                'Buddhist',
+                'Jewish',
+                'Spiritual',
+                'Atheist',
+                'Other',
+              ],
               selected: advancedSelections['Religion']!,
               onSelected: (value) => _setAdvancedSelection('Religion', value),
               nested: true,
@@ -925,14 +1053,21 @@ class _FilterScreenState extends State<FilterScreen> {
           children: [
             _advancedChoice('Relationship goal', Icons.favorite_border, const [
               'Any',
+              'Long-term relationship',
               'Marriage',
-              'Serious relationship',
+              'Dating',
               'Friendship',
+              'Networking',
             ]),
             _advancedChoice(
               'Want children',
               Icons.family_restroom_outlined,
-              const ['Any', 'Want children', 'Have children', 'Don’t want'],
+              const [
+                'Any',
+                'Want children',
+                'Have children',
+                'Don’t want children',
+              ],
             ),
             _advancedChoice('Relationship status', Icons.people_outline, const [
               'Any',
@@ -957,14 +1092,18 @@ class _FilterScreenState extends State<FilterScreen> {
               onMaximumChanged: (value) =>
                   setState(() => advancedMaximumHeight = value),
             ),
-            _advancedChoice('Body type', Icons.accessibility_new, const [
-              'Any',
-              'Slim',
-              'Athletic',
-              'Average',
-              'Curvy',
-              'Full-figured',
-            ]),
+            _BodyTypeSelector(
+              selected: selectedBodyTypes,
+              multiple: true,
+              requireValidation: true,
+              enabledGalleries: _enabledBodyGalleries(selectedGenders),
+              prompt: 'Choose the body shapes you would like to meet',
+              onChanged: (value) => setState(() {
+                selectedBodyTypes
+                  ..clear()
+                  ..addAll(value);
+              }),
+            ),
             _ColorFilterCard(
               title: 'Eye color',
               options: const [
@@ -1005,6 +1144,7 @@ class _FilterScreenState extends State<FilterScreen> {
             _advancedChoice('Smoking', Icons.smoke_free, const [
               'Any',
               'Non-smoker',
+              'Occasionally',
               'Smoker',
             ]),
           ],

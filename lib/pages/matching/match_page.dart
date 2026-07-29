@@ -367,7 +367,9 @@ class _MatchIdentity extends StatelessWidget {
 }
 
 class MatchScreen extends StatefulWidget {
-  const MatchScreen({super.key});
+  const MatchScreen({super.key, this.embedded = false});
+
+  final bool embedded;
 
   @override
   State<MatchScreen> createState() => _MatchScreenState();
@@ -382,80 +384,89 @@ class _MatchScreenState extends State<MatchScreen> {
     matches = MapLovRepository.instance.myMatches();
   }
 
-  @override
-  Widget build(BuildContext context) => _MainPage(
-    index: 2,
-    title: 'Your matches',
-    children: [
-      const Text(
-        'Compatibility helps you discover people. Messaging remains available to everyone.',
-        style: TextStyle(color: AppColors.grayText),
-      ),
-      const SizedBox(height: 16),
-      FutureBuilder<List<MatchItem>>(
-        future: matches,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          final items = snapshot.data ?? const <MatchItem>[];
-          if (items.isEmpty) {
-            return const ListTile(
-              leading: Icon(Icons.favorite_border),
-              title: Text('No mutual matches yet'),
-              subtitle: Text('Keep discovering people you like.'),
-            );
-          }
-          return Column(
-            children: items
-                .map(
-                  (item) => Card(
-                    child: ListTile(
-                      onTap: () async {
-                        if (!await _requireProfilePhotos(context, minimum: 3) ||
-                            !context.mounted) {
-                          return;
-                        }
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) =>
-                                PublicProfileScreen(profile: item.profile),
-                          ),
-                        );
-                      },
-                      leading: CircleAvatar(
-                        backgroundImage: profileImageProvider(item.profile),
-                      ),
-                      title: Text('${item.profile.name}, ${item.profile.age}'),
-                      subtitle: Text(
-                        '${item.profile.compatibilityScore}% compatible • Matched ${DateFormat.yMMMd().format(item.date)}',
-                      ),
-                      trailing: IconButton(
-                        onPressed: () async {
-                          final id = await MapLovRepository.instance
-                              .startConversation(item.profile.id);
-                          if (context.mounted) {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => ChatScreen(
-                                  conversationId: id,
-                                  profile: item.profile,
-                                ),
+  List<Widget> _children() => [
+    const Text(
+      'Compatibility helps you discover people. Messaging remains available to everyone.',
+      style: TextStyle(color: AppColors.grayText),
+    ),
+    const SizedBox(height: 16),
+    FutureBuilder<List<MatchItem>>(
+      future: matches,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        final items = snapshot.data ?? const <MatchItem>[];
+        if (items.isEmpty) {
+          return const ListTile(
+            leading: Icon(Icons.favorite_border),
+            title: Text('No mutual matches yet'),
+            subtitle: Text('Keep discovering people you like.'),
+          );
+        }
+        return Column(
+          children: items
+              .map(
+                (item) => Card(
+                  child: ListTile(
+                    onTap: () async {
+                      if (!await _requireProfilePhotos(context, minimum: 3) ||
+                          !context.mounted) {
+                        return;
+                      }
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) =>
+                              PublicProfileScreen(profile: item.profile),
+                        ),
+                      );
+                    },
+                    leading: CircleAvatar(
+                      backgroundImage: profileImageProvider(item.profile),
+                    ),
+                    title: Text('${item.profile.name}, ${item.profile.age}'),
+                    subtitle: Text(
+                      '${item.profile.compatibilityScore}% compatible • Matched ${DateFormat.yMMMd().format(item.date)}',
+                    ),
+                    trailing: IconButton(
+                      onPressed: () async {
+                        final id = await MapLovRepository.instance
+                            .startConversation(item.profile.id);
+                        if (context.mounted) {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => ChatScreen(
+                                conversationId: id,
+                                profile: item.profile,
                               ),
-                            );
-                          }
-                        },
-                        icon: const Icon(Icons.chat_bubble_outline),
-                      ),
+                            ),
+                          );
+                        }
+                      },
+                      icon: const Icon(Icons.chat_bubble_outline),
                     ),
                   ),
-                )
-                .toList(),
-          );
-        },
-      ),
-    ],
-  );
+                ),
+              )
+              .toList(),
+        );
+      },
+    ),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    if (widget.embedded) {
+      return _ResponsiveBody(
+        child: ListView(
+          key: const PageStorageKey('matches_tab'),
+          padding: const EdgeInsets.all(18),
+          children: _children(),
+        ),
+      );
+    }
+    return _MainPage(index: 2, title: 'Your matches', children: _children());
+  }
 }

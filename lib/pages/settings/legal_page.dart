@@ -211,11 +211,11 @@ const _privacySections = [
   ),
   _LegalSection(
     'Why we process it',
-    'To create accounts, verify that profile photos match the consenting account holder, recommend compatible profiles, enable communication, prevent abuse, moderate content, provide subscriptions and satisfy legal obligations.',
+    'To create accounts, compare the one-time registration selfie with existing private reference selfies, verify that profile photos match the consenting account holder, prevent duplicate accounts, recommend compatible profiles, enable communication, prevent abuse, moderate content, provide subscriptions and satisfy legal obligations.',
   ),
   _LegalSection(
     'Sharing',
-    'Profile content is shared according to your visibility choices. The private reference selfie is sent to AWS Rekognition only for face detection and comparison and is never displayed to members. Service providers process data only to operate MapLov. We do not sell biometric data, precise location or private messages.',
+    'Profile content is shared according to your visibility choices. The one-time private registration selfie is sent to AWS Rekognition only for profile-photo verification and duplicate-account prevention against existing private references, and is never displayed to members. Service providers process data only to operate MapLov. We do not sell biometric data, precise location or private messages.',
   ),
   _LegalSection(
     'Retention and deletion',

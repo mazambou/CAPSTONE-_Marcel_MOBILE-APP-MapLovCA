@@ -183,9 +183,11 @@ class AuthService {
     required String fullName,
     required String email,
     required String phone,
+    required String phoneCountry,
     required String callingCode,
     required String password,
     required String country,
+    required String countryCode,
     required String region,
     required String originCountry,
     required String originRegion,
@@ -202,7 +204,7 @@ class AuthService {
     final preferences = await SharedPreferences.getInstance();
     await preferences.setString(_pendingPhoneKey, normalizedPhone);
     await preferences.setString(_pendingPhoneEmailKey, normalizedEmail);
-    await preferences.setString(_pendingPhoneCountryKey, country.trim());
+    await preferences.setString(_pendingPhoneCountryKey, phoneCountry.trim());
     await preferences.setString(_pendingPhoneCallingCodeKey, callingCode);
 
     final client = _client;
@@ -217,9 +219,9 @@ class AuthService {
       data: {
         'first_name': fullName.trim(),
         'phone_number': normalizedPhone,
-        'phone_country_name': country.trim(),
+        'phone_country_name': phoneCountry.trim(),
         'phone_calling_code': callingCode,
-        'country_code': _countryCode(country),
+        'country_code': countryCode.trim().toUpperCase(),
         'country_name': country.trim(),
         'residence_region': region.trim(),
         'origin_country_name': originCountry.trim(),
@@ -305,21 +307,6 @@ class AuthService {
       type: OtpType.phoneChange,
     );
     await client.auth.refreshSession();
-    final preferences = await SharedPreferences.getInstance();
-    final country =
-        client.auth.currentUser?.userMetadata?['phone_country_name']
-            as String? ??
-        preferences.getString(_pendingPhoneCountryKey);
-    final callingCode =
-        client.auth.currentUser?.userMetadata?['phone_calling_code']
-            as String? ??
-        preferences.getString(_pendingPhoneCallingCodeKey);
-    if (country != null && callingCode != null) {
-      await client.rpc(
-        'sync_my_residence_from_verified_phone',
-        params: {'residence_country': country, 'calling_code': callingCode},
-      );
-    }
   }
 
   Future<void> deferPhoneVerificationForTesting() async {
@@ -415,32 +402,4 @@ class AuthService {
       '${value.year.toString().padLeft(4, '0')}-'
       '${value.month.toString().padLeft(2, '0')}-'
       '${value.day.toString().padLeft(2, '0')}';
-
-  String? _countryCode(String country) => const {
-    'Canada': 'CA',
-    'United States': 'US',
-    'Mexico': 'MX',
-    'Brazil': 'BR',
-    'United Kingdom': 'GB',
-    'France': 'FR',
-    'Germany': 'DE',
-    'Spain': 'ES',
-    'Italy': 'IT',
-    'Belgium': 'BE',
-    'Switzerland': 'CH',
-    'Morocco': 'MA',
-    'Algeria': 'DZ',
-    'Tunisia': 'TN',
-    'Senegal': 'SN',
-    'Cameroon': 'CM',
-    'Côte d’Ivoire': 'CI',
-    'Democratic Republic of the Congo': 'CD',
-    'Nigeria': 'NG',
-    'South Africa': 'ZA',
-    'India': 'IN',
-    'China': 'CN',
-    'Japan': 'JP',
-    'Australia': 'AU',
-    'New Zealand': 'NZ',
-  }[country.trim()];
 }

@@ -22,7 +22,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool loading = AuthService.instance.isConfigured;
   bool allowInternationalDiscovery = true;
   bool savingInternationalDiscovery = false;
-  bool showOriginOnProfile = false;
+  bool showOriginOnProfile = true;
   bool savingOriginVisibility = false;
   String? loadError;
 
@@ -380,25 +380,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       const SizedBox(height: 10),
       const _QuickCard('Dating preferences', Icons.tune, AppRoutes.preferences),
       const _SectionTitle('My community'),
-      const Row(
-        children: [
-          Expanded(
-            child: _QuickCard(
-              'My Friends',
-              Icons.groups_outlined,
-              AppRoutes.friends,
-            ),
-          ),
-          SizedBox(width: 10),
-          Expanded(
-            child: _QuickCard(
-              'Friends Posts',
-              Icons.dynamic_feed_outlined,
-              AppRoutes.posts,
-            ),
-          ),
-        ],
-      ),
+      const _QuickCard('My Friends', Icons.groups_outlined, AppRoutes.friends),
       const SizedBox(height: 10),
       const _QuickCard(
         'Friend Requests',

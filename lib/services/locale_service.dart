@@ -227,6 +227,17 @@ class MapLovLocalizations {
     'Posts': 'Publications',
     'Save preferences': 'Enregistrer les préférences',
     'Who you want to meet': 'Qui souhaitez-vous rencontrer',
+    'Gender preference': 'Préférence de genre',
+    'Choose a gender in Dating preferences':
+        'Choisissez un genre dans les préférences de rencontre',
+    'Choose one gender preference.':
+        'Choisissez une seule préférence de genre.',
+    'Your gender sets your default dating preference. You can change that preference later.':
+        'Votre genre définit votre préférence de rencontre par défaut. Vous pourrez ensuite modifier cette préférence.',
+    'Changing your gender resets your dating preference to the corresponding default.':
+        'La modification de votre genre réinitialise votre préférence de rencontre à la valeur correspondante par défaut.',
+    'Suggested from your profile. Confirm or change this choice.':
+        'Suggestion basée sur votre profil. Confirmez ou modifiez ce choix.',
     'Search location': 'Zone de recherche',
     'Compatibility priorities': 'Priorités de compatibilité',
     'Gender': 'Genre',
@@ -234,6 +245,19 @@ class MapLovLocalizations {
     'Women': 'Femmes',
     'Men': 'Hommes',
     'Non-binary': 'Non binaire',
+    'All silhouettes': 'Toutes les silhouettes',
+    'Feminine silhouette': 'Silhouette féminine',
+    'Masculine silhouette': 'Silhouette masculine',
+    'No preference': 'Aucune préférence',
+    'Validate selection': 'Valider la sélection',
+    'Choose the silhouette that resembles you most':
+        'Choisissez la silhouette qui vous ressemble le plus',
+    'Choose the body shapes you would like to meet':
+        'Choisissez les silhouettes que vous souhaitez rencontrer',
+    'Select one or more options. No preference is active by default.':
+        'Sélectionnez une ou plusieurs options. « Aucune préférence » est active par défaut.',
+    'This optional choice can be changed at any time.':
+        'Ce choix facultatif peut être modifié à tout moment.',
     'Nearby': 'À proximité',
     'Country': 'Pays',
     'Specific': 'Spécifique',
@@ -549,6 +573,16 @@ class MapLovLocalizations {
     'Profile photo': 'Photo de profil',
     'Private reference selfie': 'Selfie privé de référence',
     'Take selfie': 'Prendre un selfie',
+    'Identity selfie verified': 'Selfie d’identité vérifié',
+    'Verify your identity with a private selfie':
+        'Vérifiez votre identité avec un selfie privé',
+    'Your reference selfie is verified, kept private and never displayed on your profile.':
+        'Votre selfie de référence est vérifié, conservé en privé et jamais affiché sur votre profil.',
+    'Take one clear, front-facing selfie. MapLov keeps it private, compares it with existing private reference selfies to prevent duplicate accounts, and uses it to confirm your profile photos. It never appears on your profile.':
+        'Prenez un seul selfie clair et de face. MapLov le conserve en privé, le compare aux selfies privés de référence existants pour empêcher les comptes en double et l’utilise pour confirmer vos photos de profil. Il n’apparaît jamais sur votre profil.',
+    'Private • Security verification only':
+        'Privé • Vérification de sécurité uniquement',
+    'Take my private selfie': 'Prendre mon selfie privé',
     'Private selfie verification': 'Vérification par selfie privé',
     'I agree': 'J’accepte',
     'Create your private reference selfie first.':
@@ -566,14 +600,12 @@ class MapLovLocalizations {
         'Utilisez une photo de profil claire où votre visage est visible.',
     'Verified and kept private. It is never shown on your profile.':
         'Vérifié et conservé en privé. Il n’est jamais affiché sur votre profil.',
-    'Take a clear front-facing selfie. It will only be used to verify your profile photos.':
-        'Prenez un selfie clair de face. Il servira uniquement à vérifier vos photos de profil.',
-    'Ready to verify new profile photos.':
-        'Prêt à vérifier les nouvelles photos de profil.',
-    'Required before adding a profile photo.':
-        'Requis avant d’ajouter une photo de profil.',
-    'MapLov will securely store this selfie as private biometric reference data and send it to AWS Rekognition whenever you add a profile photo. The selfie is never displayed to members and is deleted with your account. Face comparison is probabilistic; if a photo is rejected, you can try another clear photo or contact support.':
-        'MapLov conservera ce selfie de façon sécurisée comme donnée biométrique privée de référence et l’enverra à AWS Rekognition chaque fois que vous ajouterez une photo de profil. Le selfie n’est jamais affiché aux membres et sera supprimé avec votre compte. La comparaison faciale est probabiliste; si une photo est refusée, essayez une autre photo claire ou contactez le soutien.',
+    'Identity verification is still loading. Try again.':
+        'La vérification d’identité est encore en cours de chargement. Réessayez.',
+    'Identity verification must be completed during registration. Contact support.':
+        'La vérification d’identité doit être effectuée pendant l’inscription. Contactez le soutien.',
+    'MapLov will securely store this one-time registration selfie as private biometric reference data and send it to AWS Rekognition to compare it with existing private reference selfies, prevent duplicate accounts, and verify your profile photos. The selfie is never displayed to members and is deleted with your account. Face comparison is probabilistic; if a photo or account is rejected, you can contact support.':
+        'MapLov conservera de façon sécurisée ce selfie unique pris à l’inscription comme donnée biométrique privée de référence et l’enverra à AWS Rekognition pour le comparer aux selfies privés existants, empêcher les comptes en double et vérifier vos photos de profil. Le selfie n’est jamais affiché aux membres et sera supprimé avec votre compte. La comparaison faciale est probabiliste; si une photo ou un compte est refusé, vous pouvez contacter le soutien.',
     'Your name and birth date are already saved. Confirm your current residence, then tell MapLov where you are originally from.':
         'Votre nom et votre date de naissance sont déjà enregistrés. Confirmez votre résidence actuelle, puis indiquez à MapLov d’où vous venez.',
     'Enable location for Discover': 'Activer la localisation pour Découvrir',
@@ -723,6 +755,10 @@ class MapLovLocalizations {
     'Your origin': 'Votre origine',
     'Determined by your verified phone number.':
         'Déterminé par votre numéro de téléphone vérifié.',
+    'Detecting from your current GPS location…':
+        'Détection à partir de votre position GPS actuelle…',
+    'Detected automatically by GPS. The country cannot be changed manually.':
+        'Détecté automatiquement par GPS. Le pays ne peut pas être modifié manuellement.',
     'Country of origin can only be chosen once.':
         'Le pays d’origine ne peut être choisi qu’une seule fois.',
     'Region of origin can only be chosen once.':
@@ -841,7 +877,13 @@ class MapLovLocalizations {
     'Separated': 'Séparé',
     'Widowed': 'Veuf',
     'Slim': 'Mince',
+    'Toned': 'Svelte et tonique',
+    'Fit': 'En forme',
     'Athletic': 'Athlétique',
+    'Muscular / built': 'Musclé(e) / charpenté(e)',
+    'Robust': 'Robuste',
+    'Round': 'Rond(e)',
+    'Very round': 'Très rond(e)',
     'Average': 'Moyenne',
     'Curvy': 'Avec des courbes',
     'Full-figured': 'Ronde',
@@ -929,12 +971,12 @@ class MapLovLocalizations {
         'Identifiants de compte, âge et détails du profil, photos, selfie privé de référence et résultats de comparaison faciale, messages, position approximative ou précise de l’appareil lorsque demandée, préférences, signalements de sécurité, état de l’abonnement et registres techniques de sécurité.',
     'To create accounts, recommend compatible profiles, enable communication, prevent abuse, moderate content, provide subscriptions and satisfy legal obligations.':
         'Pour créer des comptes, recommander des profils compatibles, permettre les communications, prévenir les abus, modérer le contenu, fournir les abonnements et respecter les obligations légales.',
-    'To create accounts, verify that profile photos match the consenting account holder, recommend compatible profiles, enable communication, prevent abuse, moderate content, provide subscriptions and satisfy legal obligations.':
-        'Pour créer des comptes, vérifier que les photos de profil correspondent au titulaire consentant, recommander des profils compatibles, permettre les communications, prévenir les abus, modérer le contenu, fournir les abonnements et respecter les obligations légales.',
+    'To create accounts, compare the one-time registration selfie with existing private reference selfies, verify that profile photos match the consenting account holder, prevent duplicate accounts, recommend compatible profiles, enable communication, prevent abuse, moderate content, provide subscriptions and satisfy legal obligations.':
+        'Pour créer des comptes, comparer le selfie unique pris à l’inscription aux selfies privés de référence existants, vérifier que les photos de profil correspondent au titulaire consentant, empêcher les comptes en double, recommander des profils compatibles, permettre les communications, prévenir les abus, modérer le contenu, fournir les abonnements et respecter les obligations légales.',
     'Profile content is shared according to your visibility choices. Service providers process data only to operate MapLov. We do not sell precise location or private messages.':
         'Le contenu du profil est partagé selon vos choix de visibilité. Les fournisseurs de services traitent les données uniquement pour exploiter MapLov. Nous ne vendons ni la position précise ni les messages privés.',
-    'Profile content is shared according to your visibility choices. The private reference selfie is sent to AWS Rekognition only for face detection and comparison and is never displayed to members. Service providers process data only to operate MapLov. We do not sell biometric data, precise location or private messages.':
-        'Le contenu du profil est partagé selon vos choix de visibilité. Le selfie privé de référence est envoyé à AWS Rekognition uniquement pour la détection et la comparaison faciales et n’est jamais affiché aux membres. Les fournisseurs traitent les données uniquement pour exploiter MapLov. Nous ne vendons ni données biométriques, ni position précise, ni messages privés.',
+    'Profile content is shared according to your visibility choices. The one-time private registration selfie is sent to AWS Rekognition only for profile-photo verification and duplicate-account prevention against existing private references, and is never displayed to members. Service providers process data only to operate MapLov. We do not sell biometric data, precise location or private messages.':
+        'Le contenu du profil est partagé selon vos choix de visibilité. Le selfie privé unique pris à l’inscription est envoyé à AWS Rekognition uniquement pour vérifier les photos de profil et empêcher les comptes en double en le comparant aux références privées existantes; il n’est jamais affiché aux membres. Les fournisseurs traitent les données uniquement pour exploiter MapLov. Nous ne vendons ni données biométriques, ni position précise, ni messages privés.',
     'A deletion request immediately hides the account. Unless retention is legally required, associated account data is scheduled for permanent erasure after 30 days.':
         'Une demande de suppression masque immédiatement le compte. Sauf obligation légale de conservation, les données associées au compte sont supprimées définitivement après 30 jours.',
     'A deletion request immediately hides the account. Unless retention is legally required, associated account data, including the private reference selfie and face-comparison records, is scheduled for permanent erasure after 30 days.':
@@ -968,6 +1010,7 @@ class MapLovLocalizations {
         'Pourquoi mon profil n’apparaît pas dans Découvrir',
     'Profile photo requirements': 'Exigences relatives aux photos de profil',
     'Likes and matches': 'J’aime et matchs',
+    'Likes & Matches': 'J’aime et matchs',
     'Messages and deletion': 'Messages et suppression',
     'Secret Garden safety': 'Sécurité du Jardin Secret',
     'Blocking and reporting': 'Blocage et signalement',

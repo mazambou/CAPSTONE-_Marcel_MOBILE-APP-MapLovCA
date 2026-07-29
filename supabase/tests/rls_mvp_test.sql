@@ -1,7 +1,7 @@
 begin;
 
 create extension if not exists pgtap with schema extensions;
-select plan(9);
+select plan(13);
 
 select set_config(
   'request.jwt.claims',
@@ -54,6 +54,31 @@ select set_config(
   'request.jwt.claims',
   '{"sub":"00000000-0000-4000-8000-0000000000a1","role":"authenticated"}',
   true
+);
+
+select ok(
+  has_function_privilege(
+    'authenticated',
+    'public.create_my_post(text,boolean)',
+    'execute'
+  ),
+  'authenticated users can call the author-scoped post RPC'
+);
+
+select lives_ok(
+  $$select public.create_my_post('Created through the trusted RPC', true)$$,
+  'an active authenticated account can create its own post'
+);
+
+select is(
+  (
+    select count(*)::integer
+    from public.posts
+    where author_id = '00000000-0000-4000-8000-0000000000a1'
+      and body = 'Created through the trusted RPC'
+  ),
+  1,
+  'the post RPC always assigns the authenticated account as author'
 );
 
 select lives_ok(
@@ -167,6 +192,15 @@ select throws_ok(
     )$$,
   'This account is not active',
   'a session suspended after login cannot keep publishing'
+);
+
+select throws_ok(
+  $$select public.create_my_post(
+      'A suspended account must not publish through the RPC',
+      true
+    )$$,
+  'This account is not active',
+  'the trusted post RPC also rejects suspended accounts'
 );
 
 select * from finish();

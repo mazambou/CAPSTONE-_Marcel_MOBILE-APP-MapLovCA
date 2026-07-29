@@ -37,6 +37,7 @@ dependencies:
   shared_preferences: ^2.5.5
   image_picker: ^1.2.3
   geolocator: ^14.0.3
+  geocoding: ^5.0.0
   in_app_purchase: ^3.3.0
   crypto: ^3.0.6
   url_launcher: ^6.3.2
@@ -86,6 +87,8 @@ flutter:
     - assets/chat/
     - assets/profile/
     - assets/secret_garden/
+    - assets/body_types/men/
+    - assets/body_types/women/
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

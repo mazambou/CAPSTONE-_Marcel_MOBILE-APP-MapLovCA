@@ -17,19 +17,20 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
   String residenceCountry = 'Canada';
   String residenceRegion = 'Any region';
   String residenceCity = 'Any city';
-  String gender = 'Everyone';
+  String? soughtGender;
   String relationshipGoal = 'Long-term';
   String language = 'Any language';
   String personality = 'Any personality';
-  bool requiredGender = false;
   bool requiredLanguage = false;
   bool requiredGoal = false;
   bool loading = true;
   bool saving = false;
   bool premiumPlus = false;
+  bool showingGenderSuggestion = false;
   List<String> savedOriginCountries = const [];
   List<String> savedOriginRegions = const [];
   List<String> savedOriginCities = const [];
+  DiscoveryFilters savedFilters = const DiscoveryFilters();
 
   @override
   void initState() {
@@ -43,6 +44,7 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
     final subscription = await MapLovRepository.instance.subscriptionInfo();
     if (!mounted) return;
     setState(() {
+      savedFilters = saved;
       ages = RangeValues(
         saved.minimumAge.toDouble(),
         saved.maximumAge.toDouble(),
@@ -55,9 +57,15 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
       searchMode = subscription.isPremium ? savedSearchMode : 'Near me';
       distance = saved.distanceKm.toDouble().clamp(1, 100);
       selectedCity = saved.cities.firstOrNull ?? 'Any city';
-      gender = _displayGenderFilterValue(
-        saved.genders.firstOrNull ?? 'Everyone',
-      );
+      final shouldSuggestGenders =
+          saved.genders.isEmpty &&
+          AuthService.instance.requiresPreferencesCompletion;
+      soughtGender = shouldSuggestGenders
+          ? _defaultSoughtGender(profile?['gender'] as String?)
+          : saved.genders.firstOrNull == null
+          ? null
+          : _displayGenderFilterValue(saved.genders.first);
+      showingGenderSuggestion = shouldSuggestGenders && soughtGender != null;
       relationshipGoal = saved.relationshipGoals.firstOrNull ?? 'Long-term';
       language = saved.languages.firstOrNull ?? 'Any language';
       personality = saved.personalities.firstOrNull ?? 'Any personality';
@@ -68,7 +76,6 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
       residenceRegion =
           profile?['residence_region'] as String? ?? residenceRegion;
       residenceCity = profile?['city'] as String? ?? residenceCity;
-      requiredGender = saved.requiredGenders;
       requiredLanguage = saved.requiredLanguages;
       requiredGoal = saved.requiredRelationshipGoal;
       premiumPlus = subscription.isPremium;
@@ -151,6 +158,12 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
 
   Future<void> _continue() async {
     if (loading || saving) return;
+    if (soughtGender == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Choose one gender preference.')),
+      );
+      return;
+    }
     final completingRegistration =
         !AuthService.instance.isConfigured ||
         AuthService.instance.requiresPreferencesCompletion;
@@ -188,9 +201,7 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
           cities: searchMode != 'Near me' && selectedCity != 'Any city'
               ? [selectedCity]
               : const [],
-          genders: gender == 'Everyone'
-              ? const []
-              : [_storedGenderFilterValue(gender)],
+          genders: [_storedGenderFilterValue(soughtGender!)],
           relationshipGoals: [relationshipGoal],
           languages: language == 'Any language'
               ? const []
@@ -203,7 +214,33 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
           originCountries: savedOriginCountries,
           originRegions: savedOriginRegions,
           originCities: savedOriginCities,
-          requiredGenders: requiredGender,
+          religions: savedFilters.religions,
+          bodyTypes: savedFilters.bodyTypes
+              .where(
+                (value) =>
+                    _bodyTypeAllowedForSoughtGender(value, soughtGender!),
+              )
+              .toList(growable: false),
+          eyeColors: savedFilters.eyeColors,
+          hairColors: savedFilters.hairColors,
+          minimumHeightCm: savedFilters.minimumHeightCm,
+          maximumHeightCm: savedFilters.maximumHeightCm,
+          childrenPreferences: savedFilters.childrenPreferences,
+          relationshipStatuses: savedFilters.relationshipStatuses,
+          educationLevels: savedFilters.educationLevels,
+          beardStyles: savedFilters.beardStyles,
+          smokingStatuses: savedFilters.smokingStatuses,
+          professionCategories: savedFilters.professionCategories,
+          incomeLevels: savedFilters.incomeLevels,
+          photoVerifiedOnly: savedFilters.photoVerifiedOnly,
+          verifiedOnly: savedFilters.verifiedOnly,
+          activeTodayOnly: savedFilters.activeTodayOnly,
+          interestSlugs: savedFilters.interestSlugs,
+          interestImportance: savedFilters.interestImportance,
+          premiumOnly: savedFilters.premiumOnly,
+          vipOnly: savedFilters.vipOnly,
+          mostLikedFirst: savedFilters.mostLikedFirst,
+          requiredGenders: true,
           requiredLocation: true,
           requiredLanguages: requiredLanguage,
           requiredRelationshipGoal: requiredGoal,
@@ -279,21 +316,21 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
         style: TextStyle(color: AppColors.grayText),
       ),
       const _SectionTitle('Who you want to meet'),
-      DropdownButtonFormField<String>(
-        initialValue: gender,
-        decoration: InputDecoration(labelText: context.tr('Gender')),
-        items: ['Everyone', 'Women', 'Men', 'Non-binary']
-            .map((value) => DropdownMenuItem(value: value, child: Text(value)))
-            .toList(),
-        onChanged: (value) => setState(() => gender = value ?? gender),
+      _GenderSingleSelector(
+        selected: soughtGender,
+        onChanged: (value) => setState(() {
+          soughtGender = value;
+          showingGenderSuggestion = false;
+        }),
       ),
-      SwitchListTile.adaptive(
-        contentPadding: EdgeInsets.zero,
-        title: const Text('Required gender criterion'),
-        subtitle: const Text('Hide profiles that do not match this choice.'),
-        value: requiredGender,
-        onChanged: (value) => setState(() => requiredGender = value),
-      ),
+      if (showingGenderSuggestion)
+        const Padding(
+          padding: EdgeInsets.only(top: 8),
+          child: Text(
+            'Suggested from your profile. Confirm or change this choice.',
+            style: TextStyle(color: AppColors.grayText, fontSize: 13),
+          ),
+        ),
       const SizedBox(height: 14),
       Text('Age range: ${ages.start.round()}–${ages.end.round()}'),
       RangeSlider(

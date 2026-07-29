@@ -24,7 +24,8 @@ class _PostsScreenState extends State<PostsScreen> {
   }
 
   @override
-  Widget build(BuildContext context) => _AppPage(
+  Widget build(BuildContext context) => _MainPage(
+    index: 1,
     title: 'Friends posts',
     children: [
       Align(

@@ -7,6 +7,8 @@ class AppRoutes {
   static const register = '/register';
   static const ageGate = '/age-gate';
   static const forgotPassword = '/forgot-password';
+  static const magicLink = '/magic-link';
+  static const authCallback = '/auth/callback';
   static const resetPassword = '/reset-password';
   static const verifyEmail = '/verify-email';
   static const verifyPhone = '/verify-phone';
@@ -47,6 +49,7 @@ class AppRoutes {
   static const privacy = '/settings/privacy';
   static const photoDisplaySettings = '/settings/photo-display';
   static const security = '/settings/security';
+  static const changeEmail = '/settings/change-email';
   static const notificationSettings = '/settings/notifications';
   static const language = '/settings/language';
   static const blockedUsers = '/settings/blocked-users';

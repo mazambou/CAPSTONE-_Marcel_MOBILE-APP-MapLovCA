@@ -13,8 +13,8 @@ class RegistrationGateData {
 }
 
 const _legalDocumentVersions = <String, String>{
-  'terms_of_use': '2026-07-16',
-  'privacy_policy': '2026-07-16',
+  'terms_of_use': _legalDraftVersion,
+  'privacy_policy': _legalDraftVersion,
   'community_guidelines': '2026-07-16',
   'adult_eligibility': '2026-07-16',
   'content_and_safety_rules': '2026-07-16',
@@ -35,17 +35,17 @@ class _AgeGateScreenState extends State<AgeGateScreen> {
       acceptedDocuments.length == _legalDocumentVersions.length;
 
   void _openLegalDocument(String key) {
-    final (title, sections) = switch (key) {
-      'terms_of_use' => ('Terms of Use', _termsSections),
-      'privacy_policy' => ('Privacy Policy', _privacySections),
-      'community_guidelines' => ('Community Guidelines', _communitySections),
-      'adult_eligibility' => ('Adult eligibility', _childSafetySections),
-      _ => ('Content, reporting and safety rules', _communitySections),
+    final document = switch (key) {
+      'terms_of_use' => _termsDocument,
+      'privacy_policy' => _privacyDocument,
+      'community_guidelines' => _communityDocument,
+      'adult_eligibility' => _adultEligibilityDocument,
+      _ => _contentSafetyDocument,
     };
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => _LegalDocumentScreen(title: title, sections: sections),
+        builder: (_) => _LegalDocumentScreen(document: document),
       ),
     );
   }
@@ -139,7 +139,7 @@ class _AgeGateScreenState extends State<AgeGateScreen> {
       ),
       _acceptanceTile(
         'privacy_policy',
-        'I have read and accept the ',
+        'I acknowledge that I have read the ',
         'Privacy Policy',
       ),
       _acceptanceTile(

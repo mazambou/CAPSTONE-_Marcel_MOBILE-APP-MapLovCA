@@ -1,7 +1,7 @@
 begin;
 
 create extension if not exists pgtap with schema extensions;
-select plan(17);
+select plan(21);
 
 select has_table('public', 'face_references',
   'private reference selfie metadata is stored');
@@ -56,6 +56,37 @@ select has_function(
 select ok(
   not has_table_privilege('authenticated', 'public.profile_photos', 'insert'),
   'authenticated users cannot bypass server-side face verification'
+);
+select has_function(
+  'private',
+  'can_upload_registration_selfie',
+  array['uuid'],
+  'storage checks whether registration may upload its unique selfie'
+);
+select has_function(
+  'public',
+  'cleanup_rejected_duplicate_registrations',
+  array['integer'],
+  'rejected provisional duplicate accounts have a cleanup worker'
+);
+select ok(
+  not has_function_privilege(
+    'authenticated',
+    'public.cleanup_rejected_duplicate_registrations(integer)',
+    'EXECUTE'
+  ),
+  'members cannot invoke rejected-registration cleanup'
+);
+select ok(
+  exists(
+    select 1
+    from pg_policies
+    where schemaname = 'storage'
+      and tablename = 'objects'
+      and policyname = 'identity_selfies_owner_insert'
+      and with_check like '%can_upload_registration_selfie%'
+  ),
+  'identity storage rejects a second reference-selfie upload'
 );
 
 select * from finish();

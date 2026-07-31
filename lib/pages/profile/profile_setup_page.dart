@@ -310,6 +310,10 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
         );
       }
     } on FaceVerificationException catch (error) {
+      if (error.rejectsRegistration) {
+        await _handleRejectedDuplicateRegistration();
+        return;
+      }
       if (mounted) {
         ScaffoldMessenger.of(
           context,
@@ -326,6 +330,29 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     } finally {
       if (mounted) setState(() => enrollingFaceReference = false);
     }
+  }
+
+  Future<void> _handleRejectedDuplicateRegistration() async {
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: const Text('Account not created'),
+        content: const Text(
+          'MapLov rejected this registration because the selfie matches an existing private reference. The provisional account and uploaded selfie are removed. Use account recovery or contact support.',
+        ),
+        actions: [
+          FilledButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Go to login'),
+          ),
+        ],
+      ),
+    );
+    await AuthService.instance.discardRejectedRegistration();
+    if (!mounted) return;
+    Navigator.pushNamedAndRemoveUntil(context, AppRoutes.login, (_) => false);
   }
 
   Future<void> _continue() async {

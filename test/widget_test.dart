@@ -271,6 +271,7 @@ void main() {
     await tester.drag(find.byType(ListView), const Offset(0, -500));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('defer_phone_verification')), findsOneWidget);
+    expect(find.text('Continue for now'), findsOneWidget);
 
     await tester.drag(find.byType(ListView), const Offset(0, 500));
     await tester.pumpAndSettle();
@@ -282,6 +283,13 @@ void main() {
     await tester.pump();
 
     expect(find.text('Enter the 6-digit code sent by SMS.'), findsOneWidget);
+
+    await tester.drag(find.byType(ListView), const Offset(0, -500));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('defer_phone_verification')));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(HomeScreen), findsOneWidget);
   });
 
   testWidgets('profile setup reuses residence and asks for origin', (
@@ -389,9 +397,7 @@ void main() {
       find.byType(ListView).first,
       const Offset(0, -250),
     );
-    await tester.ensureVisible(
-      find.byKey(const Key('profile_setup_continue')),
-    );
+    await tester.ensureVisible(find.byKey(const Key('profile_setup_continue')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('profile_setup_continue')));
     await tester.pumpAndSettle();
@@ -2128,6 +2134,13 @@ void main() {
     );
     expect(error.code, 'face_mismatch');
     expect(error.toString(), error.message);
+    expect(error.rejectsRegistration, isFalse);
+
+    const duplicate = FaceVerificationException(
+      'duplicate_account_detected',
+      'An account already exists.',
+    );
+    expect(duplicate.rejectsRegistration, isTrue);
   });
 
   testWidgets('non-VIP invisible navigation opens the VIP popup', (

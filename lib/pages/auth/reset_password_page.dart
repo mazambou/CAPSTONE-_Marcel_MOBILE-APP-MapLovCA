@@ -46,7 +46,9 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Your password has been updated.')),
       );
-      Navigator.pushNamedAndRemoveUntil(context, AppRoutes.login, (_) => false);
+      final destination = await _authenticatedLandingRoute();
+      if (!mounted) return;
+      Navigator.pushNamedAndRemoveUntil(context, destination, (_) => false);
     } catch (error) {
       if (mounted) {
         setState(() => _errorText = AuthService.instance.messageFor(error));

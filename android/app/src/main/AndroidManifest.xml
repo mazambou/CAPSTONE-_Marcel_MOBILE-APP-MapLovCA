@@ -33,6 +33,23 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
+            <!--
+              Production Supabase callbacks use a verified HTTPS App Link.
+              autoVerify removes the browser chooser once maplov.ca serves a
+              matching Digital Asset Links statement for ca.maplov.app.
+            -->
+            <intent-filter
+                android:autoVerify="true"
+                android:label="MapLov verified authentication">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="https"
+                    android:host="maplov.ca"
+                    android:path="/auth/callback" />
+            </intent-filter>
+            <!-- Compatibility fallback for links issued by earlier builds. -->
             <intent-filter android:label="MapLov authentication">
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />

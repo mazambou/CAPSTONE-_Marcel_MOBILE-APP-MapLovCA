@@ -13,32 +13,10 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _rememberMe = true;
   bool _obscurePassword = true;
   bool _isLoading = false;
-  bool _isNavigating = false;
   String? _errorText;
-  StreamSubscription<MapLovAuthEvent>? _authSubscription;
-
-  @override
-  void initState() {
-    super.initState();
-    _authSubscription = AuthService.instance.events.listen((event) {
-      if (event == MapLovAuthEvent.signedIn) unawaited(_handleSignedIn());
-    });
-  }
-
-  Future<void> _handleSignedIn() async {
-    try {
-      await AuthService.instance.validateCurrentAccount();
-      await _goHome();
-    } catch (error) {
-      if (mounted) {
-        setState(() => _errorText = AuthService.instance.messageFor(error));
-      }
-    }
-  }
 
   @override
   void dispose() {
-    _authSubscription?.cancel();
     _identifierController.dispose();
     _passwordController.dispose();
     super.dispose();
@@ -63,7 +41,9 @@ class _LoginScreenState extends State<LoginScreen> {
         password: password,
         rememberSession: _rememberMe,
       );
-      await _goHome();
+      if (!AuthService.instance.isConfigured) {
+        await _navigateToAuthenticatedLanding();
+      }
     } catch (error) {
       if (mounted) {
         setState(() => _errorText = AuthService.instance.messageFor(error));
@@ -81,7 +61,9 @@ class _LoginScreenState extends State<LoginScreen> {
     });
     try {
       await signIn();
-      if (!AuthService.instance.isConfigured) await _goHome();
+      if (!AuthService.instance.isConfigured) {
+        await _navigateToAuthenticatedLanding();
+      }
     } catch (error) {
       if (mounted) {
         setState(() => _errorText = AuthService.instance.messageFor(error));
@@ -91,18 +73,9 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  Future<void> _goHome() async {
-    if (!mounted || _isNavigating) return;
-    _isNavigating = true;
-    final complete = await AuthService.instance.isCurrentProfileComplete();
+  Future<void> _navigateToAuthenticatedLanding() async {
+    final destination = await _authenticatedLandingRoute();
     if (!mounted) return;
-    final destination = !complete
-        ? AppRoutes.profileSetup
-        : AuthService.instance.requiresPreferencesCompletion
-        ? AppRoutes.preferences
-        : AuthService.instance.requiresPhoneVerification
-        ? AppRoutes.verifyPhone
-        : AppRoutes.home;
     Navigator.pushNamedAndRemoveUntil(context, destination, (_) => false);
   }
 
@@ -170,6 +143,10 @@ class _LoginScreenState extends State<LoginScreen> {
                                 );
                               },
                               onLogin: _login,
+                              onMagicLink: () => Navigator.pushNamed(
+                                context,
+                                AppRoutes.magicLink,
+                              ),
                               onGoogleLogin: () => _socialLogin(
                                 AuthService.instance.signInWithGoogle,
                               ),
@@ -294,6 +271,7 @@ class _LoginCard extends StatelessWidget {
     required this.onRememberChanged,
     required this.onPasswordVisibilityChanged,
     required this.onLogin,
+    required this.onMagicLink,
     required this.onGoogleLogin,
     required this.onAppleLogin,
     required this.onRegister,
@@ -308,6 +286,7 @@ class _LoginCard extends StatelessWidget {
   final ValueChanged<bool?> onRememberChanged;
   final VoidCallback onPasswordVisibilityChanged;
   final VoidCallback onLogin;
+  final VoidCallback onMagicLink;
   final VoidCallback onGoogleLogin;
   final VoidCallback onAppleLogin;
   final VoidCallback onRegister;
@@ -461,6 +440,11 @@ class _LoginCard extends StatelessWidget {
                       ),
               ),
             ),
+          ),
+          TextButton.icon(
+            onPressed: isLoading ? null : onMagicLink,
+            icon: const Icon(Icons.mark_email_read_outlined, size: 18),
+            label: const Text('Email me a Magic Link'),
           ),
           const SizedBox(height: 13),
           const Row(

@@ -7,10 +7,29 @@ class SecurityScreen extends StatelessWidget {
   Widget build(BuildContext context) => _AppPage(
     title: 'Security',
     children: [
-      const ListTile(
-        leading: Icon(Icons.verified_user_outlined, color: AppColors.success),
-        title: Text('Email verified'),
-        subtitle: Text('jamie@example.com'),
+      ListTile(
+        leading: Icon(
+          AuthService.instance.isEmailVerified
+              ? Icons.verified_user_outlined
+              : Icons.mark_email_unread_outlined,
+          color: AuthService.instance.isEmailVerified
+              ? AppColors.success
+              : AppColors.coral,
+        ),
+        title: Text(
+          AuthService.instance.isEmailVerified
+              ? 'Email verified'
+              : 'Email verification pending',
+        ),
+        subtitle: Text(
+          AuthService.instance.currentEmail ?? 'No email address available',
+        ),
+      ),
+      ListTile(
+        leading: const Icon(Icons.alternate_email_outlined),
+        title: const Text('Change email address'),
+        trailing: const Icon(Icons.chevron_right),
+        onTap: () => Navigator.pushNamed(context, AppRoutes.changeEmail),
       ),
       ListTile(
         leading: const Icon(Icons.password_outlined),

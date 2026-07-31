@@ -565,8 +565,20 @@ class MapLovLocalizations {
     'Phone verification protects accounts and helps keep MapLov authentic.':
         'La vérification téléphonique protège les comptes et contribue à préserver l’authenticité de MapLov.',
     'Confirm this phone number': 'Confirmer ce numéro de téléphone',
-    'Temporary testing option: the phone will remain unverified.':
-        'Option de test temporaire : le téléphone restera non vérifié.',
+    'You can verify your phone number later. It will not block account creation for now.':
+        'Vous pourrez vérifier votre numéro de téléphone plus tard. Pour le moment, cela ne bloque pas la création du compte.',
+    'Continue for now': 'Continuer pour l’instant',
+    'Continuing…': 'Ouverture…',
+    'Send verification code': 'Envoyer le code de vérification',
+    'Resend code': 'Renvoyer le code',
+    'Sending…': 'Envoi…',
+    'Verify phone number': 'Vérifier le numéro de téléphone',
+    'Verifying…': 'Vérification…',
+    'Phone number unavailable': 'Numéro de téléphone indisponible',
+    'The phone number could not be recovered. Return to the previous steps or continue for now.':
+        'Le numéro de téléphone n’a pas pu être récupéré. Revenez aux étapes précédentes ou continuez pour l’instant.',
+    'Enter the 6-digit code sent by SMS.':
+        'Saisissez le code à 6 chiffres envoyé par SMS.',
     'Back to dating preferences': 'Retour aux préférences de rencontre',
     'Create your profile': 'Créer votre profil',
     'Add profile photo': 'Ajouter une photo de profil',
@@ -574,6 +586,10 @@ class MapLovLocalizations {
     'Private reference selfie': 'Selfie privé de référence',
     'Take selfie': 'Prendre un selfie',
     'Identity selfie verified': 'Selfie d’identité vérifié',
+    'Account not created': 'Compte non créé',
+    'Go to login': 'Aller à la connexion',
+    'MapLov rejected this registration because the selfie matches an existing private reference. The provisional account and uploaded selfie are removed. Use account recovery or contact support.':
+        'MapLov a refusé cette inscription, car le selfie correspond à une référence privée existante. Le compte provisoire et le selfie téléversé sont supprimés. Utilisez la récupération de compte ou contactez le soutien.',
     'Verify your identity with a private selfie':
         'Vérifiez votre identité avec un selfie privé',
     'Your reference selfie is verified, kept private and never displayed on your profile.':
@@ -585,6 +601,12 @@ class MapLovLocalizations {
     'Take my private selfie': 'Prendre mon selfie privé',
     'Private selfie verification': 'Vérification par selfie privé',
     'I agree': 'J’accepte',
+    'I understand and agree': 'Je comprends et j’accepte',
+    'Read the detailed notice': 'Lire l’avis détaillé',
+    'MapLov will store one private registration selfie as the biometric reference for this account. Image bytes are sent to AWS Rekognition to detect one face, compare the selfie with existing private references to limit duplicate accounts, and verify later profile photos.\n\n'
+            'The selfie is never displayed to members or used for advertising. It remains private while the account is active and follows the 30-day account-deletion schedule. Face comparison is probabilistic and can produce a false match or rejection. You can ask privacy@maplov.ca to review a decision, withdraw consent or delete the reference; withdrawal may prevent continued use of features that require it.':
+        'MapLov conservera un selfie privé d’inscription comme référence biométrique de ce compte. Les octets de l’image sont transmis à AWS Rekognition afin de détecter un visage, de comparer le selfie aux références privées existantes pour limiter les comptes en double et de vérifier les futures photos de profil.\n\n'
+        'Le selfie n’est jamais affiché aux membres ni utilisé à des fins publicitaires. Il demeure privé tant que le compte est actif et suit le calendrier de suppression du compte de 30 jours. La comparaison faciale est probabiliste et peut produire un faux rapprochement ou un refus. Vous pouvez demander à privacy@maplov.ca de réviser une décision, de retirer votre consentement ou de supprimer la référence; ce retrait peut empêcher l’utilisation continue des fonctions qui en ont besoin.',
     'Create your private reference selfie first.':
         'Créez d’abord votre selfie privé de référence.',
     'A private reference selfie is required.':
@@ -656,6 +678,13 @@ class MapLovLocalizations {
     'Try a shorter search or contact support.':
         'Essayez une recherche plus courte ou contactez le soutien.',
     'MVP legal documents': 'Documents juridiques du MVP',
+    'Legal drafts for MapLov': 'Projets juridiques pour MapLov',
+    'Original Canadian drafts based on MapLov’s actual features. The legal operator name, postal address and final launch date must be confirmed by qualified Canadian counsel before publication.':
+        'Projets canadiens originaux fondés sur les fonctions réelles de MapLov. La dénomination de l’exploitant, son adresse postale et la date définitive de lancement doivent être confirmées par un juriste canadien qualifié avant publication.',
+    'Privacy controls': 'Contrôles de confidentialité',
+    'Questions about privacy or these documents can be sent to privacy@maplov.ca. General support is available at support@maplov.ca.':
+        'Les questions sur la vie privée ou ces documents peuvent être envoyées à privacy@maplov.ca. Le soutien général est offert à support@maplov.ca.',
+    'I acknowledge that I have read the ': 'Je reconnais avoir lu la ',
     'Questions: privacy@maplov.ca': 'Questions : privacy@maplov.ca',
     'This report is confidential.': 'Ce signalement est confidentiel.',
     'Report submitted for review.': 'Signalement soumis pour examen.',

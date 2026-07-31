@@ -331,24 +331,27 @@ Deno.serve(async (request) => {
           provider_request_id: duplicate.requestId,
           failure_reason: 'duplicate_account_detected',
         });
-        await admin
-          .from('profiles')
-          .update({ status: 'suspended', is_discoverable: false })
-          .eq('id', user.id);
-        await admin.from('notifications').insert({
-          user_id: user.id,
-          kind: 'security',
-          title: 'Account already exists',
-          body:
-            'A MapLov account already exists for this person. Use account recovery or contact support.',
-          entity_type: 'profile',
-          entity_id: user.id,
-        });
         await admin.storage.from('identity-selfies').remove([storagePath]);
+
+        // The authenticated row only exists provisionally so the private
+        // selfie can be uploaded. A rejected duplicate is not a MapLov
+        // account and must not remain in Auth or any profile table.
+        const { error: deleteUserError } = await admin.auth.admin.deleteUser(
+          user.id,
+        );
+        if (deleteUserError) {
+          // Keep the unusable provisional row hidden until the scheduled
+          // cleanup retries the permanent deletion.
+          await admin
+            .from('profiles')
+            .update({ status: 'suspended', is_discoverable: false })
+            .eq('id', user.id);
+        }
         return response(409, {
           code: 'duplicate_account_detected',
           message:
             'A MapLov account already exists for this person. Use account recovery or contact support.',
+          registrationRemoved: !deleteUserError,
         });
       }
       const { error } = await admin.from('face_references').insert({

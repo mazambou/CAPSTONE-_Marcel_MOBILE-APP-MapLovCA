@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
-	<dict>
+<dict>
 		<key>CADisableMinimumFrameDurationOnPhone</key>
 		<true/>
 		<key>CFBundleDevelopmentRegion</key>
@@ -23,6 +23,7 @@
 		<key>CFBundleURLTypes</key>
 		<array>
 			<dict>
+				<!-- Compatibility fallback for links issued by earlier builds. -->
 				<key>CFBundleTypeRole</key>
 				<string>Editor</string>
 				<key>CFBundleURLSchemes</key>
@@ -35,16 +36,16 @@
 		<string>????</string>
 		<key>CFBundleVersion</key>
 		<string>$(FLUTTER_BUILD_NUMBER)</string>
-	<key>LSRequiresIPhoneOS</key>
-	<true/>
-	<key>NSCameraUsageDescription</key>
-	<string>MapLov uses the camera when you choose to add a profile or post photo.</string>
-	<key>NSPhotoLibraryUsageDescription</key>
-	<string>MapLov uses selected photos for your profile, posts, messages, and Secret Garden.</string>
-	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>MapLov uses your approximate location to find nearby people without showing exact coordinates.</string>
-	<key>NSMicrophoneUsageDescription</key>
-	<string>MapLov uses the microphone when you choose to record a voice message.</string>
+		<key>LSRequiresIPhoneOS</key>
+		<true/>
+		<key>NSCameraUsageDescription</key>
+		<string>MapLov uses the camera when you choose to add a profile or post photo.</string>
+		<key>NSPhotoLibraryUsageDescription</key>
+		<string>MapLov uses selected photos for your profile, posts, messages, and Secret Garden.</string>
+		<key>NSLocationWhenInUseUsageDescription</key>
+		<string>MapLov uses your approximate location to find nearby people without showing exact coordinates.</string>
+		<key>NSMicrophoneUsageDescription</key>
+		<string>MapLov uses the microphone when you choose to record a voice message.</string>
 		<key>UIApplicationSceneManifest</key>
 		<dict>
 			<key>UIApplicationSupportsMultipleScenes</key>
@@ -87,5 +88,5 @@
 		</array>
 		<key>UIStatusBarHidden</key>
 		<false/>
-	</dict>
+</dict>
 </plist>

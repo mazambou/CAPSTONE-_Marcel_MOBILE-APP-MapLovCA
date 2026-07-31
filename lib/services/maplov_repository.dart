@@ -14,6 +14,8 @@ class FaceVerificationException implements Exception {
   final String code;
   final String message;
 
+  bool get rejectsRegistration => code == 'duplicate_account_detected';
+
   @override
   String toString() => message;
 }

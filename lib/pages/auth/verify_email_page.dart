@@ -10,30 +10,12 @@ class VerifyEmailScreen extends StatefulWidget {
 }
 
 class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
-  StreamSubscription<MapLovAuthEvent>? _authSubscription;
   bool _isLoading = false;
   String? _message;
   bool _messageIsError = false;
 
   String get _email =>
       widget.email ?? AuthService.instance.currentEmail ?? 'your email address';
-
-  @override
-  void initState() {
-    super.initState();
-    _authSubscription = AuthService.instance.events.listen((event) {
-      if (event == MapLovAuthEvent.signedIn ||
-          event == MapLovAuthEvent.userUpdated) {
-        _continueToProfile();
-      }
-    });
-  }
-
-  @override
-  void dispose() {
-    _authSubscription?.cancel();
-    super.dispose();
-  }
 
   Future<void> _checkVerification() async {
     setState(() {

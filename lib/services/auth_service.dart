@@ -1,6 +1,7 @@
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../config/auth_link_config.dart';
 import '../config/supabase_config.dart';
 
 enum MapLovAuthEvent {
@@ -9,6 +10,19 @@ enum MapLovAuthEvent {
   passwordRecovery,
   userUpdated,
   other,
+}
+
+/// The request that must be completed when Supabase returns to MapLov.
+///
+/// Supabase emits the authoritative auth event. Persisting this small,
+/// non-secret intent also covers Flutter web, where Supabase can process and
+/// clear the callback URL before the first widget subscribes to auth events.
+enum MapLovAuthIntent {
+  emailConfirmation,
+  passwordRecovery,
+  magicLink,
+  oauth,
+  emailChange,
 }
 
 class SignUpResult {
@@ -21,8 +35,10 @@ class AuthService {
   AuthService._();
 
   static final instance = AuthService._();
-  static const authRedirectUrl = 'io.maplov.app://auth-callback';
+  static const authRedirectUrl = AuthLinkConfig.callbackUrl;
+  static const fallbackAuthRedirectUrl = AuthLinkConfig.customSchemeCallbackUrl;
   static const _rememberSessionKey = 'maplov_remember_session';
+  static const _pendingAuthIntentKey = 'maplov_pending_auth_intent';
   static const _pendingPhoneKey = 'maplov_pending_phone';
   static const _pendingPhoneEmailKey = 'maplov_pending_phone_email';
   static const _pendingPhoneCountryKey = 'maplov_pending_phone_country';
@@ -30,10 +46,12 @@ class AuthService {
 
   String? _pendingPhoneCache;
   String? _pendingPhoneEmailCache;
+  MapLovAuthIntent? _pendingAuthIntent;
 
   SupabaseClient? get _client => SupabaseConfig.client;
   bool get isConfigured => SupabaseConfig.isConfigured;
   bool get hasActiveSession => _client?.auth.currentSession != null;
+  MapLovAuthIntent? get pendingAuthIntent => _pendingAuthIntent;
   String? get currentEmail => _client?.auth.currentUser?.email;
   bool get isEmailVerified =>
       !isConfigured || _client?.auth.currentUser?.emailConfirmedAt != null;
@@ -78,13 +96,27 @@ class AuthService {
     });
   }
 
+  /// Hydrates local auth state before the first widget is built.
+  Future<void> initialize() async {
+    final preferences = await SharedPreferences.getInstance();
+    _pendingPhoneCache = preferences.getString(_pendingPhoneKey);
+    _pendingPhoneEmailCache = preferences.getString(_pendingPhoneEmailKey);
+    final storedIntent = preferences.getString(_pendingAuthIntentKey);
+    _pendingAuthIntent = MapLovAuthIntent.values
+        .where((intent) => intent.name == storedIntent)
+        .firstOrNull;
+  }
+
   Future<void> enforceSessionPreference() async {
     final preferences = await SharedPreferences.getInstance();
     _pendingPhoneCache = preferences.getString(_pendingPhoneKey);
     _pendingPhoneEmailCache = preferences.getString(_pendingPhoneEmailKey);
     final client = _client;
     if (client == null || client.auth.currentSession == null) return;
-    if (preferences.getBool(_rememberSessionKey) == false) {
+    // A recovery/confirmation callback creates a short-lived session needed
+    // to finish the requested operation, even when "Remember me" was off.
+    if (_pendingAuthIntent == null &&
+        preferences.getBool(_rememberSessionKey) == false) {
       await client.auth.signOut(scope: SignOutScope.local);
     }
   }
@@ -106,6 +138,7 @@ class AuthService {
     final client = _client;
     if (client == null) return;
 
+    await clearPendingAuthIntent();
     final normalizedIdentifier = identifier.trim();
     if (normalizedIdentifier.contains('@')) {
       await client.auth.signInWithPassword(
@@ -212,28 +245,34 @@ class AuthService {
       return const SignUpResult(requiresEmailConfirmation: true);
     }
 
-    final response = await client.auth.signUp(
-      email: normalizedEmail,
-      password: password,
-      emailRedirectTo: authRedirectUrl,
-      data: {
-        'first_name': fullName.trim(),
-        'phone_number': normalizedPhone,
-        'phone_country_name': phoneCountry.trim(),
-        'phone_calling_code': callingCode,
-        'country_code': countryCode.trim().toUpperCase(),
-        'country_name': country.trim(),
-        'residence_region': region.trim(),
-        'origin_country_name': originCountry.trim(),
-        'origin_region': originRegion.trim(),
-        'origin_city': originCity.trim(),
-        'city': city.trim(),
-        'date_of_birth': _dateOnly(dateOfBirth),
-        'accepted_legal_documents': acceptedDocuments,
-        'legal_accepted_at': legalAcceptedAt.toUtc().toIso8601String(),
-      },
-    );
-    return SignUpResult(requiresEmailConfirmation: response.session == null);
+    await _rememberAuthIntent(MapLovAuthIntent.emailConfirmation);
+    try {
+      final response = await client.auth.signUp(
+        email: normalizedEmail,
+        password: password,
+        emailRedirectTo: authRedirectUrl,
+        data: {
+          'first_name': fullName.trim(),
+          'phone_number': normalizedPhone,
+          'phone_country_name': phoneCountry.trim(),
+          'phone_calling_code': callingCode,
+          'country_code': countryCode.trim().toUpperCase(),
+          'country_name': country.trim(),
+          'residence_region': region.trim(),
+          'origin_country_name': originCountry.trim(),
+          'origin_region': originRegion.trim(),
+          'origin_city': originCity.trim(),
+          'city': city.trim(),
+          'date_of_birth': _dateOnly(dateOfBirth),
+          'accepted_legal_documents': acceptedDocuments,
+          'legal_accepted_at': legalAcceptedAt.toUtc().toIso8601String(),
+        },
+      );
+      return SignUpResult(requiresEmailConfirmation: response.session == null);
+    } catch (_) {
+      await clearPendingAuthIntent();
+      rethrow;
+    }
   }
 
   Future<bool> signInWithGoogle() => _signInWithOAuth(OAuthProvider.google);
@@ -245,27 +284,79 @@ class AuthService {
     if (client == null) return false;
     final preferences = await SharedPreferences.getInstance();
     await preferences.setBool(_rememberSessionKey, true);
-    return client.auth.signInWithOAuth(provider, redirectTo: authRedirectUrl);
+    await _rememberAuthIntent(MapLovAuthIntent.oauth);
+    try {
+      final launched = await client.auth.signInWithOAuth(
+        provider,
+        redirectTo: authRedirectUrl,
+      );
+      if (!launched) await clearPendingAuthIntent();
+      return launched;
+    } catch (_) {
+      await clearPendingAuthIntent();
+      rethrow;
+    }
+  }
+
+  Future<void> sendMagicLink(String email) async {
+    final client = _client;
+    if (client == null) return;
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.setBool(_rememberSessionKey, true);
+    await _rememberAuthIntent(MapLovAuthIntent.magicLink);
+    try {
+      await client.auth.signInWithOtp(
+        email: email.trim().toLowerCase(),
+        emailRedirectTo: authRedirectUrl,
+        shouldCreateUser: false,
+      );
+    } catch (_) {
+      await clearPendingAuthIntent();
+      rethrow;
+    }
   }
 
   Future<void> sendPasswordReset(String email) async {
     final client = _client;
     if (client == null) return;
-    await client.auth.resetPasswordForEmail(
-      email.trim().toLowerCase(),
-      redirectTo: authRedirectUrl,
-    );
+    await _rememberAuthIntent(MapLovAuthIntent.passwordRecovery);
+    try {
+      await client.auth.resetPasswordForEmail(
+        email.trim().toLowerCase(),
+        redirectTo: authRedirectUrl,
+      );
+    } catch (_) {
+      await clearPendingAuthIntent();
+      rethrow;
+    }
   }
 
   Future<void> updatePassword(String password) async {
     final client = _client;
     if (client == null) return;
     await client.auth.updateUser(UserAttributes(password: password));
+    await clearPendingAuthIntent();
+  }
+
+  Future<void> requestEmailChange(String email) async {
+    final client = _client;
+    if (client == null) return;
+    await _rememberAuthIntent(MapLovAuthIntent.emailChange);
+    try {
+      await client.auth.updateUser(
+        UserAttributes(email: email.trim().toLowerCase()),
+        emailRedirectTo: authRedirectUrl,
+      );
+    } catch (_) {
+      await clearPendingAuthIntent();
+      rethrow;
+    }
   }
 
   Future<void> resendVerificationEmail(String email) async {
     final client = _client;
     if (client == null) return;
+    await _rememberAuthIntent(MapLovAuthIntent.emailConfirmation);
     await client.auth.resend(
       type: OtpType.signup,
       email: email.trim().toLowerCase(),
@@ -309,7 +400,7 @@ class AuthService {
     await client.auth.refreshSession();
   }
 
-  Future<void> deferPhoneVerificationForTesting() async {
+  Future<void> deferPhoneVerification() async {
     final client = _client;
     final user = client?.auth.currentUser;
     if (isConfigured && (client == null || user == null)) {
@@ -336,6 +427,7 @@ class AuthService {
   }
 
   Future<void> signOut({bool allDevices = false}) async {
+    await clearPendingAuthIntent();
     final client = _client;
     if (client != null) {
       try {
@@ -346,6 +438,22 @@ class AuthService {
       await client.auth.signOut(
         scope: allDevices ? SignOutScope.global : SignOutScope.local,
       );
+    }
+  }
+
+  Future<void> discardRejectedRegistration() async {
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.remove(_pendingPhoneKey);
+    await preferences.remove(_pendingPhoneEmailKey);
+    await preferences.remove(_pendingPhoneCountryKey);
+    await preferences.remove(_pendingPhoneCallingCodeKey);
+    _pendingPhoneCache = null;
+    _pendingPhoneEmailCache = null;
+    await clearPendingAuthIntent();
+
+    final client = _client;
+    if (client != null) {
+      await client.auth.signOut(scope: SignOutScope.local);
     }
   }
 
@@ -362,6 +470,18 @@ class AuthService {
       await client.rpc('request_account_deletion');
       await client.auth.signOut(scope: SignOutScope.global);
     }
+  }
+
+  Future<void> _rememberAuthIntent(MapLovAuthIntent intent) async {
+    _pendingAuthIntent = intent;
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.setString(_pendingAuthIntentKey, intent.name);
+  }
+
+  Future<void> clearPendingAuthIntent() async {
+    _pendingAuthIntent = null;
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.remove(_pendingAuthIntentKey);
   }
 
   String messageFor(Object error) {

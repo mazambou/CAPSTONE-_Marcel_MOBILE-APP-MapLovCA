@@ -17,6 +17,13 @@ abstract final class SupabaseConfig {
     await Supabase.initialize(
       url: Env.supabaseUrl,
       publishableKey: Env.supabasePublishableKey,
+      // PKCE keeps the verifier on the device that initiated the request.
+      // Supabase Flutter owns the app_links listener and exchanges the code
+      // received through Android App Links or iOS Universal Links.
+      authOptions: const FlutterAuthClientOptions(
+        authFlowType: AuthFlowType.pkce,
+        detectSessionInUri: true,
+      ),
     );
   }
 

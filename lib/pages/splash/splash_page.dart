@@ -29,6 +29,14 @@ class _SplashScreenState extends State<SplashScreen> {
 
   Future<void> _leaveSplash() async {
     if (!mounted) return;
+    // A recovery session remains actionable across an interruption until the
+    // password is actually changed.
+    if (AuthService.instance.hasActiveSession &&
+        AuthService.instance.pendingAuthIntent ==
+            MapLovAuthIntent.passwordRecovery) {
+      Navigator.of(context).pushReplacementNamed(AppRoutes.resetPassword);
+      return;
+    }
     var profileComplete = true;
     if (AuthService.instance.hasActiveSession) {
       try {

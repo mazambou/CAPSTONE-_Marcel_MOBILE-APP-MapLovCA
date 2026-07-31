@@ -18,6 +18,8 @@ class AppRouter {
     },
     AppRoutes.ageGate: (_) => const AgeGateScreen(),
     AppRoutes.forgotPassword: (_) => const ForgotPasswordScreen(),
+    AppRoutes.magicLink: (_) => const MagicLinkScreen(),
+    AppRoutes.authCallback: (_) => const AuthCallbackScreen(),
     AppRoutes.resetPassword: (_) => const ResetPasswordScreen(),
     AppRoutes.verifyEmail: (_) => const VerifyEmailScreen(),
     AppRoutes.verifyPhone: (_) => const VerifyPhoneScreen(),
@@ -59,7 +61,8 @@ class AppRouter {
     AppRoutes.notifications: (_) => _protected(const NotificationsScreen()),
     AppRoutes.privacy: (_) => const PrivacyScreen(),
     AppRoutes.photoDisplaySettings: (_) => const PhotoDisplaySettingsScreen(),
-    AppRoutes.security: (_) => const SecurityScreen(),
+    AppRoutes.security: (_) => _protected(const SecurityScreen()),
+    AppRoutes.changeEmail: (_) => _protected(const ChangeEmailScreen()),
     AppRoutes.notificationSettings: (_) => const NotificationSettingsScreen(),
     AppRoutes.language: (_) => const LanguageScreen(),
     AppRoutes.blockedUsers: (_) => const BlockedUsersScreen(),
@@ -74,6 +77,30 @@ class AppRouter {
     AppRoutes.adminAudit: (_) =>
         const _AdminRouteGuard(child: AdminAuditScreen()),
   };
+
+  /// Resolves query-bearing web callbacks by path while preserving arguments.
+  static Route<dynamic>? onGenerateRoute(RouteSettings settings) {
+    final path = Uri.tryParse(settings.name ?? '')?.path;
+    final builder = path == null ? null : routes[path];
+    if (builder == null) return null;
+    return MaterialPageRoute<void>(
+      builder: builder,
+      settings: RouteSettings(name: path, arguments: settings.arguments),
+    );
+  }
+
+  /// Prevents Flutter from constructing intermediate routes such as `/auth`
+  /// when the browser starts directly at `/auth/callback`.
+  static List<Route<dynamic>> onGenerateInitialRoutes(String initialRoute) {
+    final callback = onGenerateRoute(RouteSettings(name: initialRoute));
+    if (callback != null) return [callback];
+    return [
+      MaterialPageRoute<void>(
+        builder: routes[AppRoutes.splash]!,
+        settings: const RouteSettings(name: AppRoutes.splash),
+      ),
+    ];
+  }
 }
 
 class _AuthenticatedRouteGuard extends StatelessWidget {

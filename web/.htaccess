@@ -1,0 +1,9 @@
+# Namecheap shared hosting uses Apache. Keep verified-link files directly
+# accessible and send application routes such as /auth/callback to Flutter.
+Options -MultiViews
+RewriteEngine On
+
+RewriteCond %{REQUEST_URI} !^/\.well-known/
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^ index.html [L]

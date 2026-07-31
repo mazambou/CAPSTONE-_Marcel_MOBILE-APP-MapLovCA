@@ -12,6 +12,7 @@ class _VerifyPhoneScreenState extends State<VerifyPhoneScreen> {
   bool _sending = true;
   bool _verifying = false;
   bool _deferring = false;
+  bool _codeSent = false;
   String? _message;
   bool _messageIsError = false;
   String? _phone;
@@ -25,8 +26,15 @@ class _VerifyPhoneScreenState extends State<VerifyPhoneScreen> {
   Future<void> _initialize() async {
     final phone = await AuthService.instance.phoneNumberForVerification();
     if (!mounted) return;
-    setState(() => _phone = phone);
-    await _sendCode();
+    setState(() {
+      _phone = phone;
+      _sending = false;
+      if (phone == null || phone.isEmpty) {
+        _message =
+            'The phone number could not be recovered. Return to the previous steps or continue for now.';
+        _messageIsError = true;
+      }
+    });
   }
 
   @override
@@ -44,7 +52,7 @@ class _VerifyPhoneScreenState extends State<VerifyPhoneScreen> {
       setState(() {
         _sending = false;
         _message =
-            'The phone number could not be recovered. Return to the previous steps or continue with the temporary testing option.';
+            'The phone number could not be recovered. Return to the previous steps or continue for now.';
         _messageIsError = true;
       });
       return;
@@ -57,6 +65,7 @@ class _VerifyPhoneScreenState extends State<VerifyPhoneScreen> {
       }
       if (mounted) {
         setState(() {
+          _codeSent = true;
           _message =
               'A 6-digit verification code was sent to ${_phone ?? 'this number'}.';
           _messageIsError = false;
@@ -82,13 +91,13 @@ class _VerifyPhoneScreenState extends State<VerifyPhoneScreen> {
     }
   }
 
-  Future<void> _continueForTesting() async {
+  Future<void> _continueWithoutVerification() async {
     setState(() {
       _deferring = true;
       _message = null;
     });
     try {
-      await AuthService.instance.deferPhoneVerificationForTesting();
+      await AuthService.instance.deferPhoneVerification();
       if (mounted) {
         Navigator.pushNamedAndRemoveUntil(
           context,
@@ -210,8 +219,16 @@ class _VerifyPhoneScreenState extends State<VerifyPhoneScreen> {
           onPressed: _verifying ? () {} : _verify,
         ),
         TextButton(
-          onPressed: _sending ? null : () => _sendCode(resend: true),
-          child: Text(_sending ? 'Sending…' : 'Resend code'),
+          onPressed: _sending || _verifying || _deferring
+              ? null
+              : () => _sendCode(resend: _codeSent),
+          child: Text(
+            _sending
+                ? 'Sending…'
+                : _codeSent
+                ? 'Resend code'
+                : 'Send verification code',
+          ),
         ),
         TextButton.icon(
           key: const Key('phone_back_to_preferences'),
@@ -221,27 +238,21 @@ class _VerifyPhoneScreenState extends State<VerifyPhoneScreen> {
           icon: const Icon(Icons.arrow_back),
           label: const Text('Back to dating preferences'),
         ),
-        if (AppConfig.allowTestingBypass) ...[
-          const SizedBox(height: 12),
-          const Divider(),
-          const SizedBox(height: 8),
-          const Text(
-            'Temporary testing option: the phone will remain unverified.',
-            textAlign: TextAlign.center,
-            style: TextStyle(color: AppColors.grayText, fontSize: 12),
-          ),
-          TextButton(
-            key: const Key('defer_phone_verification'),
-            onPressed: _sending || _verifying || _deferring
-                ? null
-                : _continueForTesting,
-            child: Text(
-              _deferring
-                  ? 'Continuing…'
-                  : 'Continue without verification (testing)',
-            ),
-          ),
-        ],
+        const SizedBox(height: 12),
+        const Divider(),
+        const SizedBox(height: 8),
+        const Text(
+          'You can verify your phone number later. It will not block account creation for now.',
+          textAlign: TextAlign.center,
+          style: TextStyle(color: AppColors.grayText, fontSize: 12),
+        ),
+        TextButton(
+          key: const Key('defer_phone_verification'),
+          onPressed: _verifying || _deferring
+              ? null
+              : _continueWithoutVerification,
+          child: Text(_deferring ? 'Continuing…' : 'Continue for now'),
+        ),
       ],
     );
   }

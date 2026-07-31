@@ -4,6 +4,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/material.dart' as material show Text, TextDirection;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/services.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:file_selector/file_selector.dart' show XTypeGroup, openFile;
@@ -15,6 +16,7 @@ import 'package:record/record.dart';
 
 import 'data/mock_data.dart';
 import 'config/app_config.dart';
+import 'config/auth_link_config.dart';
 import 'models/user_profile.dart';
 import 'routes/app_routes.dart';
 import 'services/auth_service.dart';
@@ -44,6 +46,8 @@ part 'pages/auth/register_page.dart';
 part 'pages/auth/age_gate_page.dart';
 part 'pages/auth/delete_account_page.dart';
 part 'pages/auth/forgot_password_page.dart';
+part 'pages/auth/magic_link_page.dart';
+part 'pages/auth/auth_callback_page.dart';
 part 'pages/auth/reset_password_page.dart';
 part 'pages/auth/verify_email_page.dart';
 part 'pages/auth/verify_phone_page.dart';
@@ -87,6 +91,7 @@ part 'pages/settings/notification_settings_page.dart';
 part 'pages/settings/privacy_page.dart';
 part 'pages/settings/photo_display_settings_page.dart';
 part 'pages/settings/security_page.dart';
+part 'pages/settings/change_email_page.dart';
 part 'pages/notifications/notifications_page.dart';
 part 'pages/admin/admin_dashboard_page.dart';
 part 'pages/admin/moderation_reports_page.dart';
@@ -205,6 +210,18 @@ class MapLoveApp extends StatefulWidget {
   State<MapLoveApp> createState() => _MapLoveAppState();
 }
 
+Future<String> _authenticatedLandingRoute() async {
+  await AuthService.instance.validateCurrentAccount();
+  final complete = await AuthService.instance.isCurrentProfileComplete();
+  return !complete
+      ? AppRoutes.profileSetup
+      : AuthService.instance.requiresPreferencesCompletion
+      ? AppRoutes.preferences
+      : AuthService.instance.requiresPhoneVerification
+      ? AppRoutes.verifyPhone
+      : AppRoutes.home;
+}
+
 class _MapLoveAppState extends State<MapLoveApp> with WidgetsBindingObserver {
   // Keeping a NavigatorObserver avoids reparenting a GlobalKey-owned
   // Navigator when the MaterialApp rebuilds after a locale change. Flutter
@@ -213,6 +230,7 @@ class _MapLoveAppState extends State<MapLoveApp> with WidgetsBindingObserver {
   final _navigatorObserver = NavigatorObserver();
   StreamSubscription<MapLovAuthEvent>? _authSubscription;
   Timer? _presenceHeartbeat;
+  bool _authNavigationInProgress = false;
 
   @override
   void initState() {
@@ -226,11 +244,54 @@ class _MapLoveAppState extends State<MapLoveApp> with WidgetsBindingObserver {
       } else if (event == MapLovAuthEvent.signedOut) {
         _presenceHeartbeat?.cancel();
       }
-      if (event == MapLovAuthEvent.passwordRecovery) {
-        _navigatorObserver.navigator?.pushNamed(AppRoutes.resetPassword);
+      if (event == MapLovAuthEvent.signedIn ||
+          event == MapLovAuthEvent.passwordRecovery) {
+        unawaited(_routeAfterAuth(event));
+      }
+    });
+    // On Flutter web, Supabase can exchange and remove the callback code
+    // before widgets subscribe. The persisted intent safely restores the
+    // missing navigation decision without storing any token.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (kIsWeb &&
+          AuthLinkConfig.isCallback(Uri.base) &&
+          AuthService.instance.pendingAuthIntent != null &&
+          AuthService.instance.hasActiveSession) {
+        unawaited(_routeAfterAuth(MapLovAuthEvent.other));
       }
     });
     if (AuthService.instance.hasActiveSession) _startPresence();
+  }
+
+  Future<void> _routeAfterAuth(MapLovAuthEvent event) async {
+    final navigator = _navigatorObserver.navigator;
+    if (navigator == null || _authNavigationInProgress) return;
+    _authNavigationInProgress = true;
+    try {
+      final intent = AuthService.instance.pendingAuthIntent;
+      if (event == MapLovAuthEvent.passwordRecovery ||
+          intent == MapLovAuthIntent.passwordRecovery) {
+        navigator.pushNamedAndRemoveUntil(
+          AppRoutes.resetPassword,
+          (_) => false,
+        );
+        return;
+      }
+      if (!AuthService.instance.hasActiveSession) return;
+      if (intent == MapLovAuthIntent.emailChange) {
+        await AuthService.instance.clearPendingAuthIntent();
+        navigator.pushNamedAndRemoveUntil(AppRoutes.security, (_) => false);
+        return;
+      }
+      final destination = await _authenticatedLandingRoute();
+      if (intent != null) await AuthService.instance.clearPendingAuthIntent();
+      navigator.pushNamedAndRemoveUntil(destination, (_) => false);
+    } catch (_) {
+      // Account validation owns the user-facing error on the login screen.
+      navigator.pushNamedAndRemoveUntil(AppRoutes.login, (_) => false);
+    } finally {
+      _authNavigationInProgress = false;
+    }
   }
 
   void _startPresence() {
@@ -304,8 +365,12 @@ class _MapLoveAppState extends State<MapLoveApp> with WidgetsBindingObserver {
             style: OutlinedButton.styleFrom(minimumSize: const Size(48, 48)),
           ),
         ),
-        initialRoute: AppRoutes.splash,
+        // Web must honor /auth/callback from the browser. Native launches
+        // continue through the splash screen while Supabase handles the URI.
+        initialRoute: kIsWeb ? null : AppRoutes.splash,
+        onGenerateInitialRoutes: AppRouter.onGenerateInitialRoutes,
         routes: AppRouter.routes,
+        onGenerateRoute: AppRouter.onGenerateRoute,
       ),
     );
   }
@@ -443,20 +508,36 @@ Future<bool> confirmFaceVerificationConsent(BuildContext context) async =>
     await showDialog<bool>(
       context: context,
       barrierDismissible: false,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: const Text('Private selfie verification'),
-        content: const Text(
-          'MapLov will securely store this one-time registration selfie as private biometric reference data and send it to AWS Rekognition to compare it with existing private reference selfies, prevent duplicate accounts, and verify your profile photos. The selfie is never displayed to members and is deleted with your account. Face comparison is probabilistic; if a photo or account is rejected, you can contact support.',
+        content: const SingleChildScrollView(
+          child: Text(
+            'MapLov will store one private registration selfie as the biometric reference for this account. Image bytes are sent to AWS Rekognition to detect one face, compare the selfie with existing private references to limit duplicate accounts, and verify later profile photos.\n\n'
+            'The selfie is never displayed to members or used for advertising. It remains private while the account is active and follows the 30-day account-deletion schedule. Face comparison is probabilistic and can produce a false match or rejection. You can ask privacy@maplov.ca to review a decision, withdraw consent or delete the reference; withdrawal may prevent continued use of features that require it.',
+          ),
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context, false),
+            onPressed: () async {
+              await Navigator.push(
+                dialogContext,
+                MaterialPageRoute(
+                  builder: (_) => const _LegalDocumentScreen(
+                    document: _faceVerificationDocument,
+                  ),
+                ),
+              );
+            },
+            child: const Text('Read the detailed notice'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
             child: const Text('Not now'),
           ),
           FilledButton(
             key: const Key('accept_face_verification'),
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('I agree'),
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('I understand and agree'),
           ),
         ],
       ),

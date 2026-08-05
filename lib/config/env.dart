@@ -8,6 +8,15 @@ abstract final class Env {
     defaultValue: false,
   );
 
+  /// Exposes hosted Stripe, PayPal and Flutterwave checkout on Flutter Web.
+  ///
+  /// The matching server switch must also be enabled. Native mobile builds
+  /// keep using App Store / Play Billing to comply with store policies.
+  static const externalCheckoutEnabled = bool.fromEnvironment(
+    'EXTERNAL_CHECKOUT_ENABLED',
+    defaultValue: false,
+  );
+
   static const supabaseUrl = String.fromEnvironment(
     'SUPABASE_URL',
     defaultValue: 'https://heqkgexzlhdnmrkuikle.supabase.co',

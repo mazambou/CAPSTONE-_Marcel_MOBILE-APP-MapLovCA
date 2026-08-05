@@ -97,10 +97,11 @@ class _LoginScreenState extends State<LoginScreen> {
                 alignment: Alignment.center,
               ),
               SafeArea(
-                child: Center(
-                  child: FittedBox(
-                    fit: BoxFit.scaleDown,
-                    alignment: Alignment.topCenter,
+                child: SingleChildScrollView(
+                  key: const Key('login_scroll_view'),
+                  keyboardDismissBehavior:
+                      ScrollViewKeyboardDismissBehavior.onDrag,
+                  child: Center(
                     child: SizedBox(
                       width: pageWidth,
                       height: 850,
@@ -143,10 +144,6 @@ class _LoginScreenState extends State<LoginScreen> {
                                 );
                               },
                               onLogin: _login,
-                              onMagicLink: () => Navigator.pushNamed(
-                                context,
-                                AppRoutes.magicLink,
-                              ),
                               onGoogleLogin: () => _socialLogin(
                                 AuthService.instance.signInWithGoogle,
                               ),
@@ -271,7 +268,6 @@ class _LoginCard extends StatelessWidget {
     required this.onRememberChanged,
     required this.onPasswordVisibilityChanged,
     required this.onLogin,
-    required this.onMagicLink,
     required this.onGoogleLogin,
     required this.onAppleLogin,
     required this.onRegister,
@@ -286,7 +282,6 @@ class _LoginCard extends StatelessWidget {
   final ValueChanged<bool?> onRememberChanged;
   final VoidCallback onPasswordVisibilityChanged;
   final VoidCallback onLogin;
-  final VoidCallback onMagicLink;
   final VoidCallback onGoogleLogin;
   final VoidCallback onAppleLogin;
   final VoidCallback onRegister;
@@ -440,11 +435,6 @@ class _LoginCard extends StatelessWidget {
                       ),
               ),
             ),
-          ),
-          TextButton.icon(
-            onPressed: isLoading ? null : onMagicLink,
-            icon: const Icon(Icons.mark_email_read_outlined, size: 18),
-            label: const Text('Email me a Magic Link'),
           ),
           const SizedBox(height: 13),
           const Row(

@@ -10,28 +10,51 @@ class VerifyEmailScreen extends StatefulWidget {
 }
 
 class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
+  final _codeController = TextEditingController();
   bool _isLoading = false;
   String? _message;
   bool _messageIsError = false;
 
   String get _email =>
-      widget.email ?? AuthService.instance.currentEmail ?? 'your email address';
+      widget.email ??
+      AuthService.instance.emailForVerification ??
+      'your email address';
 
-  Future<void> _checkVerification() async {
+  @override
+  void dispose() {
+    _codeController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _verify() async {
+    if (_email == 'your email address') {
+      setState(() {
+        _message = 'Return to registration and enter your email address.';
+        _messageIsError = true;
+      });
+      return;
+    }
+    final code = _codeController.text.trim();
+    if (!RegExp(r'^\d{6}$').hasMatch(code)) {
+      setState(() {
+        _message = 'Enter the 6-digit code sent by email.';
+        _messageIsError = true;
+      });
+      return;
+    }
     setState(() {
       _isLoading = true;
       _message = null;
     });
     try {
-      final verified = await AuthService.instance
-          .refreshAndCheckEmailVerification();
+      await AuthService.instance.verifyEmailCode(email: _email, code: code);
       if (!mounted) return;
-      if (verified) {
+      if (!AuthService.instance.isConfigured) {
         _continueToProfile();
       } else {
         setState(() {
-          _message = 'Your email is not verified yet. Check your inbox.';
-          _messageIsError = true;
+          _message = 'Email verified. Continuing…';
+          _messageIsError = false;
         });
       }
     } catch (error) {
@@ -62,7 +85,8 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
       await AuthService.instance.resendVerificationEmail(_email);
       if (mounted) {
         setState(() {
-          _message = 'A new verification email has been sent.';
+          _codeController.clear();
+          _message = 'A new 6-digit verification code has been sent.';
           _messageIsError = false;
         });
       }
@@ -106,12 +130,27 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
       ),
       const SizedBox(height: 10),
       Text(
-        'We sent a verification link to $_email. Verify your email to continue creating your profile.',
+        'We sent a 6-digit verification code to $_email. Enter it below to continue creating your profile.',
         textAlign: TextAlign.center,
         style: const TextStyle(color: AppColors.grayText),
       ),
+      const SizedBox(height: 24),
+      TextField(
+        key: const Key('email_verification_code'),
+        controller: _codeController,
+        keyboardType: TextInputType.number,
+        textInputAction: TextInputAction.done,
+        maxLength: 6,
+        autofillHints: const [AutofillHints.oneTimeCode],
+        enabled: !_isLoading,
+        onSubmitted: (_) => _verify(),
+        decoration: InputDecoration(
+          labelText: context.tr('6-digit code'),
+          prefixIcon: const Icon(Icons.password_outlined),
+        ),
+      ),
       if (_message != null) ...[
-        const SizedBox(height: 16),
+        const SizedBox(height: 8),
         Text(
           _message!,
           textAlign: TextAlign.center,
@@ -120,14 +159,14 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
           ),
         ),
       ],
-      const SizedBox(height: 28),
+      const SizedBox(height: 18),
       _PrimaryButton(
-        _isLoading ? 'Checking...' : 'I verified my email',
-        onPressed: _isLoading ? () {} : _checkVerification,
+        _isLoading ? 'Verifying…' : 'Verify email',
+        onPressed: _isLoading ? () {} : _verify,
       ),
       OutlinedButton(
         onPressed: _isLoading ? null : _resend,
-        child: const Text('Resend verification email'),
+        child: const Text('Resend code'),
       ),
     ],
   );

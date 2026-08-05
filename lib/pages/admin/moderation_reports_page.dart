@@ -1,7 +1,10 @@
 part of '../../app.dart';
 
 class ModerationReportsScreen extends StatefulWidget {
-  const ModerationReportsScreen({super.key});
+  const ModerationReportsScreen({super.key, this.pendingOnly = false});
+
+  final bool pendingOnly;
+
   @override
   State<ModerationReportsScreen> createState() =>
       _ModerationReportsScreenState();
@@ -18,7 +21,9 @@ class _ModerationReportsScreenState extends State<ModerationReportsScreen> {
   }
 
   void _reload() {
-    reports = MapLovRepository.instance.moderationReports();
+    reports = MapLovRepository.instance.moderationReports(
+      pendingOnly: widget.pendingOnly,
+    );
     moderatedProfiles = MapLovRepository.instance.moderatedProfileQueue();
     moderatedPhotos = MapLovRepository.instance.moderatedPhotoQueue();
   }
@@ -143,194 +148,202 @@ class _ModerationReportsScreenState extends State<ModerationReportsScreen> {
 
   @override
   Widget build(BuildContext context) => _AppPage(
-    title: 'User reports',
+    title: widget.pendingOnly ? 'Pending reports' : 'User reports',
     children: [
-      const Text(
-        'This page is protected by the PostgreSQL admin role and RLS policies.',
-        style: TextStyle(color: AppColors.grayText),
+      Text(
+        widget.pendingOnly
+            ? 'Only reports that still require an administrative decision are shown.'
+            : 'This page is protected by the PostgreSQL admin role and RLS policies.',
+        style: const TextStyle(color: AppColors.grayText),
       ),
       const SizedBox(height: 14),
-      const _SectionTitle('Profiles awaiting validation'),
-      FutureBuilder<List<Map<String, dynamic>>>(
-        future: moderatedProfiles,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snapshot.hasError) {
-            return Text('Unable to load profile moderation: ${snapshot.error}');
-          }
-          final profiles = snapshot.data ?? const <Map<String, dynamic>>[];
-          if (profiles.isEmpty) {
-            return const Text('No profiles are awaiting validation.');
-          }
-          return Column(
-            children: profiles.map((item) {
-              final profile = item['profile'] as Map<String, dynamic>;
-              final profileReports =
-                  item['reports'] as List<Map<String, dynamic>>;
-              final profileId = profile['id'] as String;
-              final location = [profile['city'], profile['country_name']]
-                  .whereType<String>()
-                  .where((value) => value.isNotEmpty)
-                  .join(', ');
-              return Card(
-                key: Key('moderated_profile_$profileId'),
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        leading: const CircleAvatar(
-                          child: Icon(Icons.person_off_outlined),
+      if (!widget.pendingOnly) ...[
+        const _SectionTitle('Profiles awaiting validation'),
+        FutureBuilder<List<Map<String, dynamic>>>(
+          future: moderatedProfiles,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            if (snapshot.hasError) {
+              return Text(
+                'Unable to load profile moderation: ${snapshot.error}',
+              );
+            }
+            final profiles = snapshot.data ?? const <Map<String, dynamic>>[];
+            if (profiles.isEmpty) {
+              return const Text('No profiles are awaiting validation.');
+            }
+            return Column(
+              children: profiles.map((item) {
+                final profile = item['profile'] as Map<String, dynamic>;
+                final profileReports =
+                    item['reports'] as List<Map<String, dynamic>>;
+                final profileId = profile['id'] as String;
+                final location = [profile['city'], profile['country_name']]
+                    .whereType<String>()
+                    .where((value) => value.isNotEmpty)
+                    .join(', ');
+                return Card(
+                  key: Key('moderated_profile_$profileId'),
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          leading: const CircleAvatar(
+                            child: Icon(Icons.person_off_outlined),
+                          ),
+                          title: Text(
+                            profile['first_name'] as String? ?? 'MapLov member',
+                            style: const TextStyle(fontWeight: FontWeight.w800),
+                          ),
+                          subtitle: Text(
+                            location.isEmpty
+                                ? 'Frozen and removed from Discover'
+                                : '$location • Frozen and removed from Discover',
+                          ),
                         ),
-                        title: Text(
-                          profile['first_name'] as String? ?? 'MapLov member',
+                        Text(
+                          '${item['report_count']} distinct reports',
                           style: const TextStyle(fontWeight: FontWeight.w800),
                         ),
-                        subtitle: Text(
-                          location.isEmpty
-                              ? 'Frozen and removed from Discover'
-                              : '$location • Frozen and removed from Discover',
-                        ),
-                      ),
-                      Text(
-                        '${item['report_count']} distinct reports',
-                        style: const TextStyle(fontWeight: FontWeight.w800),
-                      ),
-                      ...profileReports.map(
-                        (report) => ListTile(
-                          dense: true,
-                          contentPadding: EdgeInsets.zero,
-                          leading: const Icon(
-                            Icons.flag_outlined,
-                            color: AppColors.error,
-                          ),
-                          title: Text(report['reason'] as String),
-                          subtitle: report['comment'] == null
-                              ? null
-                              : Text(report['comment'] as String),
-                        ),
-                      ),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: OutlinedButton.icon(
-                              onPressed: () =>
-                                  _decideProfile(profileId, 'suspended'),
-                              icon: const Icon(Icons.lock_person_outlined),
-                              label: const Text('Keep suspended'),
+                        ...profileReports.map(
+                          (report) => ListTile(
+                            dense: true,
+                            contentPadding: EdgeInsets.zero,
+                            leading: const Icon(
+                              Icons.flag_outlined,
+                              color: AppColors.error,
                             ),
+                            title: Text(report['reason'] as String),
+                            subtitle: report['comment'] == null
+                                ? null
+                                : Text(report['comment'] as String),
                           ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: FilledButton.icon(
-                              onPressed: () =>
-                                  _decideProfile(profileId, 'approved'),
-                              icon: const Icon(Icons.verified_user_outlined),
-                              label: const Text('Approve profile'),
+                        ),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton.icon(
+                                onPressed: () =>
+                                    _decideProfile(profileId, 'suspended'),
+                                icon: const Icon(Icons.lock_person_outlined),
+                                label: const Text('Keep suspended'),
+                              ),
                             ),
-                          ),
-                        ],
-                      ),
-                    ],
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: FilledButton.icon(
+                                onPressed: () =>
+                                    _decideProfile(profileId, 'approved'),
+                                icon: const Icon(Icons.verified_user_outlined),
+                                label: const Text('Approve profile'),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              );
-            }).toList(),
-          );
-        },
-      ),
-      const SizedBox(height: 18),
-      const _SectionTitle('Photos awaiting review'),
-      FutureBuilder<List<Map<String, dynamic>>>(
-        future: moderatedPhotos,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snapshot.hasError) {
-            return Text('Unable to load photo moderation: ${snapshot.error}');
-          }
-          final photos = snapshot.data ?? const <Map<String, dynamic>>[];
-          if (photos.isEmpty) {
-            return const Text('No photos are awaiting review.');
-          }
-          return Column(
-            children: photos.map((item) {
-              final photo = item['photo'] as Map<String, dynamic>;
-              final photoReports =
-                  item['reports'] as List<Map<String, dynamic>>;
-              final photoId = photo['id'] as String;
-              return Card(
-                key: Key('moderated_photo_$photoId'),
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(14),
-                        child: SizedBox(
-                          height: 260,
-                          width: double.infinity,
-                          child: mediaImage(
-                            item['url'] as String,
-                            fit: BoxFit.contain,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      Text(
-                        '${item['report_count']} distinct reports',
-                        style: const TextStyle(fontWeight: FontWeight.w800),
-                      ),
-                      Text('Owner: ${item['owner_id']}'),
-                      ...photoReports.map(
-                        (report) => ListTile(
-                          dense: true,
-                          contentPadding: EdgeInsets.zero,
-                          leading: const Icon(
-                            Icons.flag_outlined,
-                            color: AppColors.error,
-                          ),
-                          title: Text(report['reason'] as String),
-                          subtitle: report['comment'] == null
-                              ? null
-                              : Text(report['comment'] as String),
-                        ),
-                      ),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: OutlinedButton.icon(
-                              onPressed: () => _deletePhoto(photoId),
-                              icon: const Icon(Icons.delete_forever_outlined),
-                              label: const Text('Delete permanently'),
+                );
+              }).toList(),
+            );
+          },
+        ),
+        const SizedBox(height: 18),
+        const _SectionTitle('Photos awaiting review'),
+        FutureBuilder<List<Map<String, dynamic>>>(
+          future: moderatedPhotos,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            if (snapshot.hasError) {
+              return Text('Unable to load photo moderation: ${snapshot.error}');
+            }
+            final photos = snapshot.data ?? const <Map<String, dynamic>>[];
+            if (photos.isEmpty) {
+              return const Text('No photos are awaiting review.');
+            }
+            return Column(
+              children: photos.map((item) {
+                final photo = item['photo'] as Map<String, dynamic>;
+                final photoReports =
+                    item['reports'] as List<Map<String, dynamic>>;
+                final photoId = photo['id'] as String;
+                return Card(
+                  key: Key('moderated_photo_$photoId'),
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(14),
+                          child: SizedBox(
+                            height: 260,
+                            width: double.infinity,
+                            child: mediaImage(
+                              item['url'] as String,
+                              fit: BoxFit.contain,
                             ),
                           ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: FilledButton.icon(
-                              onPressed: () => _approvePhoto(photoId),
-                              icon: const Icon(Icons.verified_outlined),
-                              label: const Text('Approve photo'),
+                        ),
+                        const SizedBox(height: 10),
+                        Text(
+                          '${item['report_count']} distinct reports',
+                          style: const TextStyle(fontWeight: FontWeight.w800),
+                        ),
+                        Text('Owner: ${item['owner_id']}'),
+                        ...photoReports.map(
+                          (report) => ListTile(
+                            dense: true,
+                            contentPadding: EdgeInsets.zero,
+                            leading: const Icon(
+                              Icons.flag_outlined,
+                              color: AppColors.error,
                             ),
+                            title: Text(report['reason'] as String),
+                            subtitle: report['comment'] == null
+                                ? null
+                                : Text(report['comment'] as String),
                           ),
-                        ],
-                      ),
-                    ],
+                        ),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton.icon(
+                                onPressed: () => _deletePhoto(photoId),
+                                icon: const Icon(Icons.delete_forever_outlined),
+                                label: const Text('Delete permanently'),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: FilledButton.icon(
+                                onPressed: () => _approvePhoto(photoId),
+                                icon: const Icon(Icons.verified_outlined),
+                                label: const Text('Approve photo'),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              );
-            }).toList(),
-          );
-        },
+                );
+              }).toList(),
+            );
+          },
+        ),
+        const SizedBox(height: 18),
+      ],
+      _SectionTitle(
+        widget.pendingOnly ? 'Reports awaiting action' : 'All reports',
       ),
-      const SizedBox(height: 18),
-      const _SectionTitle('All reports'),
       FutureBuilder<List<Map<String, dynamic>>>(
         future: reports,
         builder: (context, snapshot) {
@@ -346,6 +359,7 @@ class _ModerationReportsScreenState extends State<ModerationReportsScreen> {
             children: items
                 .map(
                   (report) => Card(
+                    key: Key('moderation_report_${report['id']}'),
                     child: Padding(
                       padding: const EdgeInsets.all(14),
                       child: Column(
@@ -423,6 +437,10 @@ class _ModerationReportsScreenState extends State<ModerationReportsScreen> {
                             ),
                           Text(
                             'Target: ${report['target_type']} • ${report['target_id']}',
+                          ),
+                          Text('Reporter: ${report['reporter_id']}'),
+                          Text(
+                            'Submitted: ${_adminDateTime(report['created_at'])}',
                           ),
                           if (report['comment'] != null)
                             Text(report['comment'] as String),

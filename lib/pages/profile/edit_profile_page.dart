@@ -233,7 +233,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       await MapLovRepository.instance.saveMyProfile({
         'first_name': name.text.trim(),
         'date_of_birth': birthDate.text,
-        'gender': gender,
         'city': city.text.trim(),
         'residence_city': city.text.trim(),
         'residence_region': region,
@@ -436,20 +435,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         style: TextStyle(color: AppColors.grayText),
       ),
       const _SectionTitle('Basic matching information'),
-      _dropdown(
-        'Gender',
-        gender,
-        const ['Woman', 'Man', 'Non-binary', 'Prefer not to say'],
-        (value) {
-          gender = value;
-          if (!_bodyTypeAllowedForProfileGender(bodyType, gender)) {
-            bodyType = null;
-          }
-        },
-        helperText:
-            'Changing your gender resets your dating preference to the corresponding default.',
-      ),
-      const SizedBox(height: 12),
       TextField(
         controller: birthDate,
         readOnly: true,

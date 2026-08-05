@@ -303,6 +303,359 @@ class AdminPaymentsScreen extends StatelessWidget {
   );
 }
 
+class AdminPromotionsScreen extends StatefulWidget {
+  const AdminPromotionsScreen({super.key});
+
+  @override
+  State<AdminPromotionsScreen> createState() => _AdminPromotionsScreenState();
+}
+
+class AdminStripeCatalogScreen extends StatefulWidget {
+  const AdminStripeCatalogScreen({super.key});
+
+  @override
+  State<AdminStripeCatalogScreen> createState() =>
+      _AdminStripeCatalogScreenState();
+}
+
+class _AdminStripeCatalogScreenState extends State<AdminStripeCatalogScreen> {
+  bool loading = false;
+  String? error;
+  List<Map<String, dynamic>> products = const [];
+
+  Future<void> _synchronize() async {
+    setState(() {
+      loading = true;
+      error = null;
+    });
+    try {
+      final result = await MapLovRepository.instance.synchronizeStripeCatalog();
+      if (!mounted) return;
+      setState(() => products = result);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        error =
+            'La synchronisation Stripe a échoué. Vérifiez la fonction '
+            'déployée et le secret STRIPE_SECRET_KEY.';
+      });
+    } finally {
+      if (mounted) setState(() => loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => _AppPage(
+    title: 'Catalogue Stripe',
+    children: [
+      const Text(
+        'Crée ou vérifie les 14 produits et Price IDs de test. Cette action '
+        'est idempotente et réservée aux administrateurs MapLov.',
+      ),
+      const SizedBox(height: 16),
+      _PrimaryButton(
+        loading ? 'Synchronisation…' : 'Synchroniser avec Stripe',
+        onPressed: loading ? () {} : _synchronize,
+      ),
+      if (loading) ...[
+        const SizedBox(height: 16),
+        const LinearProgressIndicator(),
+      ],
+      if (error != null) ...[
+        const SizedBox(height: 16),
+        Text(error!, style: const TextStyle(color: AppColors.error)),
+      ],
+      if (products.isNotEmpty) ...[
+        const SizedBox(height: 22),
+        Text(
+          '${products.length} tarifs Stripe vérifiés',
+          style: Theme.of(
+            context,
+          ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+        ),
+        const SizedBox(height: 8),
+        for (final product in products)
+          Card(
+            child: ListTile(
+              leading: Icon(
+                product['status'] == 'unchanged'
+                    ? Icons.verified_rounded
+                    : Icons.add_circle_rounded,
+                color: Colors.green,
+              ),
+              title: Text(product['productId']?.toString() ?? 'Produit'),
+              subtitle: Text(
+                '${product['stripePriceId'] ?? ''}\n${product['status'] ?? ''}',
+              ),
+              isThreeLine: true,
+            ),
+          ),
+      ],
+    ],
+  );
+}
+
+class _AdminPromotionsScreenState extends State<AdminPromotionsScreen> {
+  late Future<List<Map<String, dynamic>>> _promotions;
+
+  @override
+  void initState() {
+    super.initState();
+    _reload();
+  }
+
+  void _reload() {
+    _promotions = MapLovRepository.instance.adminBillingPromotions();
+  }
+
+  int? _minorUnits(String value) {
+    final parsed = double.tryParse(value.replaceAll(',', '.').trim());
+    return parsed == null ? null : (parsed * 100).round();
+  }
+
+  Future<DateTime?> _pickDateTime(DateTime initial, DateTime first) async {
+    final last = DateTime.now().add(const Duration(days: 1825));
+    final date = await showDatePicker(
+      context: context,
+      initialDate: initial,
+      firstDate: first,
+      lastDate: last,
+    );
+    if (date == null || !mounted) return null;
+    final time = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(initial),
+    );
+    if (time == null) return null;
+    return DateTime(date.year, date.month, date.day, time.hour, time.minute);
+  }
+
+  Future<void> _edit([Map<String, dynamic>? item]) async {
+    final name = TextEditingController(text: item?['name']?.toString());
+    final original = TextEditingController(
+      text: item == null
+          ? ''
+          : ((item['original_amount_minor'] as num) / 100).toStringAsFixed(2),
+    );
+    final promotional = TextEditingController(
+      text: item == null
+          ? ''
+          : ((item['promotional_amount_minor'] as num) / 100).toStringAsFixed(
+              2,
+            ),
+    );
+    final stripePrice = TextEditingController(
+      text: item?['stripe_price_id']?.toString(),
+    );
+    var productId =
+        item?['product_id']?.toString() ?? ExternalPaymentProduct.vipYearly.id;
+    var startsAt =
+        DateTime.tryParse(item?['starts_at']?.toString() ?? '') ??
+        DateTime.now();
+    var endsAt =
+        DateTime.tryParse(item?['ends_at']?.toString() ?? '') ??
+        DateTime.now().add(const Duration(days: 7));
+    var enabled = item?['is_enabled'] as bool? ?? true;
+
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: Text(
+            item == null ? 'Nouvelle promotion' : 'Modifier la promotion',
+          ),
+          content: SizedBox(
+            width: 520,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: name,
+                    decoration: const InputDecoration(
+                      labelText: 'Nom (Black Friday, Saint-Valentin…)',
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<String>(
+                    initialValue: productId,
+                    decoration: const InputDecoration(labelText: 'Produit'),
+                    items: ExternalPaymentProduct.values
+                        .map(
+                          (product) => DropdownMenuItem(
+                            value: product.id,
+                            child: Text(product.label),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (value) => productId = value ?? productId,
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: original,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    decoration: const InputDecoration(
+                      labelText: 'Prix normal CAD',
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: promotional,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    decoration: const InputDecoration(
+                      labelText: 'Prix promotionnel CAD',
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: stripePrice,
+                    decoration: const InputDecoration(
+                      labelText: 'Stripe Price ID promotionnel',
+                      hintText: 'price_...',
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Début'),
+                    subtitle: Text(
+                      DateFormat.yMMMd().add_Hm().format(startsAt),
+                    ),
+                    trailing: const Icon(Icons.calendar_month_outlined),
+                    onTap: () async {
+                      final date = await _pickDateTime(
+                        startsAt,
+                        DateTime.now().subtract(const Duration(days: 365)),
+                      );
+                      if (date != null) {
+                        setDialogState(() => startsAt = date);
+                      }
+                    },
+                  ),
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Fin'),
+                    subtitle: Text(DateFormat.yMMMd().add_Hm().format(endsAt)),
+                    trailing: const Icon(Icons.event_busy_outlined),
+                    onTap: () async {
+                      final date = await _pickDateTime(endsAt, startsAt);
+                      if (date != null) setDialogState(() => endsAt = date);
+                    },
+                  ),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Promotion activée'),
+                    value: enabled,
+                    onChanged: (value) => setDialogState(() => enabled = value),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Annuler'),
+            ),
+            FilledButton(
+              onPressed: () async {
+                final originalMinor = _minorUnits(original.text);
+                final promotionalMinor = _minorUnits(promotional.text);
+                if (name.text.trim().isEmpty ||
+                    originalMinor == null ||
+                    promotionalMinor == null ||
+                    promotionalMinor >= originalMinor ||
+                    !stripePrice.text.trim().startsWith('price_') ||
+                    !endsAt.isAfter(startsAt)) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Configuration invalide.')),
+                  );
+                  return;
+                }
+                await MapLovRepository.instance.saveBillingPromotion(
+                  id: item?['id']?.toString(),
+                  name: name.text,
+                  productId: productId,
+                  originalAmountMinor: originalMinor,
+                  promotionalAmountMinor: promotionalMinor,
+                  stripePriceId: stripePrice.text,
+                  startsAt: startsAt,
+                  endsAt: endsAt,
+                  enabled: enabled,
+                );
+                if (dialogContext.mounted) Navigator.pop(dialogContext, true);
+              },
+              child: const Text('Enregistrer'),
+            ),
+          ],
+        ),
+      ),
+    );
+    name.dispose();
+    original.dispose();
+    promotional.dispose();
+    stripePrice.dispose();
+    if (saved == true && mounted) setState(_reload);
+  }
+
+  @override
+  Widget build(BuildContext context) => _AppPage(
+    title: 'Promotions',
+    actions: [
+      IconButton(
+        tooltip: 'Nouvelle promotion',
+        onPressed: _edit,
+        icon: const Icon(Icons.add),
+      ),
+    ],
+    children: [
+      const Text(
+        'Planifiez les prix promotionnels Stripe. Le Price ID doit correspondre au montant CAD saisi.',
+      ),
+      _AdminFutureList(
+        future: _promotions,
+        empty: 'Aucune promotion configurée.',
+        builder: (item) {
+          final now = DateTime.now();
+          final starts = DateTime.tryParse(item['starts_at']?.toString() ?? '');
+          final ends = DateTime.tryParse(item['ends_at']?.toString() ?? '');
+          final active =
+              item['is_enabled'] == true &&
+              starts != null &&
+              ends != null &&
+              !starts.isAfter(now) &&
+              ends.isAfter(now);
+          return Card(
+            child: ListTile(
+              leading: Icon(
+                Icons.local_offer,
+                color: active ? Colors.green : AppColors.grayText,
+              ),
+              title: Text(item['name']?.toString() ?? 'Promotion'),
+              subtitle: Text(
+                '${item['product_id']}\n'
+                '${((item['original_amount_minor'] as num) / 100).toStringAsFixed(2)} → '
+                '${((item['promotional_amount_minor'] as num) / 100).toStringAsFixed(2)} CAD • '
+                '${active ? 'Active' : 'Inactive'}',
+              ),
+              isThreeLine: true,
+              trailing: IconButton(
+                tooltip: 'Modifier',
+                icon: const Icon(Icons.edit_outlined),
+                onPressed: () => _edit(item),
+              ),
+            ),
+          );
+        },
+      ),
+    ],
+  );
+}
+
 class AdminStatisticsScreen extends StatelessWidget {
   const AdminStatisticsScreen({super.key});
 

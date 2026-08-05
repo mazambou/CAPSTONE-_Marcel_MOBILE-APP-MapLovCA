@@ -58,6 +58,8 @@ class AppRouter {
     AppRoutes.subscriptionManagement: (_) =>
         const SubscriptionManagementScreen(),
     AppRoutes.purchaseStatus: (_) => const PurchaseStatusScreen(),
+    AppRoutes.externalCheckoutReturn: (_) =>
+        _protected(const ExternalCheckoutReturnScreen()),
     AppRoutes.notifications: (_) => _protected(const NotificationsScreen()),
     AppRoutes.privacy: (_) => const PrivacyScreen(),
     AppRoutes.photoDisplaySettings: (_) => const PhotoDisplaySettingsScreen(),

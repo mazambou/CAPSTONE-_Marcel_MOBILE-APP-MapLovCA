@@ -53,6 +53,13 @@ class AuthService {
   bool get hasActiveSession => _client?.auth.currentSession != null;
   MapLovAuthIntent? get pendingAuthIntent => _pendingAuthIntent;
   String? get currentEmail => _client?.auth.currentUser?.email;
+  String? get emailForVerification {
+    final activeEmail = currentEmail?.trim().toLowerCase();
+    if (activeEmail?.isNotEmpty == true) return activeEmail;
+    final pendingEmail = _pendingPhoneEmailCache?.trim().toLowerCase();
+    return pendingEmail?.isNotEmpty == true ? pendingEmail : null;
+  }
+
   bool get isEmailVerified =>
       !isConfigured || _client?.auth.currentUser?.emailConfirmedAt != null;
   bool get isPhoneVerified =>
@@ -250,7 +257,6 @@ class AuthService {
       final response = await client.auth.signUp(
         email: normalizedEmail,
         password: password,
-        emailRedirectTo: authRedirectUrl,
         data: {
           'first_name': fullName.trim(),
           'phone_number': normalizedPhone,
@@ -360,8 +366,25 @@ class AuthService {
     await client.auth.resend(
       type: OtpType.signup,
       email: email.trim().toLowerCase(),
-      emailRedirectTo: authRedirectUrl,
     );
+  }
+
+  Future<void> verifyEmailCode({
+    required String email,
+    required String code,
+  }) async {
+    final client = _client;
+    if (client == null) return;
+    final response = await client.auth.verifyOTP(
+      email: email.trim().toLowerCase(),
+      token: code.trim(),
+      type: OtpType.signup,
+    );
+    if (response.session == null || response.user?.emailConfirmedAt == null) {
+      throw const AuthException(
+        'Email verification did not create an authenticated session.',
+      );
+    }
   }
 
   Future<void> sendPhoneVerification() async {
@@ -491,7 +514,7 @@ class AuthService {
       return 'Incorrect email, phone number, or password.';
     }
     if (message.contains('email not confirmed')) {
-      return 'Please verify your email before signing in.';
+      return 'Please verify your email with the code before signing in.';
     }
     if (message.contains('suspended') || message.contains('banned')) {
       return raw;

@@ -175,12 +175,20 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
               ),
             );
           },
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(24),
-            child: SizedBox(
-              height: 360,
-              width: double.infinity,
-              child: profileImage(selectedProfile),
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(26),
+              border: selectedProfile.isArrivingSoon
+                  ? Border.all(color: const Color(0xFFD4AF37), width: 3)
+                  : null,
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(24),
+              child: SizedBox(
+                height: 360,
+                width: double.infinity,
+                child: profileImage(selectedProfile),
+              ),
             ),
           ),
         ),
@@ -230,6 +238,30 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
           Text(
             'Originally from ${selectedProfile.originCountry}${selectedProfile.originCity.isEmpty ? '' : ', ${selectedProfile.originCity}'}',
             style: const TextStyle(color: AppColors.grayText),
+          ),
+        if (selectedProfile.isArrivingSoon)
+          Container(
+            key: const Key('public_profile_arriving_soon'),
+            margin: const EdgeInsets.only(top: 10),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFF6D6),
+              border: Border.all(color: const Color(0xFFD4AF37)),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.flight_land, color: Color(0xFF8A6800)),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    '✈️ Arrive bientôt à ${selectedProfile.arrivalDestinationLabel}'
+                    '${selectedProfile.arrivalMonth == null ? '' : ' • ${DateFormat.yMMMM().format(selectedProfile.arrivalMonth!)}'}',
+                    style: const TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                ),
+              ],
+            ),
           ),
         const SizedBox(height: 12),
         SizedBox(

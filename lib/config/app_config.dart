@@ -15,4 +15,9 @@ abstract final class AppConfig {
 
   /// Demo data is useful for widget tests and local UI reviews only.
   static bool get allowDemoData => !kReleaseMode;
+
+  /// External providers are prepared for the web checkout only. Apple and
+  /// Google purchases continue through their native store billing systems.
+  static bool get externalCheckoutEnabled =>
+      kIsWeb && Env.externalCheckoutEnabled;
 }

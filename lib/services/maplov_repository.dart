@@ -20,6 +20,16 @@ class FaceVerificationException implements Exception {
   String toString() => message;
 }
 
+class AdminAccountDeletionException implements Exception {
+  const AdminAccountDeletionException(this.code, this.message);
+
+  final String code;
+  final String message;
+
+  @override
+  String toString() => message;
+}
+
 class DiscoveryFilters {
   const DiscoveryFilters({
     this.minimumAge = 18,
@@ -301,12 +311,14 @@ class SubscriptionInfo {
   const SubscriptionInfo({
     this.tier = 'free',
     this.status = 'active',
+    this.provider,
     this.renewsAt,
     this.autoRenewEnabled = false,
     this.history = const [],
   });
   final String tier;
   final String status;
+  final String? provider;
   final DateTime? renewsAt;
   final bool autoRenewEnabled;
   final List<Map<String, dynamic>> history;
@@ -546,7 +558,18 @@ class MapLovRepository {
       return profiles;
     }
 
+    if (filters.genders.length != 1) {
+      throw StateError('Choose exactly one gender before using Discover.');
+    }
+
     final viewerTier = (await subscriptionInfo()).tier;
+    final entitlements = await activePaymentEntitlements();
+    final hasCountryPass = entitlements.any(
+      (item) => item['entitlement_kind'] == 'country_pass',
+    );
+    final hasInternationalPass = entitlements.any(
+      (item) => item['entitlement_kind'] == 'international_pass',
+    );
     if (filters.vipOnly && viewerTier != 'elite' && viewerTier != 'vip') {
       throw StateError('VIP profiles require a VIP subscription.');
     }
@@ -564,13 +587,19 @@ class MapLovRepository {
         viewerTier != 'vip') {
       throw StateError('Origin filters require Premium Plus.');
     }
-    if ((filters.locationMode == 'my_country' ||
-            filters.locationMode == 'specific_country' ||
-            filters.locationMode == 'worldwide') &&
+    if (filters.locationMode == 'my_country' &&
+        !hasCountryPass &&
         viewerTier != 'plus' &&
         viewerTier != 'elite' &&
         viewerTier != 'vip') {
-      throw StateError('International search requires Premium Plus.');
+      throw StateError('Country search requires Premium Plus.');
+    }
+    if ((filters.locationMode == 'specific_country' ||
+            filters.locationMode == 'worldwide') &&
+        !hasInternationalPass &&
+        viewerTier != 'elite' &&
+        viewerTier != 'vip') {
+      throw StateError('International search requires Premium VIP.');
     }
 
     final vipRanking = <String, int>{};
@@ -598,6 +627,8 @@ class MapLovRepository {
       // The additive MVP migration may not have reached this environment yet.
     }
 
+    final arrivalByProfile = await _upcomingArrivalsForDiscovery(filters);
+
     if (tab == 'Nearby' ||
         (filters.locationMode == 'near_me' && filters.requiredLocation)) {
       try {
@@ -616,28 +647,36 @@ class MapLovRepository {
             if (raw['id'] case final String id)
               id: (raw['distance_km'] as num?)?.round() ?? 0,
         };
-        if (tab == 'Discover' && currentUserId != null) {
-          distanceById.putIfAbsent(currentUserId!, () => 0);
-        }
-        if (distanceById.isEmpty) return const [];
+        final candidateIds = <String>{
+          ...distanceById.keys,
+          ...arrivalByProfile.keys,
+        };
+        if (candidateIds.isEmpty) return const [];
         final profileRows = await _client!
             .from('profiles')
             .select()
-            .inFilter('id', distanceById.keys.toList());
+            .eq('status', 'active')
+            .eq('is_discoverable', true)
+            .eq('gender', filters.genders.single)
+            .inFilter('id', candidateIds.toList());
         final hydrated = await _mapInBatches(
           profileRows.cast<Map<String, dynamic>>(),
           _profileFromRow,
         );
         final result = hydrated
+            .where((profile) => profile.id != currentUserId)
             .where((profile) => profile.photoUrls.isNotEmpty)
             .where(
               (profile) =>
                   vipRanking.isEmpty || vipRanking.containsKey(profile.id),
             )
             .map(
-              (profile) => _copyProfile(
-                profile,
-                distanceKm: distanceById[profile.id] ?? profile.distanceKm,
+              (profile) => _profileWithArrival(
+                _copyProfile(
+                  profile,
+                  distanceKm: distanceById[profile.id] ?? 0,
+                ),
+                arrivalByProfile[profile.id],
               ),
             )
             .toList();
@@ -645,9 +684,8 @@ class MapLovRepository {
         return enriched
             .where(
               (profile) =>
-                  (profile.id == currentUserId && profile.isNew) ||
-                  (_profileMatchesFilters(profile, filters) &&
-                      _newAccountVisibleToViewer(profile, viewerTier)),
+                  _profileMatchesFilters(profile, filters) &&
+                  _newAccountVisibleToViewer(profile, viewerTier),
             )
             .toList()
           ..sort((a, b) => _compareWithVipRanking(a, b, filters, vipRanking));
@@ -663,7 +701,9 @@ class MapLovRepository {
         .from('profiles')
         .select()
         .eq('status', 'active')
-        .eq('is_discoverable', true);
+        .eq('is_discoverable', true)
+        .eq('gender', filters.genders.single)
+        .neq('id', currentUserId!);
     if (filters.locationMode == 'specific_country' ||
         filters.locationMode == 'worldwide') {
       final viewerId = currentUserId;
@@ -681,15 +721,31 @@ class MapLovRepository {
       profileQuery = profileQuery.inFilter('id', rankedIds);
     }
     final rows = await profileQuery.limit(100);
-    final hydrated = await _mapInBatches(
-      rows.cast<Map<String, dynamic>>(),
-      _profileFromRow,
-    );
+    final ordinaryRows = rows.cast<Map<String, dynamic>>().toList();
+    final returnedIds = ordinaryRows
+        .map((row) => row['id'] as String?)
+        .whereType<String>()
+        .toSet();
+    final missingArrivalIds = arrivalByProfile.keys
+        .where((id) => !returnedIds.contains(id))
+        .toList();
+    if (missingArrivalIds.isNotEmpty) {
+      final arrivalRows = await _client!
+          .from('profiles')
+          .select()
+          .eq('status', 'active')
+          .eq('is_discoverable', true)
+          .eq('gender', filters.genders.single)
+          .inFilter('id', missingArrivalIds);
+      ordinaryRows.addAll(arrivalRows.cast<Map<String, dynamic>>());
+    }
+    final hydrated = await _mapInBatches(ordinaryRows, _profileFromRow);
     final candidates = hydrated
+        .map(
+          (profile) =>
+              _profileWithArrival(profile, arrivalByProfile[profile.id]),
+        )
         .where((profile) {
-          if (profile.id == currentUserId) {
-            return profile.isNew && profile.photoUrls.isNotEmpty;
-          }
           if (!_newAccountVisibleToViewer(profile, viewerTier)) return false;
           if (profile.photoUrls.isEmpty) return false;
           if (profile.age < filters.minimumAge ||
@@ -700,19 +756,10 @@ class MapLovRepository {
           if (tab == 'New' && !profile.isNew) return false;
           return true;
         })
-        .map(
-          (profile) => profile.id == currentUserId
-              ? _copyProfile(profile, distanceKm: 0)
-              : profile,
-        )
         .toList();
     final enriched = await _mapInBatches(candidates, _enrichCompatibility);
     final profiles = enriched
-        .where(
-          (profile) =>
-              (profile.id == currentUserId && profile.isNew) ||
-              _profileMatchesFilters(profile, filters),
-        )
+        .where((profile) => _profileMatchesFilters(profile, filters))
         .toList();
     profiles.sort((a, b) => _compareWithVipRanking(a, b, filters, vipRanking));
     return profiles;
@@ -762,11 +809,11 @@ class MapLovRepository {
     }
     if (filters.requiredLocation &&
         filters.locationMode == 'near_me' &&
+        !profile.isArrivingSoon &&
         profile.distanceKm > filters.distanceKm) {
       return false;
     }
-    if (filters.requiredGenders &&
-        filters.genders.isNotEmpty &&
+    if (filters.genders.isNotEmpty &&
         !_matchesFilterValue(
           profile.gender,
           filters.genders,
@@ -777,21 +824,32 @@ class MapLovRepository {
     if (filters.requiredLocation &&
         filters.countries.isNotEmpty &&
         !filters.countries.any(
-          (value) => value.toLowerCase() == profile.country.toLowerCase(),
+          (value) =>
+              value.toLowerCase() ==
+              (profile.isArrivingSoon
+                      ? profile.arrivalCountry
+                      : profile.country)
+                  .toLowerCase(),
         )) {
       return false;
     }
     if (filters.requiredLocation &&
         filters.cities.isNotEmpty &&
         !filters.cities.any(
-          (value) => value.toLowerCase() == profile.city.toLowerCase(),
+          (value) =>
+              value.toLowerCase() ==
+              (profile.isArrivingSoon ? profile.arrivalCity : profile.city)
+                  .toLowerCase(),
         )) {
       return false;
     }
     if (filters.requiredLocation &&
         filters.regions.isNotEmpty &&
         !filters.regions.any(
-          (value) => value.toLowerCase() == profile.region.toLowerCase(),
+          (value) =>
+              value.toLowerCase() ==
+              (profile.isArrivingSoon ? profile.arrivalRegion : profile.region)
+                  .toLowerCase(),
         )) {
       return false;
     }
@@ -1112,11 +1170,121 @@ class MapLovRepository {
         .maybeSingle();
   }
 
+  Future<List<Map<String, dynamic>>> myUpcomingArrivals() async {
+    if (!isLive) return const [];
+    try {
+      final rows = await _client!
+          .from('upcoming_arrival_destinations')
+          .select()
+          .eq('user_id', currentUserId!)
+          .order('created_at');
+      return rows.cast<Map<String, dynamic>>();
+    } on PostgrestException catch (error) {
+      if (error.code == '42P01') return const [];
+      rethrow;
+    }
+  }
+
+  Future<void> saveUpcomingArrival({
+    String? id,
+    required String country,
+    String? region,
+    String? city,
+    DateTime? arrivalMonth,
+    bool isActive = true,
+  }) async {
+    if (!isLive) return;
+    final month = arrivalMonth == null
+        ? null
+        : DateTime(arrivalMonth.year, arrivalMonth.month, 1);
+    await _client!.rpc(
+      'save_my_upcoming_arrival',
+      params: {
+        'destination_id_value': id,
+        'country_name_value': country,
+        'region_name_value': region,
+        'city_name_value': city,
+        'arrival_month_value': month?.toIso8601String().split('T').first,
+        'is_active_value': isActive,
+      },
+    );
+  }
+
+  Future<void> deleteUpcomingArrival(String id) async {
+    if (!isLive) return;
+    await _client!.rpc(
+      'delete_my_upcoming_arrival',
+      params: {'destination_id_value': id},
+    );
+  }
+
+  Future<Map<String, Map<String, dynamic>>> _upcomingArrivalsForDiscovery(
+    DiscoveryFilters filters,
+  ) async {
+    final profile = await myProfileDetails();
+    final searchCountry =
+        filters.countries.firstOrNull ??
+        (profile?['country_name'] as String?) ??
+        '';
+    if (searchCountry.trim().isEmpty) return const {};
+    final localSearch =
+        filters.locationMode == 'near_me' ||
+        filters.locationMode == 'my_country';
+    final searchRegion =
+        filters.regions.firstOrNull ??
+        (localSearch ? (profile?['residence_region'] as String?) : null);
+    final searchCity =
+        filters.cities.firstOrNull ??
+        (localSearch
+            ? ((profile?['residence_city'] as String?) ??
+                  (profile?['city'] as String?))
+            : null);
+    try {
+      final rows =
+          await _client!.rpc(
+                'upcoming_arrivals_for_discovery',
+                params: {
+                  'search_country_value': searchCountry,
+                  'search_region_value': searchRegion,
+                  'search_city_value': searchCity,
+                },
+              )
+              as List<dynamic>;
+      return {
+        for (final row in rows.cast<Map<String, dynamic>>())
+          if (row['profile_id'] case final String id) id: row,
+      };
+    } on PostgrestException catch (error) {
+      if (error.code == '42883' || error.code == '42P01') return const {};
+      rethrow;
+    }
+  }
+
+  UserProfile _profileWithArrival(
+    UserProfile profile,
+    Map<String, dynamic>? arrival,
+  ) {
+    if (arrival == null) return profile;
+    return _copyProfile(
+      profile,
+      arrivalCountry: arrival['destination_country'] as String? ?? '',
+      arrivalRegion: arrival['destination_region'] as String? ?? '',
+      arrivalCity: arrival['destination_city'] as String? ?? '',
+      arrivalMonth: DateTime.tryParse(
+        arrival['arrival_month'] as String? ?? '',
+      ),
+    );
+  }
+
   Future<void> savePreferences(DiscoveryFilters filters) async {
     if (!isLive) return;
+    if (filters.genders.length != 1) {
+      throw StateError('Choose exactly one gender.');
+    }
     await _client!.from('dating_preferences').upsert({
       'user_id': currentUserId!,
       ...filters.toDatabase(),
+      'required_genders': true,
     });
     try {
       await _client!.rpc('refresh_my_compatibility_scores');
@@ -3060,8 +3228,19 @@ class MapLovRepository {
     });
   }
 
-  Future<List<Map<String, dynamic>>> moderationReports() async {
+  Future<List<Map<String, dynamic>>> moderationReports({
+    bool pendingOnly = false,
+  }) async {
     if (!isLive) return [];
+    if (pendingOnly) {
+      return List<Map<String, dynamic>>.from(
+        await _client!
+            .from('reports')
+            .select()
+            .inFilter('status', ['open', 'under_review'])
+            .order('created_at', ascending: false),
+      );
+    }
     return List<Map<String, dynamic>>.from(
       await _client!
           .from('reports')
@@ -3099,6 +3278,15 @@ class MapLovRepository {
           .select('id, first_name, city, role, status, created_at')
           .order('created_at', ascending: false),
     );
+  }
+
+  Future<Map<String, dynamic>> adminUserDetails(String userId) async {
+    if (!isLive) return const {};
+    final value = await _client!.rpc(
+      'admin_user_details',
+      params: {'user_id_value': userId},
+    );
+    return Map<String, dynamic>.from(value as Map);
   }
 
   Future<List<Map<String, dynamic>>> adminProfiles() async {
@@ -3171,6 +3359,64 @@ class MapLovRepository {
     );
   }
 
+  Future<List<Map<String, dynamic>>> adminBillingPromotions() async {
+    if (!isLive) return const [];
+    return List<Map<String, dynamic>>.from(
+      await _client!
+          .from('billing_promotions')
+          .select()
+          .order('created_at', ascending: false),
+    );
+  }
+
+  Future<void> saveBillingPromotion({
+    String? id,
+    required String name,
+    required String productId,
+    required int originalAmountMinor,
+    required int promotionalAmountMinor,
+    required String stripePriceId,
+    required DateTime startsAt,
+    required DateTime endsAt,
+    required bool enabled,
+  }) async {
+    if (!isLive) return;
+    await _client!.rpc(
+      'admin_save_billing_promotion',
+      params: {
+        'promotion_id_value': id,
+        'name_value': name,
+        'product_id_value': productId,
+        'original_amount_minor_value': originalAmountMinor,
+        'promotional_amount_minor_value': promotionalAmountMinor,
+        'currency_code_value': 'CAD',
+        'stripe_price_id_value': stripePriceId,
+        'starts_at_value': startsAt.toUtc().toIso8601String(),
+        'ends_at_value': endsAt.toUtc().toIso8601String(),
+        'is_enabled_value': enabled,
+      },
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> synchronizeStripeCatalog() async {
+    if (!isLive) return const [];
+    final response = await _client!.functions.invoke(
+      'sync-stripe-catalog',
+      body: const {},
+    );
+    if (response.status < 200 || response.status >= 300) {
+      throw StateError('Stripe catalog synchronization failed.');
+    }
+    final data = response.data;
+    final products = data is Map ? data['products'] : null;
+    if (products is! List) {
+      throw StateError('Stripe returned an invalid catalog response.');
+    }
+    return products
+        .map((item) => Map<String, dynamic>.from(item as Map))
+        .toList(growable: false);
+  }
+
   Future<List<Map<String, dynamic>>> adminRecoveryRequests() async {
     if (!isLive) return [];
     return List<Map<String, dynamic>>.from(
@@ -3204,6 +3450,38 @@ class MapLovRepository {
       'admin_restore_account',
       params: {'user_id_value': userId, 'reason_value': reason},
     );
+  }
+
+  Future<Map<String, dynamic>> adminDeleteAccount(
+    String userId, {
+    required bool immediate,
+    String? reason,
+  }) async {
+    if (!isLive) return const {};
+    try {
+      final response = await _client!.functions.invoke(
+        'admin-delete-account',
+        body: {
+          'action': 'delete',
+          'userId': userId,
+          'timing': immediate ? 'immediate' : 'scheduled',
+          'reason': reason,
+        },
+      );
+      return Map<String, dynamic>.from(
+        response.data as Map? ?? const <String, dynamic>{},
+      );
+    } on FunctionException catch (error) {
+      final details = error.details;
+      final body = details is Map
+          ? Map<String, dynamic>.from(details)
+          : const <String, dynamic>{};
+      throw AdminAccountDeletionException(
+        body['code'] as String? ?? 'admin_account_deletion_failed',
+        body['message'] as String? ??
+            'The account deletion service is unavailable.',
+      );
+    }
   }
 
   Future<void> setManualSubscription(
@@ -3440,12 +3718,85 @@ class MapLovRepository {
     return SubscriptionInfo(
       tier: current?['tier'] as String? ?? 'free',
       status: current?['status'] as String? ?? 'active',
+      provider: current?['provider'] as String?,
       renewsAt: DateTime.tryParse(
         current?['current_period_end'] as String? ?? '',
       ),
       autoRenewEnabled: current?['auto_renew_enabled'] as bool? ?? false,
       history: history,
     );
+  }
+
+  Future<List<Map<String, dynamic>>> oneTimePurchases() async {
+    if (!isLive) return const [];
+    try {
+      final rows = await _client!
+          .from('one_time_purchases')
+          .select(
+            'id, product_id, product_kind, provider, quantity, starts_at, '
+            'expires_at, created_at',
+          )
+          .eq('user_id', currentUserId!)
+          .order('created_at', ascending: false)
+          .limit(100);
+      return List<Map<String, dynamic>>.from(rows);
+    } on PostgrestException {
+      return const [];
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> activePaymentEntitlements() async {
+    if (!isLive) return const [];
+    try {
+      final rows = await _client!
+          .from('payment_entitlements')
+          .select('id, entitlement_kind, product_id, starts_at, expires_at')
+          .eq('user_id', currentUserId!)
+          .gt('expires_at', DateTime.now().toUtc().toIso8601String())
+          .order('expires_at');
+      return List<Map<String, dynamic>>.from(rows);
+    } on PostgrestException {
+      return const [];
+    }
+  }
+
+  Future<int> superLikesBalance() async {
+    if (!isLive) return 0;
+    try {
+      final row = await _client!
+          .from('user_consumable_balances')
+          .select('super_likes_balance')
+          .eq('user_id', currentUserId!)
+          .maybeSingle();
+      return (row?['super_likes_balance'] as num?)?.toInt() ?? 0;
+    } on PostgrestException {
+      return 0;
+    }
+  }
+
+  Future<bool> hasActivePaymentEntitlement(String kind) async {
+    final rows = await activePaymentEntitlements();
+    return rows.any((row) => row['entitlement_kind'] == kind);
+  }
+
+  Future<List<Map<String, dynamic>>> activeBillingPromotions() async {
+    if (!isLive) return const [];
+    try {
+      final now = DateTime.now().toUtc().toIso8601String();
+      final rows = await _client!
+          .from('billing_promotions')
+          .select(
+            'id, name, product_id, original_amount_minor, '
+            'promotional_amount_minor, currency_code, starts_at, ends_at',
+          )
+          .eq('is_enabled', true)
+          .lte('starts_at', now)
+          .gt('ends_at', now)
+          .order('promotional_amount_minor');
+      return List<Map<String, dynamic>>.from(rows);
+    } on PostgrestException {
+      return const [];
+    }
   }
 
   Future<void> recordProfileView(String profileId) async {
@@ -3708,6 +4059,10 @@ class MapLovRepository {
     Map<String, dynamic>? compatibilityBreakdown,
     bool? likedByMe,
     int? distanceKm,
+    String? arrivalCountry,
+    String? arrivalRegion,
+    String? arrivalCity,
+    DateTime? arrivalMonth,
   }) => UserProfile(
     id: value.id,
     name: value.name,
@@ -3757,6 +4112,10 @@ class MapLovRepository {
     likedByMe: likedByMe ?? value.likedByMe,
     lastActiveAt: value.lastActiveAt,
     createdAt: value.createdAt,
+    arrivalCountry: arrivalCountry ?? value.arrivalCountry,
+    arrivalRegion: arrivalRegion ?? value.arrivalRegion,
+    arrivalCity: arrivalCity ?? value.arrivalCity,
+    arrivalMonth: arrivalMonth ?? value.arrivalMonth,
   );
 
   Future<MapLovMessage> _messageFromRow(

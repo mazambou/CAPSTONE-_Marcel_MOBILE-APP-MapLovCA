@@ -26,11 +26,13 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
   bool loading = true;
   bool saving = false;
   bool premiumPlus = false;
+  bool vipAvailable = false;
   bool showingGenderSuggestion = false;
   List<String> savedOriginCountries = const [];
   List<String> savedOriginRegions = const [];
   List<String> savedOriginCities = const [];
   DiscoveryFilters savedFilters = const DiscoveryFilters();
+  List<Map<String, dynamic>> upcomingArrivals = const [];
 
   @override
   void initState() {
@@ -42,6 +44,9 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
     final saved = await MapLovRepository.instance.myPreferences();
     final profile = await MapLovRepository.instance.myProfileDetails();
     final subscription = await MapLovRepository.instance.subscriptionInfo();
+    final arrivals = subscription.isVip
+        ? await MapLovRepository.instance.myUpcomingArrivals()
+        : const <Map<String, dynamic>>[];
     if (!mounted) return;
     setState(() {
       savedFilters = saved;
@@ -79,6 +84,8 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
       requiredLanguage = saved.requiredLanguages;
       requiredGoal = saved.requiredRelationshipGoal;
       premiumPlus = subscription.isPremium;
+      vipAvailable = subscription.isVip;
+      upcomingArrivals = arrivals;
       savedOriginCountries = saved.originCountries;
       savedOriginRegions = saved.originRegions;
       savedOriginCities = saved.originCities;
@@ -171,12 +178,18 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
     try {
       if (searchMode != 'Near me' && !premiumPlus) {
         setState(() => saving = false);
+        final international = searchMode == 'International';
         await _requireSubscriptionFeature(
           context,
-          requirement: _SubscriptionRequirement.premiumPlus,
-          feature: searchMode == 'International'
+          requirement: international
+              ? _SubscriptionRequirement.vip
+              : _SubscriptionRequirement.premiumPlus,
+          feature: international
               ? 'International discovery'
               : 'Country discovery',
+          passProduct: international
+              ? ExternalPaymentProduct.internationalPass24h
+              : ExternalPaymentProduct.countryPass24h,
         );
         return;
       }
@@ -277,7 +290,19 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
   }
 
   Future<void> _changeSearchMode(String value) async {
-    if (value == 'Near me' || premiumPlus) {
+    final international = value == 'International';
+    final subscription = await MapLovRepository.instance.subscriptionInfo();
+    final passActive = value == 'Near me'
+        ? false
+        : await MapLovRepository.instance.hasActivePaymentEntitlement(
+            international ? 'international_pass' : 'country_pass',
+          );
+    final available =
+        value == 'Near me' ||
+        (international ? subscription.isVip : subscription.isPremium) ||
+        passActive;
+    if (!mounted) return;
+    if (available) {
       setState(() {
         if (searchMode != value) {
           preferredRegion = 'Any region';
@@ -287,15 +312,17 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
       });
       return;
     }
-    await _requireSubscriptionFeature(
+    final granted = await _requireSubscriptionFeature(
       context,
-      requirement: _SubscriptionRequirement.premiumPlus,
-      feature: value == 'International'
-          ? 'International discovery'
-          : 'Country discovery',
+      requirement: international
+          ? _SubscriptionRequirement.vip
+          : _SubscriptionRequirement.premiumPlus,
+      feature: international ? 'International discovery' : 'Country discovery',
+      passProduct: international
+          ? ExternalPaymentProduct.internationalPass24h
+          : ExternalPaymentProduct.countryPass24h,
     );
-    final subscription = await MapLovRepository.instance.subscriptionInfo();
-    if (subscription.isPremium && mounted) {
+    if (granted && mounted) {
       setState(() {
         premiumPlus = true;
         preferredRegion = 'Any region';
@@ -306,6 +333,258 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
     }
     return;
   }
+
+  Future<void> _editUpcomingArrival([Map<String, dynamic>? existing]) async {
+    if (!vipAvailable) {
+      await _requireSubscriptionFeature(
+        context,
+        requirement: _SubscriptionRequirement.vip,
+        feature: 'Arrive bientôt',
+      );
+      return;
+    }
+    if (existing == null &&
+        upcomingArrivals.where((item) => item['is_active'] != false).length >=
+            3) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('You can add up to 3 active destinations.'),
+        ),
+      );
+      return;
+    }
+    var country =
+        existing?['country_name'] as String? ??
+        _worldCountries.firstWhere(
+          (value) => value != residenceCountry,
+          orElse: () => 'France',
+        );
+    var region = existing?['region_name'] as String?;
+    var city = existing?['city_name'] as String?;
+    var month = DateTime.tryParse(existing?['arrival_month'] as String? ?? '');
+    var active = existing?['is_active'] as bool? ?? true;
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          final regions = _regionsByCountry[country] ?? const <String>[];
+          final cities = region == null
+              ? const <String>[]
+              : _citiesForCountryRegion(country, region!);
+          return AlertDialog(
+            title: Text(
+              existing == null ? 'Add a destination' : 'Edit destination',
+            ),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  DropdownButtonFormField<String>(
+                    initialValue: country,
+                    isExpanded: true,
+                    decoration: const InputDecoration(labelText: 'Country'),
+                    items: _worldCountries
+                        .where((value) => value != residenceCountry)
+                        .map(
+                          (value) => DropdownMenuItem(
+                            value: value,
+                            child: Text(value),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (value) => setDialogState(() {
+                      country = value ?? country;
+                      region = null;
+                      city = null;
+                    }),
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<String>(
+                    initialValue: regions.contains(region) ? region : null,
+                    isExpanded: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Region (optional)',
+                    ),
+                    items: [
+                      const DropdownMenuItem<String>(
+                        value: '',
+                        child: Text('Entire country'),
+                      ),
+                      ...regions.map(
+                        (value) =>
+                            DropdownMenuItem(value: value, child: Text(value)),
+                      ),
+                    ],
+                    onChanged: (value) => setDialogState(() {
+                      region = value == null || value.isEmpty ? null : value;
+                      city = null;
+                    }),
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<String>(
+                    initialValue: cities.contains(city) ? city : null,
+                    isExpanded: true,
+                    decoration: const InputDecoration(
+                      labelText: 'City (optional)',
+                    ),
+                    items: [
+                      const DropdownMenuItem<String>(
+                        value: '',
+                        child: Text('Entire region'),
+                      ),
+                      ...cities.map(
+                        (value) =>
+                            DropdownMenuItem(value: value, child: Text(value)),
+                      ),
+                    ],
+                    onChanged: region == null
+                        ? null
+                        : (value) => setDialogState(
+                            () => city = value == null || value.isEmpty
+                                ? null
+                                : value,
+                          ),
+                  ),
+                  const SizedBox(height: 12),
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Arrival month (optional)'),
+                    subtitle: Text(
+                      month == null
+                          ? 'Not specified'
+                          : DateFormat.yMMMM().format(month!),
+                    ),
+                    trailing: const Icon(Icons.calendar_month),
+                    onTap: () async {
+                      final now = DateTime.now();
+                      final selected = await showDatePicker(
+                        context: dialogContext,
+                        initialDate: month ?? now,
+                        firstDate: DateTime(now.year, now.month),
+                        lastDate: DateTime(now.year + 5, 12, 31),
+                      );
+                      if (selected != null) {
+                        setDialogState(
+                          () => month = DateTime(selected.year, selected.month),
+                        );
+                      }
+                    },
+                  ),
+                  SwitchListTile.adaptive(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Active'),
+                    value: active,
+                    onChanged: (value) => setDialogState(() => active = value),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext, false),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(dialogContext, true),
+                child: const Text('Save'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+    if (saved != true) return;
+    try {
+      await MapLovRepository.instance.saveUpcomingArrival(
+        id: existing?['id'] as String?,
+        country: country,
+        region: region,
+        city: city,
+        arrivalMonth: month,
+        isActive: active,
+      );
+      final arrivals = await MapLovRepository.instance.myUpcomingArrivals();
+      if (mounted) setState(() => upcomingArrivals = arrivals);
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Unable to save destination: $error')),
+        );
+      }
+    }
+  }
+
+  Future<void> _deleteUpcomingArrival(Map<String, dynamic> destination) async {
+    try {
+      await MapLovRepository.instance.deleteUpcomingArrival(
+        destination['id'] as String,
+      );
+      final arrivals = await MapLovRepository.instance.myUpcomingArrivals();
+      if (mounted) setState(() => upcomingArrivals = arrivals);
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Unable to delete destination: $error')),
+        );
+      }
+    }
+  }
+
+  Widget _upcomingArrivalsSection() => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      const _SectionTitle('✈️ Arrive bientôt'),
+      Text(
+        vipAvailable
+            ? 'Choose up to 3 destinations. Only members in those destinations see your arrival badge and travel details.'
+            : 'VIP members can appear in up to 3 future destinations without changing their real residence.',
+        style: const TextStyle(color: AppColors.grayText),
+      ),
+      const SizedBox(height: 10),
+      if (vipAvailable)
+        ...upcomingArrivals.map((item) {
+          final parts = <String>[
+            if ((item['city_name'] as String? ?? '').isNotEmpty)
+              item['city_name'] as String,
+            if ((item['region_name'] as String? ?? '').isNotEmpty)
+              item['region_name'] as String,
+            item['country_name'] as String? ?? '',
+          ];
+          final month = DateTime.tryParse(
+            item['arrival_month'] as String? ?? '',
+          );
+          return Card(
+            child: ListTile(
+              leading: Icon(
+                Icons.flight_land,
+                color: item['is_active'] == false
+                    ? AppColors.grayText
+                    : const Color(0xFFD4AF37),
+              ),
+              title: Text(parts.join(', ')),
+              subtitle: Text(
+                [
+                  if (month != null) DateFormat.yMMMM().format(month),
+                  item['is_active'] == false ? 'Inactive' : 'Active',
+                ].join(' • '),
+              ),
+              onTap: () => unawaited(_editUpcomingArrival(item)),
+              trailing: IconButton(
+                tooltip: 'Delete',
+                icon: const Icon(Icons.delete_outline),
+                onPressed: () => unawaited(_deleteUpcomingArrival(item)),
+              ),
+            ),
+          );
+        }),
+      OutlinedButton.icon(
+        key: const Key('manage_upcoming_arrival'),
+        onPressed: () => unawaited(_editUpcomingArrival()),
+        icon: Icon(vipAvailable ? Icons.add_location_alt : Icons.lock),
+        label: Text(vipAvailable ? 'Add a destination' : 'Unlock with VIP'),
+      ),
+    ],
+  );
 
   @override
   Widget build(BuildContext context) => _AppPage(
@@ -363,6 +642,7 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
           selectedCity = 'Any city';
         }),
       ),
+      _upcomingArrivalsSection(),
       const _SectionTitle('Compatibility priorities'),
       DropdownButtonFormField<String>(
         initialValue: relationshipGoal,

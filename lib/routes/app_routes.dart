@@ -45,6 +45,7 @@ class AppRoutes {
   static const premium = '/premium';
   static const subscriptionManagement = '/premium/subscription';
   static const purchaseStatus = '/premium/purchase-status';
+  static const externalCheckoutReturn = '/premium/external-return';
   static const notifications = '/notifications';
   static const privacy = '/settings/privacy';
   static const photoDisplaySettings = '/settings/photo-display';

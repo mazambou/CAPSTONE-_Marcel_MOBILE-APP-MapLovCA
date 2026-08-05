@@ -84,6 +84,10 @@ class _FilterScreenState extends State<FilterScreen> {
   @override
   void initState() {
     super.initState();
+    selectedGenders.addAll(
+      widget.initialFilters?.genders.take(1).map(_displayGenderFilterValue) ??
+          const Iterable<String>.empty(),
+    );
     unawaited(_loadResidenceCountry());
   }
 
@@ -241,7 +245,7 @@ class _FilterScreenState extends State<FilterScreen> {
       locationMode = 'Near me';
       distance = 50;
       selectedCity = 'Any city';
-      selectedCountry = 'Canada';
+      selectedCountry = residenceCountry;
       selectedRegion = 'Any region';
       originCountry = 'Any country';
       originRegion = 'Any region';
@@ -320,15 +324,24 @@ class _FilterScreenState extends State<FilterScreen> {
     }
     if (locationMode != 'Near me') {
       final subscription = await MapLovRepository.instance.subscriptionInfo();
-      if (!subscription.isPremium && mounted) {
-        await _requireSubscriptionFeature(
+      final international = locationMode == 'International';
+      final subscribed = international
+          ? subscription.isVip
+          : subscription.isPremium;
+      if (!subscribed && mounted) {
+        final granted = await _requireSubscriptionFeature(
           context,
-          requirement: _SubscriptionRequirement.premiumPlus,
-          feature: locationMode == 'International'
+          requirement: international
+              ? _SubscriptionRequirement.vip
+              : _SubscriptionRequirement.premiumPlus,
+          feature: international
               ? 'International discovery'
               : 'Country discovery',
+          passProduct: international
+              ? ExternalPaymentProduct.internationalPass24h
+              : ExternalPaymentProduct.countryPass24h,
         );
-        return;
+        if (!granted) return;
       }
     }
     setState(() => applyingFilters = true);
@@ -371,6 +384,10 @@ class _FilterScreenState extends State<FilterScreen> {
           : null;
       final mode = switch (locationMode) {
         'My country' => 'my_country',
+        'International'
+            when selectedCountry.trim().toLowerCase() ==
+                residenceCountry.trim().toLowerCase() =>
+          'my_country',
         'International' => 'specific_country',
         _ => 'near_me',
       };
@@ -467,7 +484,19 @@ class _FilterScreenState extends State<FilterScreen> {
   }
 
   Future<void> _changeLocationMode(String value) async {
-    if (value == 'Near me' || premiumPlus) {
+    final international = value == 'International';
+    final subscription = await MapLovRepository.instance.subscriptionInfo();
+    final passActive = value == 'Near me'
+        ? false
+        : await MapLovRepository.instance.hasActivePaymentEntitlement(
+            international ? 'international_pass' : 'country_pass',
+          );
+    final available =
+        value == 'Near me' ||
+        (international ? subscription.isVip : subscription.isPremium) ||
+        passActive;
+    if (!mounted) return;
+    if (available) {
       setState(() {
         if (locationMode != value) {
           selectedRegion = 'Any region';
@@ -477,15 +506,17 @@ class _FilterScreenState extends State<FilterScreen> {
       });
       return;
     }
-    await _requireSubscriptionFeature(
+    final granted = await _requireSubscriptionFeature(
       context,
-      requirement: _SubscriptionRequirement.premiumPlus,
-      feature: value == 'International'
-          ? 'International discovery'
-          : 'Country discovery',
+      requirement: international
+          ? _SubscriptionRequirement.vip
+          : _SubscriptionRequirement.premiumPlus,
+      feature: international ? 'International discovery' : 'Country discovery',
+      passProduct: international
+          ? ExternalPaymentProduct.internationalPass24h
+          : ExternalPaymentProduct.countryPass24h,
     );
-    final subscription = await MapLovRepository.instance.subscriptionInfo();
-    if (subscription.isPremium && mounted) {
+    if (granted && mounted) {
       setState(() {
         premiumPlus = true;
         selectedRegion = 'Any region';
@@ -682,7 +713,7 @@ class _FilterScreenState extends State<FilterScreen> {
           onCityChanged: (value) =>
               setState(() => selectedCity = value ?? 'Any city'),
           onCountryChanged: (value) => setState(() {
-            selectedCountry = value ?? 'Canada';
+            selectedCountry = value ?? residenceCountry;
             selectedRegion = 'Any region';
             selectedCity = 'Any city';
           }),
@@ -800,7 +831,7 @@ class _FilterScreenState extends State<FilterScreen> {
           onCityChanged: (value) =>
               setState(() => selectedCity = value ?? 'Any city'),
           onCountryChanged: (value) => setState(() {
-            selectedCountry = value ?? 'Canada';
+            selectedCountry = value ?? residenceCountry;
             selectedRegion = 'Any region';
             selectedCity = 'Any city';
           }),
@@ -975,7 +1006,7 @@ class _FilterScreenState extends State<FilterScreen> {
               onCityChanged: (value) =>
                   setState(() => selectedCity = value ?? 'Any city'),
               onCountryChanged: (value) => setState(() {
-                selectedCountry = value ?? 'Canada';
+                selectedCountry = value ?? residenceCountry;
                 selectedRegion = 'Any region';
                 selectedCity = 'Any city';
               }),

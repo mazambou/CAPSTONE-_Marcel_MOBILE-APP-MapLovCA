@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:maplove/app.dart';
 import 'package:maplove/config/supabase_config.dart';
 import 'package:maplove/routes/app_routes.dart';
+import 'package:maplove/services/external_checkout_service.dart';
 import 'package:maplove/services/locale_service.dart';
 import 'package:maplove/services/location_service.dart';
 import 'package:maplove/services/maplov_repository.dart';
@@ -143,6 +144,98 @@ void main() {
     expect(find.byType(HomeScreen), findsOneWidget);
   });
 
+  testWidgets('login removes Magic Link and remains scrollable when focused', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 600);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(const MaterialApp(home: LoginScreen()));
+
+    expect(find.text('Email me a Magic Link'), findsNothing);
+    expect(find.byKey(const Key('login_scroll_view')), findsOneWidget);
+
+    await tester.tap(find.byType(TextField).first);
+    await tester.pump();
+    await tester.drag(
+      find.byKey(const Key('login_scroll_view')),
+      const Offset(0, -220),
+    );
+    await tester.pump();
+
+    final scrollable = tester.state<ScrollableState>(
+      find
+          .descendant(
+            of: find.byKey(const Key('login_scroll_view')),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
+    expect(scrollable.position.pixels, greaterThan(0));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('open reports metric opens the pending-only review page', (
+    tester,
+  ) async {
+    await tester.pumpWidget(const MaterialApp(home: AdminDashboardScreen()));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('admin_open_reports_metric')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Pending reports'), findsOneWidget);
+    expect(find.text('Reports awaiting action'), findsOneWidget);
+    expect(find.text('Profiles awaiting validation'), findsNothing);
+  });
+
+  testWidgets('admin user details identify the account before an action', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: AdminUserDetailsScreen(
+          initialUser: {
+            'id': '00000000-0000-4000-8000-000000000099',
+            'first_name': 'Safety Target',
+            'email': 'safety-target@maplov.test',
+            'phone': '+14165550199',
+            'role': 'user',
+            'status': 'active',
+            'city': 'Toronto',
+            'country_name': 'Canada',
+            'date_of_birth': '1992-04-05',
+            'auth_created_at': '2026-07-01T12:00:00Z',
+            'profile_created_at': '2026-07-01T12:00:00Z',
+            'last_sign_in_at': '2026-07-30T15:00:00Z',
+            'last_active_at': '2026-07-30T15:05:00Z',
+            'open_reports': 2,
+            'photo_count': 3,
+            'subscription_tier': 'plus',
+          },
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Identity and contact'), findsOneWidget);
+    expect(find.text('Last sign-in'), findsOneWidget);
+    expect(find.text('Account created'), findsOneWidget);
+    expect(find.text('safety-target@maplov.test'), findsWidgets);
+
+    await tester.ensureVisible(find.text('Suspend'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Suspend'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Confirm account action'), findsOneWidget);
+    expect(find.text('Safety Target'), findsWidgets);
+    expect(find.text('+14165550199'), findsWidgets);
+    expect(find.text('00000000-0000-4000-8000-000000000099'), findsWidgets);
+  });
+
   testWidgets('password reset rejects a weak password', (tester) async {
     await tester.pumpWidget(const MaterialApp(home: ResetPasswordScreen()));
 
@@ -155,6 +248,44 @@ void main() {
       find.text('Use at least 8 characters, including a number and a symbol.'),
       findsOneWidget,
     );
+  });
+
+  testWidgets('email verification requires a six-digit code', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        routes: {
+          AppRoutes.profileSetup: (_) =>
+              const Scaffold(body: material.Text('Profile setup destination')),
+        },
+        home: const VerifyEmailScreen(email: 'jamie@example.com'),
+      ),
+    );
+
+    expect(find.byKey(const Key('email_verification_code')), findsOneWidget);
+    expect(
+      find.text(
+        'We sent a 6-digit verification code to jamie@example.com. Enter it below to continue creating your profile.',
+      ),
+      findsOneWidget,
+    );
+
+    await tester.enterText(
+      find.byKey(const Key('email_verification_code')),
+      '123',
+    );
+    await tester.tap(find.text('Verify email'));
+    await tester.pump();
+
+    expect(find.text('Enter the 6-digit code sent by email.'), findsOneWidget);
+
+    await tester.enterText(
+      find.byKey(const Key('email_verification_code')),
+      '123456',
+    );
+    await tester.tap(find.text('Verify email'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Profile setup destination'), findsOneWidget);
   });
 
   testWidgets('birth calendar exposes year arrows and a scrollable year list', (
@@ -315,7 +446,7 @@ void main() {
     expect(find.text('City of origin', skipOffstage: false), findsOneWidget);
     expect(
       find.text(
-        'Your gender sets your default dating preference. You can change that preference later.',
+        'Your gender is saved during registration and cannot be changed later.',
         skipOffstage: false,
       ),
       findsOneWidget,
@@ -391,6 +522,15 @@ void main() {
         home: const ProfileSetupScreen(),
       ),
     );
+    await tester.pumpAndSettle();
+    await tester.dragUntilVisible(
+      find.text('Gender'),
+      find.byType(ListView).first,
+      const Offset(0, -250),
+    );
+    await tester.tap(find.text('Gender'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Woman').last);
     await tester.pumpAndSettle();
     await tester.dragUntilVisible(
       find.byKey(const Key('profile_setup_continue')),
@@ -661,11 +801,9 @@ void main() {
 
     await tester.tap(find.byKey(const Key('location_mode_International')));
     await tester.pumpAndSettle();
-    expect(find.text('Premium Plus required'), findsOneWidget);
+    expect(find.text('Premium VIP required'), findsOneWidget);
     expect(
-      find.text(
-        'International discovery requires a Premium Plus subscription.',
-      ),
+      find.text('International discovery requires a Premium VIP subscription.'),
       findsOneWidget,
     );
   });
@@ -1203,6 +1341,32 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('Reset preserves the mandatory gender discovery filter', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: FilterScreen(
+          initialFilters: DiscoveryFilters(
+            genders: ['Woman'],
+            requiredGenders: true,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Women'), findsOneWidget);
+    await tester.tap(find.widgetWithText(TextButton, 'Reset'));
+    await tester.pumpAndSettle();
+    expect(find.text('Women'), findsOneWidget);
+  });
+
   testWidgets('Free origin filter opens the Premium Plus upgrade dialog', (
     tester,
   ) async {
@@ -1591,10 +1755,45 @@ void main() {
       expect(find.text('PREMIUM\nPLUS'), findsOneWidget);
       expect(find.text('PREMIUM\nVIP'), findsOneWidget);
       expect(find.text('PREMIUM\nELITE'), findsNothing);
+      for (final product in ExternalPaymentProduct.values) {
+        expect(find.byKey(Key('store_product_${product.id}')), findsOneWidget);
+      }
       expect(find.text('KING'), findsOneWidget);
       expect(find.text('Invisible navigation in Discover'), findsOneWidget);
-      expect(find.text(r'$19.99'), findsOneWidget);
-      expect(find.text(r'$29.99'), findsOneWidget);
+      expect(find.text(r'12,99 $ CAD'), findsOneWidget);
+      expect(find.text(r'19,99 $ CAD'), findsOneWidget);
+      expect(find.text(r'Économisez 55,89 $ (36 %)'), findsOneWidget);
+      expect(find.text(r'Économisez 89,89 $ (37 %)'), findsOneWidget);
+      expect(find.text('🏆 LE PLUS POPULAIRE'), findsOneWidget);
+      expect(find.text('⭐ MEILLEURE OFFRE'), findsOneWidget);
+      expect(find.text(r'Seulement 8,33 $ CAD / mois'), findsOneWidget);
+      expect(find.text(r'Seulement 12,50 $ CAD / mois'), findsOneWidget);
+      expect(find.textContaining('Prix affiché par Stripe'), findsNothing);
+      expect(find.textContaining('À partir de'), findsNothing);
+      expect(find.text(r'2,99 $ CAD'), findsNWidgets(3));
+      expect(find.text(r'4,99 $ CAD'), findsNWidgets(2));
+      expect(find.text(r'6,99 $ CAD'), findsNWidgets(2));
+      expect(find.text(r'7,99 $ CAD'), findsOneWidget);
+      expect(find.text(r'9,99 $ CAD'), findsOneWidget);
+      expect(find.text(r'11,99 $ CAD'), findsOneWidget);
+      expect(find.text(r'Pack de 30 • 0,40 $ par Super Like.'), findsOneWidget);
+      expect(find.text('0 Super Likes disponibles'), findsOneWidget);
+      expect(find.text('Aucun Boost actif'), findsOneWidget);
+      await tester.tap(
+        find.byKey(const Key('store_product_maplov_plus_monthly')),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('MapLov Plus mensuel'), findsWidgets);
+      expect(find.text('Ce que vous obtenez'), findsOneWidget);
+      expect(
+        find.text('Voir qui a aimé et consulté votre profil'),
+        findsOneWidget,
+      );
+      expect(
+        find.text('Filtres avancés et recherche Country par région et ville'),
+        findsOneWidget,
+      );
+      expect(find.text('S’abonner'), findsOneWidget);
       expect(tester.takeException(), isNull);
     },
   );
@@ -1616,6 +1815,60 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('VIP'), findsOneWidget);
   });
+
+  testWidgets(
+    'arrival details render only when discovery supplies a destination',
+    (tester) async {
+      final arrivalProfile = UserProfile(
+        id: 'arrival-profile',
+        name: 'Marcel',
+        age: 30,
+        city: 'Toronto',
+        country: 'Canada',
+        compatibilityScore: 90,
+        imagePath: 'assets/profile/profile_user_placeholder.png',
+        photoDisplayStyle: PhotoDisplayStyle.profileDetails,
+        isVip: true,
+        arrivalCountry: 'France',
+        arrivalRegion: 'Île-de-France',
+        arrivalCity: 'Paris',
+        arrivalMonth: DateTime(2027, 3),
+      );
+      await tester.pumpWidget(
+        MaterialApp(home: PublicProfileScreen(profile: arrivalProfile)),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('public_profile_arriving_soon')),
+        findsOneWidget,
+      );
+      expect(
+        find.textContaining('Paris, Île-de-France, France'),
+        findsOneWidget,
+      );
+
+      const ordinaryView = UserProfile(
+        id: 'ordinary-profile',
+        name: 'Marcel',
+        age: 30,
+        city: 'Toronto',
+        country: 'Canada',
+        compatibilityScore: 90,
+        imagePath: 'assets/profile/profile_user_placeholder.png',
+        photoDisplayStyle: PhotoDisplayStyle.profileDetails,
+        isVip: true,
+      );
+      await tester.pumpWidget(
+        const MaterialApp(home: PublicProfileScreen(profile: ordinaryView)),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('public_profile_arriving_soon')),
+        findsNothing,
+      );
+      expect(find.textContaining('Arrive bientôt'), findsNothing);
+    },
+  );
 
   testWidgets('origin is hidden unless the profile owner enables it', (
     tester,
@@ -1716,13 +1969,7 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('Basic matching information'), findsOneWidget);
-    expect(find.text('Gender'), findsOneWidget);
-    expect(
-      find.text(
-        'Changing your gender resets your dating preference to the corresponding default.',
-      ),
-      findsOneWidget,
-    );
+    expect(find.text('Gender'), findsNothing);
     final detailsList = find.byKey(
       const Key('edit_profile_filter_details_tab'),
     );
@@ -1837,6 +2084,11 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('main_show_vip_only')), findsOneWidget);
     expect(find.byKey(const Key('main_show_premium_profiles')), findsOneWidget);
+    expect(find.byKey(const Key('discover_tabs_scroll')), findsOneWidget);
+    expect(
+      find.byKey(const Key('discover_tab_Boutique MapLov')),
+      findsOneWidget,
+    );
     final subscriptionFilters = find.byKey(
       const Key('main_discovery_subscription_filters'),
     );
@@ -2194,6 +2446,12 @@ void main() {
     );
     expect(translations.translate('2 Comments'), '2 commentaires');
     expect(
+      translations.translate(
+        'We sent a 6-digit verification code to jamie@example.com. Enter it below to continue creating your profile.',
+      ),
+      'Nous avons envoyé un code de vérification à 6 chiffres à jamie@example.com. Saisissez-le ci-dessous pour poursuivre la création de votre profil.',
+    );
+    expect(
       translations.translate('Feminine silhouette'),
       'Silhouette féminine',
     );
@@ -2391,6 +2649,8 @@ void main() {
     'admin suspensions': const AdminSuspensionsScreen(),
     'admin subscriptions': const AdminSubscriptionsScreen(),
     'admin payments': const AdminPaymentsScreen(),
+    'admin promotions': const AdminPromotionsScreen(),
+    'admin stripe catalog': const AdminStripeCatalogScreen(),
     'admin statistics': const AdminStatisticsScreen(),
     'admin global notifications': const AdminGlobalNotificationsScreen(),
     'admin account recovery': const AdminAccountRecoveryScreen(),

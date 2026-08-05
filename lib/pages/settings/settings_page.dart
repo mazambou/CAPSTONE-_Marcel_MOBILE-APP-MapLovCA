@@ -19,8 +19,9 @@ class SettingsScreen extends StatelessWidget {
         AppRoutes.notificationSettings,
       ),
       ('Language', Icons.language, AppRoutes.language),
+      ('Boutique MapLov', Icons.diamond_outlined, AppRoutes.premium),
       (
-        'Subscription',
+        'Mon abonnement et mes achats',
         Icons.workspace_premium_outlined,
         AppRoutes.subscriptionManagement,
       ),

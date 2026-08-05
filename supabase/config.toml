@@ -248,7 +248,7 @@ admin_email = "noreply@maplov.ca"
 sender_name = "MapLov"
 
 [auth.email.template.confirmation]
-subject = "Confirm your MapLov email"
+subject = "Welcome to MapLov ❤️ – Verify your email"
 content_path = "./supabase/templates/confirmation.html"
 
 [auth.email.template.recovery]
@@ -408,6 +408,20 @@ verify_jwt = true
 verify_jwt = true
 
 [functions.store-subscription-events]
+verify_jwt = false
+
+[functions.create-external-checkout]
+verify_jwt = true
+
+[functions.manage-external-subscription]
+verify_jwt = true
+
+[functions.external-billing-webhook]
+verify_jwt = false
+
+[functions.admin-delete-account]
+# The function manually validates administrator JWTs. Its separate scheduled
+# action is authenticated with a 256-bit secret supplied by pg_cron.
 verify_jwt = false
 
 # [edge_runtime.secrets]

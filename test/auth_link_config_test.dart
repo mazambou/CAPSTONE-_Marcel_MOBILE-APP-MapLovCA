@@ -53,5 +53,15 @@ void main() {
     expect(emailSection, contains('enable_signup = true'));
     expect(emailSection, contains('enable_confirmations = true'));
     expect(emailSection, isNot(contains('enable_confirmations = false')));
+    expect(emailSection, contains('otp_length = 6'));
+  });
+
+  test('signup confirmation email contains a code instead of a link', () {
+    final template = File(
+      'supabase/templates/confirmation.html',
+    ).readAsStringSync();
+
+    expect(template, contains('{{ .Token }}'));
+    expect(template, isNot(contains('{{ .ConfirmationURL }}')));
   });
 }

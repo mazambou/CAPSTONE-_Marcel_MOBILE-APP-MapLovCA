@@ -74,6 +74,10 @@ class UserProfile {
     this.likedByMe = false,
     this.lastActiveAt,
     this.createdAt,
+    this.arrivalCountry = '',
+    this.arrivalRegion = '',
+    this.arrivalCity = '',
+    this.arrivalMonth,
   });
 
   final String id;
@@ -123,6 +127,22 @@ class UserProfile {
   final bool likedByMe;
   final DateTime? lastActiveAt;
   final DateTime? createdAt;
+  final String arrivalCountry;
+  final String arrivalRegion;
+  final String arrivalCity;
+  final DateTime? arrivalMonth;
+
+  bool get isArrivingSoon => arrivalCountry.isNotEmpty;
+
+  String get arrivalDestinationLabel {
+    final parts = <String>[
+      if (arrivalCity.isNotEmpty) arrivalCity,
+      if (arrivalRegion.isNotEmpty && arrivalRegion != arrivalCity)
+        arrivalRegion,
+      arrivalCountry,
+    ];
+    return parts.join(', ');
+  }
 
   int photoLikeCount(int index) =>
       index < photoLikeCounts.length ? photoLikeCounts[index] : 0;

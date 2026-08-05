@@ -154,12 +154,45 @@ class MapLovLocalizations {
     'Close': 'Fermer',
     'Blocked users': 'Utilisateurs bloqués',
     'Moderation dashboard': 'Tableau de modération',
+    'Administrator dashboard': 'Tableau de bord administrateur',
     'User reports': 'Signalements',
+    'Open reports': 'Signalements ouverts',
+    'Pending reports': 'Signalements en attente',
+    'Reports awaiting action': 'Signalements nécessitant une action',
+    'Only reports that still require an administrative decision are shown.':
+        'Seuls les signalements nécessitant encore une décision administrative sont affichés.',
     'User management': 'Gestion des utilisateurs',
+    'User details': 'Informations détaillées de l’utilisateur',
+    'Identity and contact': 'Identité et coordonnées',
+    'Account ID': 'Identifiant du compte',
+    'Account details': 'Informations du compte',
+    'Role': 'Rôle',
+    'Account status': 'État du compte',
+    'Account created': 'Compte créé',
+    'Profile created': 'Profil créé',
+    'Last sign-in': 'Dernière connexion',
+    'Last activity': 'Dernière activité',
+    'Email confirmed': 'Courriel confirmé',
+    'Phone confirmed': 'Téléphone confirmé',
+    'Education': 'Études',
+    'Discoverable': 'Visible dans Découvrir',
+    'Profile verified': 'Profil vérifié',
+    'Profile completed': 'Profil complété',
+    'Safety and account activity': 'Sécurité et activité du compte',
+    'Profile photos': 'Photos du profil',
+    'Deletion request': 'Demande de suppression',
+    'Administrative actions': 'Actions administratives',
+    'Confirm account action': 'Confirmer l’action sur le compte',
+    'Account status updated.': 'État du compte mis à jour.',
+    'Profile verified.': 'Profil vérifié.',
+    'Photo verified.': 'Photo vérifiée.',
+    'Destructive actions are unavailable for your own account and for privileged accounts.':
+        'Les actions destructrices sont indisponibles pour votre propre compte et pour les comptes privilégiés.',
+    'Yes': 'Oui',
+    'No': 'Non',
     'Moderator audit log': 'Journal d’audit',
     'Save': 'Enregistrer',
     'Cancel': 'Annuler',
-    'Delete': 'Supprimer',
     'Done': 'Terminé',
     'Continue': 'Continuer',
     'Message': 'Message',
@@ -185,6 +218,24 @@ class MapLovLocalizations {
     'Forgot password?': 'Mot de passe oublié ?',
     'Update password': 'Mettre à jour le mot de passe',
     'Delete account': 'Supprimer le compte',
+    'Delete this account?': 'Supprimer ce compte ?',
+    'Choose whether to erase the account now or schedule permanent deletion in 30 days.':
+        'Choisissez de supprimer le compte maintenant ou de programmer sa suppression définitive dans 30 jours.',
+    'Schedule in 30 days': 'Programmer dans 30 jours',
+    'Delete immediately': 'Supprimer immédiatement',
+    'Permanently delete this account now?':
+        'Supprimer définitivement ce compte maintenant ?',
+    'Schedule permanent deletion in 30 days?':
+        'Programmer la suppression définitive dans 30 jours ?',
+    'This cannot be undone. All account data and stored files, including the reference selfie, will be erased so the person can register again.':
+        'Cette action est irréversible. Toutes les données et tous les fichiers du compte, y compris le selfie de référence, seront supprimés afin que la personne puisse se réinscrire.',
+    'The account will be disabled and hidden now. An administrator can restore it before the 30-day deadline.':
+        'Le compte sera désactivé et masqué maintenant. Un administrateur pourra le restaurer avant l’échéance de 30 jours.',
+    'Schedule deletion': 'Programmer la suppression',
+    'The account and its stored data were permanently deleted.':
+        'Le compte et ses données stockées ont été supprimés définitivement.',
+    'Permanent deletion is scheduled in 30 days.':
+        'La suppression définitive est programmée dans 30 jours.',
     'Log Out': 'Se déconnecter',
     'Photo Display': 'Affichage des photos',
     'Subscription': 'Abonnement',
@@ -234,6 +285,8 @@ class MapLovLocalizations {
         'Choisissez une seule préférence de genre.',
     'Your gender sets your default dating preference. You can change that preference later.':
         'Votre genre définit votre préférence de rencontre par défaut. Vous pourrez ensuite modifier cette préférence.',
+    'Your gender is saved during registration and cannot be changed later.':
+        'Votre genre est enregistré pendant l’inscription et ne peut plus être modifié ensuite.',
     'Changing your gender resets your dating preference to the corresponding default.':
         'La modification de votre genre réinitialise votre préférence de rencontre à la valeur correspondante par défaut.',
     'Suggested from your profile. Confirm or change this choice.':
@@ -260,6 +313,24 @@ class MapLovLocalizations {
         'Ce choix facultatif peut être modifié à tout moment.',
     'Nearby': 'À proximité',
     'Country': 'Pays',
+    'Region (optional)': 'Région (facultatif)',
+    'City (optional)': 'Ville (facultatif)',
+    'Entire country': 'Tout le pays',
+    'Entire region': 'Toute la région',
+    'Arrival month (optional)': 'Mois d’arrivée (facultatif)',
+    'Not specified': 'Non précisé',
+    'Active': 'Actif',
+    'Inactive': 'Inactif',
+    'Add a destination': 'Ajouter une destination',
+    'Edit destination': 'Modifier la destination',
+    'You can add up to 3 active destinations.':
+        'Vous pouvez ajouter jusqu’à 3 destinations actives.',
+    'Choose up to 3 destinations. Only members in those destinations see your arrival badge and travel details.':
+        'Choisissez jusqu’à 3 destinations. Seuls les membres situés dans ces destinations voient votre badge d’arrivée et les détails du voyage.',
+    'VIP members can appear in up to 3 future destinations without changing their real residence.':
+        'Les membres VIP peuvent apparaître dans jusqu’à 3 futures destinations sans modifier leur résidence réelle.',
+    'Unlock with VIP': 'Débloquer avec VIP',
+    'Delete': 'Supprimer',
     'Specific': 'Spécifique',
     'World': 'Monde',
     'Preferred country': 'Pays préféré',
@@ -546,7 +617,14 @@ class MapLovLocalizations {
     'Back to login': 'Retour à la connexion',
     'Check your inbox': 'Vérifiez votre boîte de réception',
     'Verify your email': 'Vérifiez votre courriel',
-    'Resend verification email': 'Renvoyer le courriel de vérification',
+    'Verify email': 'Vérifier le courriel',
+    'Email verified. Continuing…': 'Courriel vérifié. Poursuite…',
+    'Enter the 6-digit code sent by email.':
+        'Saisissez le code à 6 chiffres envoyé par courriel.',
+    'A new 6-digit verification code has been sent.':
+        'Un nouveau code de vérification à 6 chiffres a été envoyé.',
+    'Return to registration and enter your email address.':
+        'Retournez à l’inscription et saisissez votre adresse courriel.',
     'Create new password': 'Créer un nouveau mot de passe',
     'Choose a strong password with at least 8 characters, one number and one symbol.':
         'Choisissez un mot de passe fort contenant au moins 8 caractères, un chiffre et un symbole.',
@@ -1070,8 +1148,8 @@ class MapLovLocalizations {
         'Soutien général : support@maplov.ca\nVie privée : privacy@maplov.ca\nSécurité des enfants : child-safety@maplov.ca\n\nIndiquez l’adresse courriel de votre compte, le modèle de votre appareil et une brève description. N’envoyez jamais votre mot de passe ni votre code SMS.',
     'Incorrect email, phone number, or password.':
         'Courriel, numéro de téléphone ou mot de passe incorrect.',
-    'Please verify your email before signing in.':
-        'Veuillez vérifier votre courriel avant de vous connecter.',
+    'Please verify your email with the code before signing in.':
+        'Veuillez vérifier votre courriel avec le code avant de vous connecter.',
     'An account already exists for this email.':
         'Un compte existe déjà pour ce courriel.',
     'Use at least 8 characters, including a number and a symbol.':
@@ -1124,6 +1202,12 @@ class MapLovLocalizations {
     final privatePhotos = RegExp(r'^(\d+) private photos$').firstMatch(value);
     if (privatePhotos != null) {
       return '${privatePhotos.group(1)} photos privées';
+    }
+    final emailVerification = RegExp(
+      r'^We sent a 6-digit verification code to (.+)\. Enter it below to continue creating your profile\.$',
+    ).firstMatch(value);
+    if (emailVerification != null) {
+      return 'Nous avons envoyé un code de vérification à 6 chiffres à ${emailVerification.group(1)}. Saisissez-le ci-dessous pour poursuivre la création de votre profil.';
     }
     final photos = RegExp(r'^(\d+) photos$').firstMatch(value);
     if (photos != null) {

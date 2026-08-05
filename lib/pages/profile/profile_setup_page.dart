@@ -12,7 +12,8 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   final originCityOther = TextEditingController();
   final residenceRegionOther = TextEditingController();
   final originRegionOther = TextEditingController();
-  String gender = 'Prefer not to say';
+  String gender = '';
+  bool genderLocked = false;
   String? bodyType;
   String residenceCountry = 'Canada';
   String residenceCity = 'Toronto';
@@ -70,9 +71,14 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
             profile['residence_region'] as String? ??
             _regionForKnownCity(savedResidenceCountry, savedResidenceCity) ??
             _firstRegionForCountry(savedResidenceCountry);
-        final savedGender = profile['gender'] as String? ?? gender;
+        final storedGender = profile['gender'] as String?;
+        final savedGender =
+            const {'Woman', 'Man', 'Non-binary'}.contains(storedGender)
+            ? storedGender!
+            : gender;
         setState(() {
           gender = savedGender;
+          genderLocked = storedGender == savedGender && savedGender.isNotEmpty;
           bodyType = _normalizedProfileBodyType(
             profile['body_type'] as String?,
             savedGender,
@@ -356,6 +362,12 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   }
 
   Future<void> _continue() async {
+    if (!const {'Woman', 'Man', 'Non-binary'}.contains(gender)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Choose your gender to continue.')),
+      );
+      return;
+    }
     if (!faceReferenceReady && MapLovRepository.instance.isLive) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -646,23 +658,25 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       ),
       const SizedBox(height: 12),
       DropdownButtonFormField<String>(
-        initialValue: gender,
+        initialValue: gender.isEmpty ? null : gender,
         isExpanded: true,
         decoration: InputDecoration(
           labelText: context.tr('Gender'),
           helperText: context.tr(
-            'Your gender sets your default dating preference. You can change that preference later.',
+            'Your gender is saved during registration and cannot be changed later.',
           ),
         ),
-        items: const ['Woman', 'Man', 'Non-binary', 'Prefer not to say']
+        items: const ['Woman', 'Man', 'Non-binary']
             .map((value) => DropdownMenuItem(value: value, child: Text(value)))
             .toList(),
-        onChanged: (value) => setState(() {
-          gender = value ?? gender;
-          if (!_bodyTypeAllowedForProfileGender(bodyType, gender)) {
-            bodyType = null;
-          }
-        }),
+        onChanged: genderLocked
+            ? null
+            : (value) => setState(() {
+                gender = value ?? gender;
+                if (!_bodyTypeAllowedForProfileGender(bodyType, gender)) {
+                  bodyType = null;
+                }
+              }),
       ),
       const SizedBox(height: 12),
       _BodyTypeSelector(

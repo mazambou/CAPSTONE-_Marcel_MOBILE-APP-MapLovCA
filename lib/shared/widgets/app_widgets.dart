@@ -6,40 +6,91 @@ Future<bool> _requireSubscriptionFeature(
   BuildContext context, {
   required _SubscriptionRequirement requirement,
   required String feature,
+  ExternalPaymentProduct? passProduct,
 }) async {
   final subscription = await MapLovRepository.instance.subscriptionInfo();
-  final allowed = requirement == _SubscriptionRequirement.vip
+  var allowed = requirement == _SubscriptionRequirement.vip
       ? subscription.isVip
       : subscription.isPremium;
+  final entitlementKind = switch (passProduct) {
+    ExternalPaymentProduct.countryPass24h ||
+    ExternalPaymentProduct.countryPass7d => 'country_pass',
+    ExternalPaymentProduct.internationalPass24h ||
+    ExternalPaymentProduct.internationalPass7d => 'international_pass',
+    _ => null,
+  };
+  if (!allowed && entitlementKind != null) {
+    allowed = await MapLovRepository.instance.hasActivePaymentEntitlement(
+      entitlementKind,
+    );
+  }
   if (allowed || !context.mounted) return allowed;
 
   final level = requirement == _SubscriptionRequirement.vip
       ? 'Premium VIP'
       : 'Premium Plus';
-  final upgrade = await showDialog<bool>(
+  final choice = await showDialog<String>(
     context: context,
     builder: (dialogContext) => AlertDialog(
       title: Text('$level required'),
-      content: Text('$feature requires a $level subscription.'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('$feature requires a $level subscription.'),
+          if (passProduct != null) ...[
+            const SizedBox(height: 12),
+            Text('Choisissez ${passProduct.label} ou passez à $level.'),
+          ],
+        ],
+      ),
       actions: [
         TextButton(
-          onPressed: () => Navigator.pop(dialogContext, false),
+          onPressed: () => Navigator.pop(dialogContext, 'cancel'),
           child: const Text('Cancel'),
         ),
+        if (passProduct != null && AppConfig.externalCheckoutEnabled)
+          OutlinedButton(
+            onPressed: () => Navigator.pop(dialogContext, 'pass'),
+            child: Text('Acheter ${passProduct.label}'),
+          ),
         FilledButton(
-          onPressed: () => Navigator.pop(dialogContext, true),
+          onPressed: () => Navigator.pop(dialogContext, 'upgrade'),
           child: const Text('Upgrade'),
         ),
       ],
     ),
   );
-  if (upgrade == true && context.mounted) {
+  if (choice == 'pass' && passProduct != null && context.mounted) {
+    final launched = await ExternalCheckoutService.instance.startCheckout(
+      provider: ExternalPaymentProvider.stripe,
+      productId: passProduct.id,
+    );
+    if (!launched && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            ExternalCheckoutService.instance.error ??
+                'Le paiement Stripe est indisponible.',
+          ),
+        ),
+      );
+    }
+    return false;
+  }
+  if (choice == 'upgrade' && context.mounted) {
     await Navigator.pushNamed(context, AppRoutes.premium);
     if (!context.mounted) return false;
     final updated = await MapLovRepository.instance.subscriptionInfo();
-    return requirement == _SubscriptionRequirement.vip
+    allowed = requirement == _SubscriptionRequirement.vip
         ? updated.isVip
         : updated.isPremium;
+    if (!allowed && entitlementKind != null) {
+      allowed = await MapLovRepository.instance.hasActivePaymentEntitlement(
+        entitlementKind,
+      );
+    }
+    return allowed;
   }
   return false;
 }
@@ -139,9 +190,10 @@ class _MapLovNavigationBar extends StatelessWidget {
 }
 
 class _AppPage extends StatelessWidget {
-  const _AppPage({required this.title, required this.children});
+  const _AppPage({required this.title, required this.children, this.actions});
   final String title;
   final List<Widget> children;
+  final List<Widget>? actions;
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
@@ -149,6 +201,7 @@ class _AppPage extends StatelessWidget {
         context.tr(title),
         style: const TextStyle(fontWeight: FontWeight.w800),
       ),
+      actions: actions,
     ),
     body: SafeArea(
       child: _ResponsiveBody(

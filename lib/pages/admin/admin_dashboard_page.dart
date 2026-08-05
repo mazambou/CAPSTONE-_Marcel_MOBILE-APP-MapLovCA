@@ -16,6 +16,19 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     metrics = MapLovRepository.instance.adminDashboardStatistics();
   }
 
+  Future<void> _openPendingReports() async {
+    await Navigator.push<void>(
+      context,
+      MaterialPageRoute<void>(
+        builder: (_) => const ModerationReportsScreen(pendingOnly: true),
+      ),
+    );
+    if (!mounted) return;
+    setState(() {
+      metrics = MapLovRepository.instance.adminDashboardStatistics();
+    });
+  }
+
   @override
   Widget build(BuildContext context) => _AppPage(
     title: 'Administrator dashboard',
@@ -44,6 +57,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   'Open reports',
                   '${values['open_reports'] ?? 0}',
                   Icons.manage_accounts_outlined,
+                  key: const Key('admin_open_reports_metric'),
+                  onTap: _openPendingReports,
                 ),
               ),
             ],
@@ -93,6 +108,18 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         title: 'Payments',
         subtitle: 'Validated Apple and Google transactions',
         destination: const AdminPaymentsScreen(),
+      ),
+      _AdminDashboardTile(
+        icon: Icons.local_offer_outlined,
+        title: 'Promotions',
+        subtitle: 'Schedule Stripe promotional prices',
+        destination: const AdminPromotionsScreen(),
+      ),
+      _AdminDashboardTile(
+        icon: Icons.sync_alt_rounded,
+        title: 'Stripe catalog',
+        subtitle: 'Create and verify products and prices',
+        destination: const AdminStripeCatalogScreen(),
       ),
       _AdminDashboardTile(
         icon: Icons.analytics_outlined,
@@ -150,25 +177,37 @@ class _AdminDashboardTile extends StatelessWidget {
 }
 
 class _AdminMetric extends StatelessWidget {
-  const _AdminMetric(this.label, this.value, this.icon);
+  const _AdminMetric(
+    this.label,
+    this.value,
+    this.icon, {
+    super.key,
+    this.onTap,
+  });
+
   final String label;
   final String value;
   final IconData icon;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) => Card(
-    child: Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        children: [
-          Icon(icon, color: AppColors.coral),
-          const SizedBox(height: 8),
-          Text(
-            value,
-            style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w900),
-          ),
-          Text(label, textAlign: TextAlign.center),
-        ],
+    clipBehavior: Clip.antiAlias,
+    child: InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            Icon(icon, color: AppColors.coral),
+            const SizedBox(height: 8),
+            Text(
+              value,
+              style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w900),
+            ),
+            Text(label, textAlign: TextAlign.center),
+          ],
+        ),
       ),
     ),
   );

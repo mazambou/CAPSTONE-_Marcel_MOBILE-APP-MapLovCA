@@ -290,7 +290,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     return switch (selectedTab) {
       'Nearby' =>
         _profiles
-            .where((profile) => profile.distanceKm <= _filters.distanceKm)
+            .where(
+              (profile) =>
+                  profile.isArrivingSoon ||
+                  profile.distanceKm <= _filters.distanceKm,
+            )
             .toList(),
       'Online' => _profiles.where((profile) => profile.isOnline).toList(),
       'New' => _profiles.where((profile) => profile.isNew).toList(),
@@ -418,6 +422,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             _DiscoverTabs(
               selectedTab: selectedTab,
               onSelected: (tab) {
+                if (tab == 'Boutique MapLov') {
+                  Navigator.pushNamed(context, AppRoutes.premium);
+                  return;
+                }
                 setState(() {
                   selectedTab = tab;
                   if (tab != 'Nearby') _locationFailure = null;
@@ -988,43 +996,52 @@ class _DiscoverTabs extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: ['Discover', 'Nearby', 'Online', 'New']
-          .map(
-            (tab) => Expanded(
-              child: InkWell(
-                key: Key('discover_tab_$tab'),
-                onTap: () => onSelected(tab),
-                child: Padding(
-                  padding: const EdgeInsets.only(top: 12),
-                  child: Column(
-                    children: [
-                      Text(
-                        tab,
-                        style: TextStyle(
-                          color: selectedTab == tab
-                              ? AppColors.deepPink
-                              : AppColors.grayText,
-                          fontWeight: FontWeight.w700,
+    return SizedBox(
+      height: 52,
+      child: SingleChildScrollView(
+        key: const Key('discover_tabs_scroll'),
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        child: Row(
+          children: ['Discover', 'Nearby', 'Online', 'Boutique MapLov', 'New']
+              .map(
+                (tab) => InkWell(
+                  key: Key('discover_tab_$tab'),
+                  onTap: () => onSelected(tab),
+                  borderRadius: BorderRadius.circular(16),
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(14, 10, 14, 0),
+                    child: Column(
+                      children: [
+                        Text(
+                          tab,
+                          style: TextStyle(
+                            color: tab == 'Boutique MapLov'
+                                ? AppColors.deepPink
+                                : selectedTab == tab
+                                ? AppColors.deepPink
+                                : AppColors.grayText,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 10),
-                      AnimatedContainer(
-                        duration: const Duration(milliseconds: 180),
-                        height: 3,
-                        width: selectedTab == tab ? 54 : 0,
-                        decoration: BoxDecoration(
-                          color: AppColors.deepPink,
-                          borderRadius: BorderRadius.circular(99),
+                        const SizedBox(height: 10),
+                        AnimatedContainer(
+                          duration: const Duration(milliseconds: 180),
+                          height: 3,
+                          width: selectedTab == tab ? 54 : 0,
+                          decoration: BoxDecoration(
+                            color: AppColors.deepPink,
+                            borderRadius: BorderRadius.circular(99),
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
-              ),
-            ),
-          )
-          .toList(),
+              )
+              .toList(),
+        ),
+      ),
     );
   }
 }
@@ -1046,149 +1063,172 @@ class _DiscoverGridCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(18),
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          GestureDetector(
-            key: Key('profile_photo_${profile.name}'),
-            onTap: onPhotoTap,
-            child: ClipRect(
-              child: Transform.scale(
-                scale: 1.48,
-                alignment: const Alignment(0, -0.12),
-                child: profileImage(profile),
-              ),
-            ),
-          ),
-          const IgnorePointer(
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [Colors.transparent, Color(0xDD000000)],
-                  stops: [0.46, 1],
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        border: profile.isArrivingSoon
+            ? Border.all(color: const Color(0xFFD4AF37), width: 3)
+            : null,
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(18),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            GestureDetector(
+              key: Key('profile_photo_${profile.name}'),
+              onTap: onPhotoTap,
+              child: ClipRect(
+                child: Transform.scale(
+                  scale: 1.48,
+                  alignment: const Alignment(0, -0.12),
+                  child: profileImage(profile),
                 ),
               ),
             ),
-          ),
-          Positioned(
-            left: 8,
-            right: 8,
-            top: 8,
-            child: Row(
-              children: [
-                if (profile.isNew)
-                  const Flexible(
-                    child: _GridStatusBadge(
-                      label: 'New ✨',
-                      foregroundColor: AppColors.deepPink,
-                      backgroundColor: Colors.white,
-                    ),
+            const IgnorePointer(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [Colors.transparent, Color(0xDD000000)],
+                    stops: [0.46, 1],
                   ),
-                if (profile.isNew && profile.isOnline) const SizedBox(width: 5),
-                if (!profile.isNew) const Spacer(),
-                if (profile.isOnline)
-                  const Flexible(
-                    child: _GridStatusBadge(
-                      label: '● Online',
-                      foregroundColor: Color(0xFF37E19A),
-                      backgroundColor: Color(0xA6000000),
-                    ),
-                  ),
-              ],
+                ),
+              ),
             ),
-          ),
-          Positioned(
-            left: 12,
-            right: 8,
-            bottom: 10,
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      GestureDetector(
-                        key: Key('profile_name_${profile.name}'),
-                        onTap: onNameTap,
-                        child: Row(
-                          children: [
-                            Flexible(
-                              child: Text(
-                                '${profile.name}, ${profile.age}',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w900,
+            Positioned(
+              left: 8,
+              right: 8,
+              top: 8,
+              child: Row(
+                children: [
+                  if (profile.isArrivingSoon)
+                    const Flexible(
+                      child: _GridStatusBadge(
+                        label: '✈️ Arrive bientôt',
+                        foregroundColor: Color(0xFF5C4300),
+                        backgroundColor: Color(0xFFFFE89A),
+                      ),
+                    ),
+                  if (profile.isArrivingSoon &&
+                      (profile.isNew || profile.isOnline))
+                    const SizedBox(width: 5),
+                  if (profile.isNew)
+                    const Flexible(
+                      child: _GridStatusBadge(
+                        label: 'New ✨',
+                        foregroundColor: AppColors.deepPink,
+                        backgroundColor: Colors.white,
+                      ),
+                    ),
+                  if (profile.isNew && profile.isOnline)
+                    const SizedBox(width: 5),
+                  if (!profile.isNew && !profile.isArrivingSoon) const Spacer(),
+                  if (profile.isArrivingSoon) const Spacer(),
+                  if (profile.isOnline)
+                    const Flexible(
+                      child: _GridStatusBadge(
+                        label: '● Online',
+                        foregroundColor: Color(0xFF37E19A),
+                        backgroundColor: Color(0xA6000000),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            Positioned(
+              left: 12,
+              right: 8,
+              bottom: 10,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        GestureDetector(
+                          key: Key('profile_name_${profile.name}'),
+                          onTap: onNameTap,
+                          child: Row(
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  '${profile.name}, ${profile.age}',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w900,
+                                  ),
                                 ),
                               ),
-                            ),
-                            const SizedBox(width: 4),
-                            const Icon(
-                              Icons.verified,
-                              color: AppColors.deepPink,
-                              size: 18,
-                            ),
-                            if (profile.isVip) ...[
-                              const SizedBox(width: 5),
-                              const _VipBadge(compact: true),
+                              const SizedBox(width: 4),
+                              const Icon(
+                                Icons.verified,
+                                color: AppColors.deepPink,
+                                size: 18,
+                              ),
+                              if (profile.isVip) ...[
+                                const SizedBox(width: 5),
+                                const _VipBadge(compact: true),
+                              ],
                             ],
-                          ],
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 5),
-                      Text(
-                        '● ${profile.distanceKm} km away',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 13,
+                        const SizedBox(height: 5),
+                        Text(
+                          profile.isArrivingSoon
+                              ? '✈️ ${profile.arrivalDestinationLabel}'
+                              : '● ${profile.distanceKm} km away',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 13,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 3),
-                      Text(
-                        '▣ ${profile.profession}',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 13,
+                        const SizedBox(height: 3),
+                        Text(
+                          '▣ ${profile.profession}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 13,
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
-                ),
-                SizedBox(
-                  width: 42,
-                  height: 42,
-                  child: IconButton.filled(
-                    key: Key('grid_like_${profile.name}'),
-                    onPressed: onLike,
-                    padding: EdgeInsets.zero,
-                    style: IconButton.styleFrom(
-                      backgroundColor: Colors.white,
-                      foregroundColor: liked
-                          ? AppColors.deepPink
-                          : AppColors.softCoral,
-                    ),
-                    icon: Icon(
-                      liked ? Icons.favorite : Icons.favorite_border,
-                      size: 22,
+                      ],
                     ),
                   ),
-                ),
-              ],
+                  SizedBox(
+                    width: 42,
+                    height: 42,
+                    child: IconButton.filled(
+                      key: Key('grid_like_${profile.name}'),
+                      onPressed: onLike,
+                      padding: EdgeInsets.zero,
+                      style: IconButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        foregroundColor: liked
+                            ? AppColors.deepPink
+                            : AppColors.softCoral,
+                      ),
+                      icon: Icon(
+                        liked ? Icons.favorite : Icons.favorite_border,
+                        size: 22,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

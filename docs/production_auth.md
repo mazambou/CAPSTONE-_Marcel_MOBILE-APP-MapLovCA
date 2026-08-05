@@ -1,14 +1,26 @@
 # MapLov production authentication
 
-MapLov uses Supabase Auth with PKCE and one canonical callback:
+MapLov uses a six-digit Supabase email OTP to confirm new email/password
+accounts. The user enters that code directly in the application, so signup
+confirmation emails do not contain an authentication link.
+
+The other Supabase Auth flows use PKCE and one canonical callback:
 
 `https://maplov.ca/auth/callback`
 
-The HTTPS callback is shared by email confirmation, password recovery, Magic
-Link, email change, Google OAuth, and Apple OAuth. `supabase_flutter` exchanges
-the PKCE code and emits the auth event that selects the correct Flutter screen.
-The legacy callback `io.maplov.app://auth-callback` remains allow-listed only
-for links issued by older builds.
+The HTTPS callback is shared by password recovery, Magic Link, email change,
+Google OAuth, and Apple OAuth. `supabase_flutter` exchanges the PKCE code and
+emits the auth event that selects the correct Flutter screen. The legacy
+callback `io.maplov.app://auth-callback` remains allow-listed only for links
+issued by older builds.
+
+## Signup email verification
+
+Supabase Auth must keep email confirmations enabled with a six-digit OTP. The
+confirmation template uses `{{ .Token }}` and intentionally does not use
+`{{ .ConfirmationURL }}`. The Flutter client verifies the code with the
+`signup` OTP type, which confirms the address and creates the authenticated
+session used to continue profile setup.
 
 ## Supabase URL configuration
 

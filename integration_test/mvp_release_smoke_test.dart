@@ -22,8 +22,8 @@ void main() {
 
     expect(find.byType(HomeScreen), findsOneWidget);
     expect(find.text('Discover'), findsWidgets);
-    expect(find.text('Likes'), findsWidgets);
-    expect(find.text('Matches'), findsWidgets);
+    expect(find.text('Posts'), findsWidgets);
+    expect(find.text('Likes & Matches'), findsWidgets);
     expect(find.text('Messages'), findsWidgets);
     expect(find.text('Profile'), findsWidgets);
   });

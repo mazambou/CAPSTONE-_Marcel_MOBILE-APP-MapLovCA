@@ -23,6 +23,7 @@ class PurchaseService extends ChangeNotifier {
   static final instance = PurchaseService._();
 
   StreamSubscription<List<PurchaseDetails>>? _subscription;
+  bool _initialized = false;
   List<ProductDetails> products = const [];
   bool storeAvailable = false;
   bool loading = false;
@@ -30,7 +31,20 @@ class PurchaseService extends ChangeNotifier {
   String? lastVerifiedProductId;
 
   Future<void> initialize() async {
-    if (_subscription != null) return;
+    if (_initialized) return;
+    _initialized = true;
+
+    // Web subscriptions are handled by the external checkout providers.
+    // Initializing the native StoreKit/Play Billing plugin in a browser leaves
+    // Pigeon calls without a platform host and produces uncaught JS errors.
+    if (kIsWeb) {
+      storeAvailable = false;
+      loading = false;
+      error = null;
+      notifyListeners();
+      return;
+    }
+
     _subscription = InAppPurchase.instance.purchaseStream.listen(
       _handlePurchases,
       onError: (Object value) {

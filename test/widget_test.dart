@@ -21,6 +21,35 @@ void main() {
     expect(const SubscriptionInfo(tier: 'plus').isVip, isFalse);
   });
 
+  test('premium catalog keeps included products visible for paid tiers', () {
+    const plus = SubscriptionInfo(tier: 'plus');
+    const vip = SubscriptionInfo(tier: 'vip');
+
+    expect(
+      storeProductIncludedLabel(plus, ExternalPaymentProduct.plusMonthly),
+      'Inclus avec MapLov Plus',
+    );
+    expect(
+      storeProductIncludedLabel(plus, ExternalPaymentProduct.countryPass24h),
+      'Inclus avec MapLov Plus',
+    );
+    expect(
+      storeProductIncludedLabel(plus, ExternalPaymentProduct.vipMonthly),
+      isNull,
+    );
+    expect(
+      storeProductIncludedLabel(
+        vip,
+        ExternalPaymentProduct.internationalPass7d,
+      ),
+      'Inclus avec MapLov VIP',
+    );
+    expect(
+      storeProductIncludedLabel(vip, ExternalPaymentProduct.boost30m),
+      isNull,
+    );
+  });
+
   test('New Account visibility follows the 7/7/14 day rollout', () {
     final now = DateTime.utc(2026, 7, 17);
     bool visible(int days, String tier, {bool owner = false}) =>

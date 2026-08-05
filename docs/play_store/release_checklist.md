@@ -4,20 +4,38 @@
 
 - [x] Flutter Analyze
 - [x] Widget test suite
-- [x] MVP integration smoke test
+- [x] Reviewed Play Store golden screenshots
+- [x] MVP integration smoke-test scenario implemented
+- [x] MVP account-to-discovery smoke flow passed on local macOS host
 - [x] Local discovery performance budget
-- [x] Android App Bundle build
+- [x] Debug Android APK build
+- [x] Release-mode Android App Bundle build using temporary debug signing
+- [x] Debug iOS simulator build
 - [x] R8 code shrinking and resource shrinking
 - [x] Cleartext traffic disabled
 - [x] Android backups disabled for sensitive account data
 - [x] Debug phone-verification bypass excluded from Release
 - [x] Public routes guarded against unauthenticated demo leakage
+- [x] Account, social, billing and settings routes authentication-guarded
 - [x] Data export and delayed permanent-erasure backend
 - [x] Report rate limits and target validation
+- [x] Permanent Android application ID set to `ca.maplov.app`
+- [x] Local and linked Supabase migrations synchronized through migration 049
+- [x] Linked PostgreSQL lint has no error-level findings
+
+## Device and release-build validation
+
+- [ ] Run the MVP smoke flow on an Android emulator
+- [ ] Run the MVP smoke flow on a physical Android device
+- [ ] Run the MVP smoke flow on an iOS simulator
+- [ ] Run the MVP smoke flow on a physical iPhone
+- [ ] Build the signed production Android App Bundle
+- [ ] Build and archive the signed production iOS application
+- [ ] Verify foreground location, camera, microphone and file attachments
+- [ ] Verify email confirmation, recovery and verified HTTPS callbacks
 
 ## Owner / Play Console actions
 
-- [ ] Confirm the permanent application ID (currently `com.example.maplove`)
 - [ ] Create and securely back up the upload keystore
 - [ ] Replace debug Release signing with the upload signing configuration
 - [ ] Create/verify the Google Play developer account

@@ -762,6 +762,25 @@ class _StoreCatalog extends StatefulWidget {
   State<_StoreCatalog> createState() => _StoreCatalogState();
 }
 
+String? storeProductIncludedLabel(
+  SubscriptionInfo subscription,
+  ExternalPaymentProduct product,
+) {
+  final productName = product.name;
+  if (subscription.isVip &&
+      (product.isSubscription ||
+          productName.startsWith('countryPass') ||
+          productName.startsWith('internationalPass'))) {
+    return 'Inclus avec MapLov VIP';
+  }
+  if (subscription.tier == 'plus' &&
+      (productName.startsWith('plus') ||
+          productName.startsWith('countryPass'))) {
+    return 'Inclus avec MapLov Plus';
+  }
+  return null;
+}
+
 class _StoreCatalogState extends State<_StoreCatalog> {
   static const items = [
     _StoreCatalogItem(
@@ -929,28 +948,6 @@ class _StoreCatalogState extends State<_StoreCatalog> {
     return '${(amount / 100).toStringAsFixed(2).replaceAll('.', ',')} \$ CAD';
   }
 
-  List<_StoreCatalogItem> _visibleItems(SubscriptionInfo subscription) {
-    if (subscription.isVip) {
-      return items
-          .where(
-            (item) =>
-                item.product.name.startsWith('boost') ||
-                item.product.name.startsWith('superLikes'),
-          )
-          .toList(growable: false);
-    }
-    if (subscription.tier == 'plus') {
-      return items
-          .where(
-            (item) =>
-                !item.product.name.startsWith('plus') &&
-                !item.product.name.startsWith('countryPass'),
-          )
-          .toList(growable: false);
-    }
-    return items;
-  }
-
   Future<ExternalPaymentProvider?> _provider(BuildContext context) {
     return showModalBottomSheet<ExternalPaymentProvider>(
       context: context,
@@ -1038,6 +1035,7 @@ class _StoreCatalogState extends State<_StoreCatalog> {
     BuildContext context,
     _StoreCatalogItem item,
     Map<String, dynamic>? promotion,
+    String? includedLabel,
   ) async {
     final buy = await showModalBottomSheet<bool>(
       context: context,
@@ -1165,10 +1163,17 @@ class _StoreCatalogState extends State<_StoreCatalog> {
               const SizedBox(height: 20),
               FilledButton.icon(
                 key: Key('store_buy_${item.product.id}'),
-                onPressed: () => Navigator.pop(sheetContext, true),
-                icon: const Icon(Icons.lock_outline_rounded),
+                onPressed: includedLabel == null
+                    ? () => Navigator.pop(sheetContext, true)
+                    : null,
+                icon: Icon(
+                  includedLabel == null
+                      ? Icons.lock_outline_rounded
+                      : Icons.check_circle_rounded,
+                ),
                 label: Text(
-                  item.product.isSubscription ? 'S’abonner' : 'Acheter',
+                  includedLabel ??
+                      (item.product.isSubscription ? 'S’abonner' : 'Acheter'),
                 ),
               ),
             ],
@@ -1185,7 +1190,7 @@ class _StoreCatalogState extends State<_StoreCatalog> {
       future: _subscription,
       builder: (context, snapshot) {
         final subscription = snapshot.data ?? const SubscriptionInfo();
-        final visibleItems = _visibleItems(subscription);
+        const visibleItems = items;
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -1314,6 +1319,10 @@ class _StoreCatalogState extends State<_StoreCatalog> {
                                   context,
                                   item,
                                   _promotions[item.product.id],
+                                  storeProductIncludedLabel(
+                                    subscription,
+                                    item.product,
+                                  ),
                                 ),
                                 child: Padding(
                                   padding: const EdgeInsets.all(16),
@@ -1361,6 +1370,21 @@ class _StoreCatalogState extends State<_StoreCatalog> {
                                                 fontWeight: FontWeight.w800,
                                               ),
                                             ),
+                                            if (storeProductIncludedLabel(
+                                                  subscription,
+                                                  item.product,
+                                                )
+                                                case final includedLabel?) ...[
+                                              const SizedBox(height: 3),
+                                              Text(
+                                                includedLabel,
+                                                style: const TextStyle(
+                                                  color: Color(0xFF168447),
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.w800,
+                                                ),
+                                              ),
+                                            ],
                                             const SizedBox(height: 3),
                                             if (_promotions[item.product.id]
                                                 case final promotion?) ...[
@@ -1416,7 +1440,23 @@ class _StoreCatalogState extends State<_StoreCatalog> {
                                           ],
                                         ),
                                       ),
-                                      const Icon(Icons.chevron_right_rounded),
+                                      Icon(
+                                        storeProductIncludedLabel(
+                                                  subscription,
+                                                  item.product,
+                                                ) ==
+                                                null
+                                            ? Icons.chevron_right_rounded
+                                            : Icons.check_circle_rounded,
+                                        color:
+                                            storeProductIncludedLabel(
+                                                  subscription,
+                                                  item.product,
+                                                ) ==
+                                                null
+                                            ? null
+                                            : const Color(0xFF168447),
+                                      ),
                                     ],
                                   ),
                                 ),

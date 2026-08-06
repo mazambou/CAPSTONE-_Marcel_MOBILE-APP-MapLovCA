@@ -13,6 +13,63 @@ import 'package:maplove/services/maplov_repository.dart';
 
 void main() {
   SupabaseConfig.forceUiOnlyForTesting = true;
+  GeographyRepository.useForTesting(
+    GeographyRepository.forTesting(
+      countriesLoader: () async => const [
+        GeographyCountry(id: 'ca', name: 'Canada', iso2: 'CA'),
+        GeographyCountry(id: 'al', name: 'Albania', iso2: 'AL'),
+        GeographyCountry(id: 'cm', name: 'Cameroon', iso2: 'CM'),
+        GeographyCountry(id: 'fr', name: 'France', iso2: 'FR'),
+        GeographyCountry(id: 'us', name: 'United States', iso2: 'US'),
+      ],
+      regionsLoader: (countryId) async => switch (countryId) {
+        'ca' => const [
+          GeographyRegion(id: 'ca-on', countryId: 'ca', name: 'Ontario'),
+          GeographyRegion(id: 'ca-qc', countryId: 'ca', name: 'Quebec'),
+        ],
+        'cm' => const [
+          GeographyRegion(id: 'cm-ce', countryId: 'cm', name: 'Centre'),
+        ],
+        'fr' => const [
+          GeographyRegion(id: 'fr-idf', countryId: 'fr', name: 'Île-de-France'),
+        ],
+        _ => const [],
+      },
+      citiesLoader: (regionId) async => switch (regionId) {
+        'ca-on' => const [
+          GeographyCity(
+            id: 'ca-on-toronto',
+            regionId: 'ca-on',
+            countryId: 'ca',
+            name: 'Toronto',
+          ),
+          GeographyCity(
+            id: 'ca-on-ottawa',
+            regionId: 'ca-on',
+            countryId: 'ca',
+            name: 'Ottawa',
+          ),
+        ],
+        'cm-ce' => const [
+          GeographyCity(
+            id: 'cm-ce-yaounde',
+            regionId: 'cm-ce',
+            countryId: 'cm',
+            name: 'Yaoundé',
+          ),
+        ],
+        'fr-idf' => const [
+          GeographyCity(
+            id: 'fr-idf-paris',
+            regionId: 'fr-idf',
+            countryId: 'fr',
+            name: 'Paris',
+          ),
+        ],
+        _ => const [],
+      },
+    ),
+  );
 
   test('legacy Elite and current VIP tiers share the public VIP identity', () {
     expect(const SubscriptionInfo(tier: 'elite').isVip, isTrue);
@@ -2237,6 +2294,9 @@ void main() {
       'maximum_age': 40,
       'location_mode': 'specific_country',
       'country_codes': ['Canada'],
+      'country_ids': ['ca'],
+      'region_ids': ['ca-on'],
+      'city_ids': ['ca-on-toronto'],
       'languages': ['French'],
       'relationship_goals': ['Marriage'],
       'genders': ['Women'],
@@ -2251,6 +2311,9 @@ void main() {
 
     expect(filters.minimumAge, 25);
     expect(filters.countries, ['Canada']);
+    expect(filters.countryIds, ['ca']);
+    expect(filters.regionIds, ['ca-on']);
+    expect(filters.cityIds, ['ca-on-toronto']);
     expect(filters.languages, ['French']);
     expect(filters.personalities, ['Creative']);
     expect(filters.interestSlugs, ['travel']);
@@ -2260,6 +2323,9 @@ void main() {
     expect(filters.vipOnly, isTrue);
     expect(filters.mostLikedFirst, isTrue);
     expect(filters.toDatabase()['location_mode'], 'specific_country');
+    expect(filters.toDatabase()['country_ids'], ['ca']);
+    expect(filters.toDatabase()['region_ids'], ['ca-on']);
+    expect(filters.toDatabase()['city_ids'], ['ca-on-toronto']);
     expect(filters.toDatabase()['premium_only'], isTrue);
     expect(filters.toDatabase()['vip_only'], isTrue);
     expect(filters.toDatabase()['most_liked_first'], isTrue);

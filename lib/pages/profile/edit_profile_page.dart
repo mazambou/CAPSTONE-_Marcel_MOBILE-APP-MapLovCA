@@ -35,6 +35,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   String incomeLevel = 'Prefer not to say';
   double height = 170;
   bool saving = false;
+  bool loadingRegions = false;
+  bool loadingCities = false;
+  int _geographyRequest = 0;
   String? profilePhotoUrl;
 
   final Set<String> languages = {'English'};
@@ -76,10 +79,25 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   Future<void> _loadExistingProfile() async {
     try {
+      await _loadCountries();
       final values = await MapLovRepository.instance.myProfileDetails();
       if (values == null || !mounted) return;
       final photos = await MapLovRepository.instance.myPhotos();
       final savedGender = values['gender'] as String? ?? gender;
+      final savedCountry = values['country_name'] as String? ?? country;
+      await _loadRegions(savedCountry);
+      final savedRegion =
+          values['residence_region'] as String? ??
+          _firstRegionForCountry(savedCountry);
+      await _loadCities(savedCountry, savedRegion);
+      final savedOriginCountry =
+          values['origin_country_name'] as String? ?? originCountry;
+      await _loadRegions(savedOriginCountry);
+      final savedOriginRegion =
+          values['origin_region'] as String? ??
+          _firstRegionForCountry(savedOriginCountry);
+      await _loadCities(savedOriginCountry, savedOriginRegion);
+      if (!mounted) return;
       setState(() {
         name.text = values['first_name'] as String? ?? name.text;
         city.text = values['city'] as String? ?? city.text;
@@ -88,17 +106,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         bio.text = values['bio'] as String? ?? bio.text;
         birthDate.text = values['date_of_birth'] as String? ?? birthDate.text;
         gender = savedGender;
-        country = values['country_name'] as String? ?? country;
-        region =
-            values['residence_region'] as String? ??
-            _regionForKnownCity(country, city.text) ??
-            _firstRegionForCountry(country);
-        originCountry =
-            values['origin_country_name'] as String? ?? originCountry;
-        originRegion =
-            values['origin_region'] as String? ??
-            _regionForKnownCity(originCountry, originCity.text) ??
-            _firstRegionForCountry(originCountry);
+        country = savedCountry;
+        region = savedRegion;
+        originCountry = savedOriginCountry;
+        originRegion = savedOriginRegion;
         citySelection = _cityBelongsToSelection(country, region, city.text)
             ? city.text
             : 'Other city';
@@ -152,6 +163,28 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Unable to load all profile details: $error')),
         );
+      }
+    }
+  }
+
+  Future<void> _changeResidenceRegion(String value) async {
+    final request = ++_geographyRequest;
+    setState(() {
+      region = value;
+      citySelection = '';
+      city.clear();
+      loadingCities = true;
+    });
+    try {
+      await _loadCities(country, value);
+      if (!mounted || request != _geographyRequest) return;
+      setState(() {
+        citySelection = _firstCityForCountryRegion(country, value);
+        if (citySelection != 'Other city') city.text = citySelection;
+      });
+    } finally {
+      if (mounted && request == _geographyRequest) {
+        setState(() => loadingCities = false);
       }
     }
   }
@@ -236,6 +269,16 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         'city': city.text.trim(),
         'residence_city': city.text.trim(),
         'residence_region': region,
+        'residence_country_id': _countryId(country),
+        'residence_region_id': _regionId(country, region),
+        'residence_city_id': _cityId(country, region, city.text.trim()),
+        'origin_country_id': _countryId(originCountry),
+        'origin_region_id': _regionId(originCountry, originRegion),
+        'origin_city_id': _cityId(
+          originCountry,
+          originRegion,
+          originCity.text.trim(),
+        ),
         'profession': profession.text.trim(),
         'education_level': educationLevel,
         'height_cm': height.round(),
@@ -347,11 +390,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           if (!(_regionsByCountry[country] ?? const []).contains(region))
             region,
         }.toList(),
-        (value) {
-          region = value;
-          citySelection = _firstCityForCountryRegion(country, region);
-          if (citySelection != 'Other city') city.text = citySelection;
-        },
+        (value) => unawaited(_changeResidenceRegion(value)),
+        enabled: !loadingRegions,
       ),
       const SizedBox(height: 12),
       _dropdown(
@@ -362,6 +402,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           citySelection = value;
           if (value != 'Other city') city.text = value;
         },
+        enabled: !loadingCities,
       ),
       if (citySelection == 'Other city') ...[
         const SizedBox(height: 12),
@@ -638,27 +679,30 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     ValueChanged<String> update, {
     bool enabled = true,
     String? helperText,
-  }) => DropdownButtonFormField<String>(
-    initialValue: value,
-    isExpanded: true,
-    decoration: InputDecoration(
-      labelText: context.tr(label),
-      helperText: helperText == null ? null : context.tr(helperText),
-    ),
-    items: options
-        .map(
-          (option) => DropdownMenuItem(
-            value: option,
-            child: Text(option, overflow: TextOverflow.ellipsis),
-          ),
-        )
-        .toList(),
-    onChanged: enabled
-        ? (selected) {
-            if (selected != null) setState(() => update(selected));
-          }
-        : null,
-  );
+  }) {
+    final uniqueOptions = {...options, value}.toList(growable: false);
+    return DropdownButtonFormField<String>(
+      initialValue: value,
+      isExpanded: true,
+      decoration: InputDecoration(
+        labelText: context.tr(label),
+        helperText: helperText == null ? null : context.tr(helperText),
+      ),
+      items: uniqueOptions
+          .map(
+            (option) => DropdownMenuItem(
+              value: option,
+              child: Text(option, overflow: TextOverflow.ellipsis),
+            ),
+          )
+          .toList(),
+      onChanged: enabled
+          ? (selected) {
+              if (selected != null) setState(() => update(selected));
+            }
+          : null,
+    );
+  }
 
   Widget _chips(List<String> options, Set<String> selected) => Wrap(
     spacing: 8,

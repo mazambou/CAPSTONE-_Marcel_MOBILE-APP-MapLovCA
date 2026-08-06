@@ -1,0 +1,435 @@
+{
+  "source": {
+    "provider": "GeoNames",
+    "license": "CC BY 4.0",
+    "admin1_url": "https://download.geonames.org/export/dump/admin1CodesASCII.txt",
+    "admin1_sha256": "34784457b76b988a669dff7c3e4b104e4902c0875643cff019281ac79dfa2992",
+    "cities_url": "https://download.geonames.org/export/dump/cities500.zip",
+    "cities_sha256": "e0ed86eff8f926488d4db7efac628926c61b4b90b4980e84832da7f5152e754b",
+    "city_scope": "cities500: populated places with population above 500, plus administrative seats down to PPLA4"
+  },
+  "totals": {
+    "countries": 72,
+    "regions": 1078,
+    "cities": 105164
+  },
+  "countries": [
+    {
+      "iso2": "AE",
+      "regions": 7,
+      "cities": 106
+    },
+    {
+      "iso2": "AU",
+      "regions": 8,
+      "cities": 4887
+    },
+    {
+      "iso2": "BE",
+      "regions": 3,
+      "cities": 2223
+    },
+    {
+      "iso2": "BF",
+      "regions": 13,
+      "cities": 118
+    },
+    {
+      "iso2": "BI",
+      "regions": 16,
+      "cities": 33
+    },
+    {
+      "iso2": "BJ",
+      "regions": 12,
+      "cities": 87
+    },
+    {
+      "iso2": "BW",
+      "regions": 16,
+      "cities": 130
+    },
+    {
+      "iso2": "CA",
+      "regions": 13,
+      "cities": 3222
+    },
+    {
+      "iso2": "CD",
+      "regions": 26,
+      "cities": 118
+    },
+    {
+      "iso2": "CF",
+      "regions": 20,
+      "cities": 51
+    },
+    {
+      "iso2": "CG",
+      "regions": 12,
+      "cities": 60
+    },
+    {
+      "iso2": "CH",
+      "regions": 26,
+      "cities": 1895
+    },
+    {
+      "iso2": "CI",
+      "regions": 14,
+      "cities": 5086
+    },
+    {
+      "iso2": "CM",
+      "regions": 10,
+      "cities": 145
+    },
+    {
+      "iso2": "CV",
+      "regions": 22,
+      "cities": 224
+    },
+    {
+      "iso2": "DE",
+      "regions": 16,
+      "cities": 11537
+    },
+    {
+      "iso2": "DJ",
+      "regions": 6,
+      "cities": 31
+    },
+    {
+      "iso2": "DK",
+      "regions": 5,
+      "cities": 496
+    },
+    {
+      "iso2": "DZ",
+      "regions": 58,
+      "cities": 351
+    },
+    {
+      "iso2": "EG",
+      "regions": 27,
+      "cities": 258
+    },
+    {
+      "iso2": "ER",
+      "regions": 6,
+      "cities": 18
+    },
+    {
+      "iso2": "ES",
+      "regions": 19,
+      "cities": 7388
+    },
+    {
+      "iso2": "ET",
+      "regions": 14,
+      "cities": 253
+    },
+    {
+      "iso2": "FR",
+      "regions": 13,
+      "cities": 15259
+    },
+    {
+      "iso2": "GA",
+      "regions": 9,
+      "cities": 50
+    },
+    {
+      "iso2": "GB",
+      "regions": 4,
+      "cities": 5660
+    },
+    {
+      "iso2": "GH",
+      "regions": 16,
+      "cities": 119
+    },
+    {
+      "iso2": "GM",
+      "regions": 6,
+      "cities": 179
+    },
+    {
+      "iso2": "GN",
+      "regions": 8,
+      "cities": 83
+    },
+    {
+      "iso2": "GQ",
+      "regions": 8,
+      "cities": 27
+    },
+    {
+      "iso2": "GW",
+      "regions": 9,
+      "cities": 44
+    },
+    {
+      "iso2": "IE",
+      "regions": 4,
+      "cities": 561
+    },
+    {
+      "iso2": "IT",
+      "regions": 20,
+      "cities": 11719
+    },
+    {
+      "iso2": "KE",
+      "regions": 47,
+      "cities": 332
+    },
+    {
+      "iso2": "KM",
+      "regions": 3,
+      "cities": 119
+    },
+    {
+      "iso2": "LR",
+      "regions": 15,
+      "cities": 26
+    },
+    {
+      "iso2": "LS",
+      "regions": 10,
+      "cities": 36
+    },
+    {
+      "iso2": "LY",
+      "regions": 22,
+      "cities": 119
+    },
+    {
+      "iso2": "MA",
+      "regions": 12,
+      "cities": 479
+    },
+    {
+      "iso2": "MG",
+      "regions": 23,
+      "cities": 151
+    },
+    {
+      "iso2": "ML",
+      "regions": 11,
+      "cities": 94
+    },
+    {
+      "iso2": "MR",
+      "regions": 15,
+      "cities": 87
+    },
+    {
+      "iso2": "MU",
+      "regions": 12,
+      "cities": 113
+    },
+    {
+      "iso2": "MW",
+      "regions": 3,
+      "cities": 39
+    },
+    {
+      "iso2": "MZ",
+      "regions": 11,
+      "cities": 94
+    },
+    {
+      "iso2": "NA",
+      "regions": 14,
+      "cities": 93
+    },
+    {
+      "iso2": "NE",
+      "regions": 8,
+      "cities": 74
+    },
+    {
+      "iso2": "NG",
+      "regions": 37,
+      "cities": 926
+    },
+    {
+      "iso2": "NL",
+      "regions": 12,
+      "cities": 1959
+    },
+    {
+      "iso2": "NO",
+      "regions": 15,
+      "cities": 622
+    },
+    {
+      "iso2": "NZ",
+      "regions": 17,
+      "cities": 728
+    },
+    {
+      "iso2": "PT",
+      "regions": 20,
+      "cities": 1066
+    },
+    {
+      "iso2": "RW",
+      "regions": 5,
+      "cities": 51
+    },
+    {
+      "iso2": "SA",
+      "regions": 13,
+      "cities": 156
+    },
+    {
+      "iso2": "SC",
+      "regions": 28,
+      "cities": 25
+    },
+    {
+      "iso2": "SD",
+      "regions": 18,
+      "cities": 112
+    },
+    {
+      "iso2": "SE",
+      "regions": 21,
+      "cities": 1302
+    },
+    {
+      "iso2": "SL",
+      "regions": 5,
+      "cities": 86
+    },
+    {
+      "iso2": "SN",
+      "regions": 14,
+      "cities": 153
+    },
+    {
+      "iso2": "SO",
+      "regions": 18,
+      "cities": 76
+    },
+    {
+      "iso2": "SS",
+      "regions": 10,
+      "cities": 23
+    },
+    {
+      "iso2": "ST",
+      "regions": 2,
+      "cities": 51
+    },
+    {
+      "iso2": "SZ",
+      "regions": 4,
+      "cities": 25
+    },
+    {
+      "iso2": "TD",
+      "regions": 23,
+      "cities": 74
+    },
+    {
+      "iso2": "TG",
+      "regions": 5,
+      "cities": 35
+    },
+    {
+      "iso2": "TN",
+      "regions": 24,
+      "cities": 286
+    },
+    {
+      "iso2": "TZ",
+      "regions": 31,
+      "cities": 319
+    },
+    {
+      "iso2": "UG",
+      "regions": 4,
+      "cities": 208
+    },
+    {
+      "iso2": "US",
+      "regions": 51,
+      "cities": 21454
+    },
+    {
+      "iso2": "ZA",
+      "regions": 9,
+      "cities": 987
+    },
+    {
+      "iso2": "ZM",
+      "regions": 10,
+      "cities": 97
+    },
+    {
+      "iso2": "ZW",
+      "regions": 10,
+      "cities": 69
+    }
+  ],
+  "incomplete_countries": [],
+  "skipped": {
+    "unknown_region": 55,
+    "duplicate_name": 1401,
+    "unknown_region_by_country": {
+      "AE": 1,
+      "BW": 9,
+      "CI": 8,
+      "CV": 3,
+      "DJ": 1,
+      "EG": 2,
+      "ET": 2,
+      "GB": 2,
+      "GM": 1,
+      "GW": 6,
+      "KE": 2,
+      "LS": 11,
+      "MA": 1,
+      "MR": 1,
+      "MU": 3,
+      "SA": 1,
+      "SC": 1
+    },
+    "duplicate_name_by_country": {
+      "AU": 14,
+      "BE": 33,
+      "CA": 36,
+      "CH": 2,
+      "CI": 42,
+      "CV": 1,
+      "DE": 358,
+      "DK": 9,
+      "ES": 11,
+      "FR": 104,
+      "GB": 251,
+      "GH": 1,
+      "GW": 2,
+      "IE": 5,
+      "IT": 136,
+      "KE": 2,
+      "LR": 1,
+      "MG": 1,
+      "NG": 1,
+      "NL": 8,
+      "NO": 3,
+      "NZ": 2,
+      "PT": 13,
+      "SA": 3,
+      "SE": 24,
+      "SL": 2,
+      "TZ": 1,
+      "UG": 4,
+      "US": 328,
+      "ZA": 2,
+      "ZM": 1
+    }
+  }
+}

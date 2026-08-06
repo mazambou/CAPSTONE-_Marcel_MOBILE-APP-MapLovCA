@@ -80,6 +80,9 @@ class _FilterScreenState extends State<FilterScreen> {
     'Profession': 'Any profession',
     'Income level': 'Any income level',
   };
+  int _geographyRequest = 0;
+  bool loadingGeography = false;
+  String? geographyError;
 
   @override
   void initState() {
@@ -93,6 +96,7 @@ class _FilterScreenState extends State<FilterScreen> {
 
   Future<void> _loadResidenceCountry() async {
     try {
+      await _loadCountries();
       final profile = await MapLovRepository.instance.myProfileDetails();
       final subscription = await MapLovRepository.instance.subscriptionInfo();
       final preferences =
@@ -101,6 +105,30 @@ class _FilterScreenState extends State<FilterScreen> {
       final country = profile?['country_name'] as String?;
       final region = profile?['residence_region'] as String?;
       final city = profile?['city'] as String?;
+      final loadedResidenceCountry = country?.trim().isNotEmpty == true
+          ? country!.trim()
+          : residenceCountry;
+      final loadedSelectedCountry =
+          preferences.countries.firstOrNull ?? loadedResidenceCountry;
+      final loadedSelectedRegion =
+          preferences.regions.firstOrNull ?? 'Any region';
+      final loadedOriginCountry =
+          preferences.originCountries.firstOrNull ?? 'Any country';
+      final loadedOriginRegion =
+          preferences.originRegions.firstOrNull ?? 'Any region';
+      await _loadRegions(loadedResidenceCountry);
+      if (loadedSelectedCountry != loadedResidenceCountry) {
+        await _loadRegions(loadedSelectedCountry);
+      }
+      if (loadedSelectedRegion != 'Any region') {
+        await _loadCities(loadedSelectedCountry, loadedSelectedRegion);
+      }
+      if (loadedOriginCountry != 'Any country') {
+        await _loadRegions(loadedOriginCountry);
+        if (loadedOriginRegion != 'Any region') {
+          await _loadCities(loadedOriginCountry, loadedOriginRegion);
+        }
+      }
       if (mounted) {
         setState(() {
           premiumPlus = subscription.isPremium;
@@ -162,13 +190,11 @@ class _FilterScreenState extends State<FilterScreen> {
           if (city != null && city.trim().isNotEmpty) {
             residenceCity = city.trim();
           }
-          selectedCountry =
-              preferences.countries.firstOrNull ?? residenceCountry;
-          selectedRegion = preferences.regions.firstOrNull ?? 'Any region';
+          selectedCountry = loadedSelectedCountry;
+          selectedRegion = loadedSelectedRegion;
           selectedCity = preferences.cities.firstOrNull ?? 'Any city';
-          originCountry =
-              preferences.originCountries.firstOrNull ?? 'Any country';
-          originRegion = preferences.originRegions.firstOrNull ?? 'Any region';
+          originCountry = loadedOriginCountry;
+          originRegion = loadedOriginRegion;
           originCity = preferences.originCities.firstOrNull ?? 'Any city';
           quickLanguage = preferences.languages.firstOrNull ?? 'Any';
           standardSelections['Language'] = quickLanguage;
@@ -232,6 +258,76 @@ class _FilterScreenState extends State<FilterScreen> {
       // The filter can still be applied with the locally known default.
     }
   }
+
+  Future<void> _changeCountry(String? value, {bool origin = false}) async {
+    final country = value ?? (origin ? 'Any country' : residenceCountry);
+    final request = ++_geographyRequest;
+    setState(() {
+      loadingGeography = country != 'Any country';
+      geographyError = null;
+      if (origin) {
+        originCountry = country;
+        originRegion = 'Any region';
+        originCity = 'Any city';
+      } else {
+        selectedCountry = country;
+        selectedRegion = 'Any region';
+        selectedCity = 'Any city';
+      }
+    });
+    if (country == 'Any country') return;
+    try {
+      await _loadRegions(country);
+      if (mounted && request == _geographyRequest) setState(() {});
+    } catch (_) {
+      if (mounted && request == _geographyRequest) {
+        setState(() => geographyError = 'Unable to load regions.');
+      }
+    } finally {
+      if (mounted && request == _geographyRequest) {
+        setState(() => loadingGeography = false);
+      }
+    }
+  }
+
+  Future<void> _changeRegion(String? value, {bool origin = false}) async {
+    final region = value ?? 'Any region';
+    final country = origin ? originCountry : selectedCountry;
+    final request = ++_geographyRequest;
+    setState(() {
+      loadingGeography = region != 'Any region';
+      geographyError = null;
+      if (origin) {
+        originRegion = region;
+        originCity = 'Any city';
+      } else {
+        selectedRegion = region;
+        selectedCity = 'Any city';
+      }
+    });
+    if (region == 'Any region') return;
+    try {
+      await _loadCities(country, region);
+      if (mounted && request == _geographyRequest) setState(() {});
+    } catch (_) {
+      if (mounted && request == _geographyRequest) {
+        setState(() => geographyError = 'Unable to load cities.');
+      }
+    } finally {
+      if (mounted && request == _geographyRequest) {
+        setState(() => loadingGeography = false);
+      }
+    }
+  }
+
+  List<Widget> get _geographyStatus => [
+    if (loadingGeography) const LinearProgressIndicator(),
+    if (geographyError != null)
+      Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: Text(geographyError!, style: const TextStyle(color: Colors.red)),
+      ),
+  ];
 
   Future<void> _persistFilters(DiscoveryFilters filters) async {
     await MapLovRepository.instance
@@ -401,17 +497,41 @@ class _FilterScreenState extends State<FilterScreen> {
           'International' => [selectedCountry],
           _ => const [],
         },
+        countryIds: switch (locationMode) {
+          'My country' => [_countryId(residenceCountry)].nonNulls.toList(),
+          'International' => [_countryId(selectedCountry)].nonNulls.toList(),
+          _ => const [],
+        },
         regions: locationMode == 'Near me' || selectedRegion == 'Any region'
             ? const []
             : [selectedRegion],
+        regionIds: locationMode == 'Near me' || selectedRegion == 'Any region'
+            ? const []
+            : [_regionId(selectedCountry, selectedRegion)].nonNulls.toList(),
         cities: locationMode != 'Near me' && selectedCity != 'Any city'
             ? [selectedCity]
+            : const [],
+        cityIds: locationMode != 'Near me' && selectedCity != 'Any city'
+            ? [
+                _cityId(selectedCountry, selectedRegion, selectedCity),
+              ].nonNulls.toList()
             : const [],
         originCountries: originCountry == 'Any country'
             ? const []
             : [originCountry],
+        originCountryIds: originCountry == 'Any country'
+            ? const []
+            : [_countryId(originCountry)].nonNulls.toList(),
         originRegions: originRegion == 'Any region' ? const [] : [originRegion],
+        originRegionIds: originRegion == 'Any region'
+            ? const []
+            : [_regionId(originCountry, originRegion)].nonNulls.toList(),
         originCities: originCity == 'Any city' ? const [] : [originCity],
+        originCityIds: originCity == 'Any city'
+            ? const []
+            : [
+                _cityId(originCountry, originRegion, originCity),
+              ].nonNulls.toList(),
         languages: language == null || language == 'Any'
             ? const []
             : [language],
@@ -699,6 +819,7 @@ class _FilterScreenState extends State<FilterScreen> {
         const _SectionTitle('Main Profile Discovery'),
         ..._vipDiscoveryFilters(),
         const _SectionTitle('Place of residence'),
+        ..._geographyStatus,
         _SearchLocationSelector(
           mode: locationMode,
           distance: distance,
@@ -712,32 +833,21 @@ class _FilterScreenState extends State<FilterScreen> {
           onDistanceChanged: (value) => setState(() => distance = value),
           onCityChanged: (value) =>
               setState(() => selectedCity = value ?? 'Any city'),
-          onCountryChanged: (value) => setState(() {
-            selectedCountry = value ?? residenceCountry;
-            selectedRegion = 'Any region';
-            selectedCity = 'Any city';
-          }),
-          onRegionChanged: (value) => setState(() {
-            selectedRegion = value ?? 'Any region';
-            selectedCity = 'Any city';
-          }),
+          onCountryChanged: (value) => unawaited(_changeCountry(value)),
+          onRegionChanged: (value) => unawaited(_changeRegion(value)),
         ),
         const _SectionTitle('Origin'),
+        ..._geographyStatus,
         _OriginFilter(
           available: premiumPlus,
           onLockedTap: _showOriginUpgrade,
           country: originCountry,
           region: originRegion,
           city: originCity,
-          onCountryChanged: (value) => setState(() {
-            originCountry = value ?? 'Any country';
-            originRegion = 'Any region';
-            originCity = 'Any city';
-          }),
-          onRegionChanged: (value) => setState(() {
-            originRegion = value ?? 'Any region';
-            originCity = 'Any city';
-          }),
+          onCountryChanged: (value) =>
+              unawaited(_changeCountry(value, origin: true)),
+          onRegionChanged: (value) =>
+              unawaited(_changeRegion(value, origin: true)),
           onCityChanged: (value) =>
               setState(() => originCity = value ?? 'Any city'),
         ),
@@ -816,6 +926,7 @@ class _FilterScreenState extends State<FilterScreen> {
           onChanged: (value) => setState(() => standardAges = value),
         ),
         const _SectionTitle('Place of residence'),
+        ..._geographyStatus,
         _SearchLocationSelector(
           mode: locationMode,
           distance: standardDistance,
@@ -830,32 +941,21 @@ class _FilterScreenState extends State<FilterScreen> {
               setState(() => standardDistance = value),
           onCityChanged: (value) =>
               setState(() => selectedCity = value ?? 'Any city'),
-          onCountryChanged: (value) => setState(() {
-            selectedCountry = value ?? residenceCountry;
-            selectedRegion = 'Any region';
-            selectedCity = 'Any city';
-          }),
-          onRegionChanged: (value) => setState(() {
-            selectedRegion = value ?? 'Any region';
-            selectedCity = 'Any city';
-          }),
+          onCountryChanged: (value) => unawaited(_changeCountry(value)),
+          onRegionChanged: (value) => unawaited(_changeRegion(value)),
         ),
         const _SectionTitle('Origin'),
+        ..._geographyStatus,
         _OriginFilter(
           available: premiumPlus,
           onLockedTap: _showOriginUpgrade,
           country: originCountry,
           region: originRegion,
           city: originCity,
-          onCountryChanged: (value) => setState(() {
-            originCountry = value ?? 'Any country';
-            originRegion = 'Any region';
-            originCity = 'Any city';
-          }),
-          onRegionChanged: (value) => setState(() {
-            originRegion = value ?? 'Any region';
-            originCity = 'Any city';
-          }),
+          onCountryChanged: (value) =>
+              unawaited(_changeCountry(value, origin: true)),
+          onRegionChanged: (value) =>
+              unawaited(_changeRegion(value, origin: true)),
           onCityChanged: (value) =>
               setState(() => originCity = value ?? 'Any city'),
         ),
@@ -991,6 +1091,7 @@ class _FilterScreenState extends State<FilterScreen> {
                 style: TextStyle(fontWeight: FontWeight.w800),
               ),
             ),
+            ..._geographyStatus,
             _SearchLocationSelector(
               mode: locationMode,
               distance: advancedDistance,
@@ -1005,15 +1106,8 @@ class _FilterScreenState extends State<FilterScreen> {
                   setState(() => advancedDistance = value),
               onCityChanged: (value) =>
                   setState(() => selectedCity = value ?? 'Any city'),
-              onCountryChanged: (value) => setState(() {
-                selectedCountry = value ?? residenceCountry;
-                selectedRegion = 'Any region';
-                selectedCity = 'Any city';
-              }),
-              onRegionChanged: (value) => setState(() {
-                selectedRegion = value ?? 'Any region';
-                selectedCity = 'Any city';
-              }),
+              onCountryChanged: (value) => unawaited(_changeCountry(value)),
+              onRegionChanged: (value) => unawaited(_changeRegion(value)),
             ),
             const Padding(
               padding: EdgeInsets.all(10),
@@ -1022,21 +1116,17 @@ class _FilterScreenState extends State<FilterScreen> {
                 style: TextStyle(fontWeight: FontWeight.w800),
               ),
             ),
+            ..._geographyStatus,
             _OriginFilter(
               available: premiumPlus,
               onLockedTap: _showOriginUpgrade,
               country: originCountry,
               region: originRegion,
               city: originCity,
-              onCountryChanged: (value) => setState(() {
-                originCountry = value ?? 'Any country';
-                originRegion = 'Any region';
-                originCity = 'Any city';
-              }),
-              onRegionChanged: (value) => setState(() {
-                originRegion = value ?? 'Any region';
-                originCity = 'Any city';
-              }),
+              onCountryChanged: (value) =>
+                  unawaited(_changeCountry(value, origin: true)),
+              onRegionChanged: (value) =>
+                  unawaited(_changeRegion(value, origin: true)),
               onCityChanged: (value) =>
                   setState(() => originCity = value ?? 'Any city'),
             ),
@@ -2355,202 +2445,3 @@ final _locationFilterDecoration = BoxDecoration(
   borderRadius: BorderRadius.circular(18),
   border: Border.all(color: AppColors.blush),
 );
-
-const _worldCountries = [
-  'Afghanistan',
-  'Albania',
-  'Algeria',
-  'Andorra',
-  'Angola',
-  'Antigua and Barbuda',
-  'Argentina',
-  'Armenia',
-  'Australia',
-  'Austria',
-  'Azerbaijan',
-  'Bahamas',
-  'Bahrain',
-  'Bangladesh',
-  'Barbados',
-  'Belarus',
-  'Belgium',
-  'Belize',
-  'Benin',
-  'Bhutan',
-  'Bolivia',
-  'Bosnia and Herzegovina',
-  'Botswana',
-  'Brazil',
-  'Brunei',
-  'Bulgaria',
-  'Burkina Faso',
-  'Burundi',
-  'Cabo Verde',
-  'Cambodia',
-  'Cameroon',
-  'Canada',
-  'Central African Republic',
-  'Chad',
-  'Chile',
-  'China',
-  'Colombia',
-  'Comoros',
-  'Congo',
-  'Costa Rica',
-  'Côte d’Ivoire',
-  'Croatia',
-  'Cuba',
-  'Cyprus',
-  'Czechia',
-  'Democratic Republic of the Congo',
-  'Denmark',
-  'Djibouti',
-  'Dominica',
-  'Dominican Republic',
-  'Ecuador',
-  'Egypt',
-  'El Salvador',
-  'Equatorial Guinea',
-  'Eritrea',
-  'Estonia',
-  'Eswatini',
-  'Ethiopia',
-  'Fiji',
-  'Finland',
-  'France',
-  'Gabon',
-  'Gambia',
-  'Georgia',
-  'Germany',
-  'Ghana',
-  'Greece',
-  'Grenada',
-  'Guatemala',
-  'Guinea',
-  'Guinea-Bissau',
-  'Guyana',
-  'Haiti',
-  'Honduras',
-  'Hungary',
-  'Iceland',
-  'India',
-  'Indonesia',
-  'Iran',
-  'Iraq',
-  'Ireland',
-  'Israel',
-  'Italy',
-  'Jamaica',
-  'Japan',
-  'Jordan',
-  'Kazakhstan',
-  'Kenya',
-  'Kiribati',
-  'Kuwait',
-  'Kyrgyzstan',
-  'Laos',
-  'Latvia',
-  'Lebanon',
-  'Lesotho',
-  'Liberia',
-  'Libya',
-  'Liechtenstein',
-  'Lithuania',
-  'Luxembourg',
-  'Madagascar',
-  'Malawi',
-  'Malaysia',
-  'Maldives',
-  'Mali',
-  'Malta',
-  'Marshall Islands',
-  'Mauritania',
-  'Mauritius',
-  'Mexico',
-  'Micronesia',
-  'Moldova',
-  'Monaco',
-  'Mongolia',
-  'Montenegro',
-  'Morocco',
-  'Mozambique',
-  'Myanmar',
-  'Namibia',
-  'Nauru',
-  'Nepal',
-  'Netherlands',
-  'New Zealand',
-  'Nicaragua',
-  'Niger',
-  'Nigeria',
-  'North Korea',
-  'North Macedonia',
-  'Norway',
-  'Oman',
-  'Pakistan',
-  'Palau',
-  'Palestine',
-  'Panama',
-  'Papua New Guinea',
-  'Paraguay',
-  'Peru',
-  'Philippines',
-  'Poland',
-  'Portugal',
-  'Qatar',
-  'Romania',
-  'Russia',
-  'Rwanda',
-  'Saint Kitts and Nevis',
-  'Saint Lucia',
-  'Saint Vincent and the Grenadines',
-  'Samoa',
-  'San Marino',
-  'São Tomé and Príncipe',
-  'Saudi Arabia',
-  'Senegal',
-  'Serbia',
-  'Seychelles',
-  'Sierra Leone',
-  'Singapore',
-  'Slovakia',
-  'Slovenia',
-  'Solomon Islands',
-  'Somalia',
-  'South Africa',
-  'South Korea',
-  'South Sudan',
-  'Spain',
-  'Sri Lanka',
-  'Sudan',
-  'Suriname',
-  'Sweden',
-  'Switzerland',
-  'Syria',
-  'Taiwan',
-  'Tajikistan',
-  'Tanzania',
-  'Thailand',
-  'Timor-Leste',
-  'Togo',
-  'Tonga',
-  'Trinidad and Tobago',
-  'Tunisia',
-  'Türkiye',
-  'Turkmenistan',
-  'Tuvalu',
-  'Uganda',
-  'Ukraine',
-  'United Arab Emirates',
-  'United Kingdom',
-  'United States',
-  'Uruguay',
-  'Uzbekistan',
-  'Vanuatu',
-  'Vatican City',
-  'Venezuela',
-  'Vietnam',
-  'Yemen',
-  'Zambia',
-  'Zimbabwe',
-];

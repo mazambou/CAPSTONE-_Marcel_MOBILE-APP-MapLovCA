@@ -1,409 +1,33 @@
 part of '../app.dart';
 
+GeographyRepository get _geography => GeographyRepository.instance;
+
+List<String> get _worldCountries => _geography.cachedCountries
+    .map((country) => country.name)
+    .toList(growable: false);
+
+Map<String, List<String>> get _regionsByCountry => {
+  for (final country in _geography.cachedCountries)
+    country.name: _geography
+        .cachedRegions(country.id)
+        .map((region) => region.name)
+        .toList(growable: false),
+};
+
 List<String> _regionOptions(String country) => [
   'Any region',
-  ...(_regionsByCountry[country] ?? const ['Other region']),
+  ...(_regionsByCountry[country] ?? const <String>[]),
 ];
 
-const Map<String, List<String>> _regionsByCountry = {
-  'Canada': [
-    'Alberta',
-    'British Columbia',
-    'Manitoba',
-    'New Brunswick',
-    'Newfoundland and Labrador',
-    'Northwest Territories',
-    'Nova Scotia',
-    'Nunavut',
-    'Ontario',
-    'Prince Edward Island',
-    'Quebec',
-    'Saskatchewan',
-    'Yukon',
-  ],
-  'United States': [
-    'California',
-    'Florida',
-    'Georgia',
-    'Illinois',
-    'Massachusetts',
-    'Michigan',
-    'New Jersey',
-    'New York',
-    'North Carolina',
-    'Ohio',
-    'Pennsylvania',
-    'Texas',
-    'Virginia',
-    'Washington',
-  ],
-  'Cameroon': [
-    'Adamawa',
-    'Centre',
-    'East',
-    'Far North',
-    'Littoral',
-    'North',
-    'North-West',
-    'South',
-    'South-West',
-    'West',
-  ],
-  'France': [
-    'Auvergne-Rhône-Alpes',
-    'Bourgogne-Franche-Comté',
-    'Brittany',
-    'Centre-Val de Loire',
-    'Corsica',
-    'Grand Est',
-    'Hauts-de-France',
-    'Île-de-France',
-    'Normandy',
-    'Nouvelle-Aquitaine',
-    'Occitanie',
-    'Pays de la Loire',
-    'Provence-Alpes-Côte d’Azur',
-  ],
-  'United Kingdom': ['England', 'Northern Ireland', 'Scotland', 'Wales'],
-};
-
-/// Principal Cameroonian cities grouped by the country's ten official regions.
-/// This is the single hierarchy used by registration, profile and discovery.
-const _cameroonCitiesByRegion = <String, List<String>>{
-  'Adamawa': ['Ngaoundéré', 'Meiganga', 'Banyo', 'Tibati', 'Tignère'],
-  'Centre': [
-    'Yaoundé',
-    'Mbalmayo',
-    'Bafia',
-    'Obala',
-    'Mfou',
-    'Nanga-Eboko',
-    'Akonolinga',
-    'Eséka',
-    'Monatélé',
-    'Ntui',
-  ],
-  'East': [
-    'Bertoua',
-    'Batouri',
-    'Yokadouma',
-    'Abong-Mbang',
-    'Garoua-Boulaï',
-    'Bélabo',
-    'Kétté',
-    'Lomié',
-  ],
-  'Far North': [
-    'Maroua',
-    'Kousséri',
-    'Mokolo',
-    'Yagoua',
-    'Mora',
-    'Kaélé',
-    'Bogo',
-    'Maga',
-    'Waza',
-  ],
-  'Littoral': [
-    'Douala',
-    'Nkongsamba',
-    'Edéa',
-    'Loum',
-    'Manjo',
-    'Melong',
-    'Mbanga',
-    'Dibombari',
-  ],
-  'North': [
-    'Garoua',
-    'Guider',
-    'Figuil',
-    'Pitoa',
-    'Poli',
-    'Lagdo',
-    'Touboro',
-    'Rey-Bouba',
-    'Tcholliré',
-  ],
-  'North-West': [
-    'Bamenda',
-    'Kumbo',
-    'Wum',
-    'Nkambe',
-    'Fundong',
-    'Ndop',
-    'Bali',
-    'Bafut',
-    'Batibo',
-    'Mbengwi',
-  ],
-  'South': [
-    'Ebolowa',
-    'Kribi',
-    'Sangmélima',
-    'Ambam',
-    'Lolodorf',
-    'Akom II',
-    'Djoum',
-    'Zoétélé',
-    'Meyomessala',
-  ],
-  'South-West': [
-    'Buea',
-    'Limbe',
-    'Kumba',
-    'Tiko',
-    'Mamfe',
-    'Muyuka',
-    'Mutengene',
-    'Bangem',
-    'Mundemba',
-    'Tombel',
-    'Ekondo-Titi',
-  ],
-  'West': [
-    'Bafoussam',
-    'Dschang',
-    'Foumban',
-    'Mbouda',
-    'Bafang',
-    'Bangangté',
-    'Foumbot',
-    'Bandjoun',
-    'Baham',
-    'Tonga',
-    'Batcham',
-  ],
-};
-
-/// Cities are resolved from the selected country and region. This prevents a
-/// city from another province/state from remaining available after a region
-/// change (for example Toronto under Quebec).
-const _citiesByCountryAndRegion = <String, Map<String, List<String>>>{
-  'Canada': {
-    'Alberta': [
-      'Airdrie',
-      'Calgary',
-      'Camrose',
-      'Cold Lake',
-      'Edmonton',
-      'Fort McMurray',
-      'Fort Saskatchewan',
-      'Grande Prairie',
-      'Lacombe',
-      'Leduc',
-      'Lethbridge',
-      'Medicine Hat',
-      'Okotoks',
-      'Red Deer',
-      'Spruce Grove',
-      'St. Albert',
-    ],
-    'British Columbia': [
-      'Abbotsford',
-      'Burnaby',
-      'Campbell River',
-      'Chilliwack',
-      'Coquitlam',
-      'Courtenay',
-      'Cranbrook',
-      'Delta',
-      'Fort St. John',
-      'Kamloops',
-      'Kelowna',
-      'Langford',
-      'Langley',
-      'Maple Ridge',
-      'Nanaimo',
-      'Nelson',
-      'New Westminster',
-      'North Vancouver',
-      'Parksville',
-      'Penticton',
-      'Port Alberni',
-      'Port Coquitlam',
-      'Port Moody',
-      'Powell River',
-      'Prince George',
-      'Prince Rupert',
-      'Quesnel',
-      'Richmond',
-      'Salmon Arm',
-      'Surrey',
-      'Terrace',
-      'Trail',
-      'Vancouver',
-      'Vernon',
-      'Victoria',
-      'West Kelowna',
-      'White Rock',
-      'Williams Lake',
-    ],
-    'Manitoba': [
-      'Brandon',
-      'Dauphin',
-      'Flin Flon',
-      'Morden',
-      'Portage la Prairie',
-      'Selkirk',
-      'Steinbach',
-      'Thompson',
-      'Winkler',
-      'Winnipeg',
-    ],
-    'New Brunswick': [
-      'Bathurst',
-      'Campbellton',
-      'Dieppe',
-      'Edmundston',
-      'Fredericton',
-      'Miramichi',
-      'Moncton',
-      'Saint John',
-    ],
-    'Newfoundland and Labrador': ['Corner Brook', 'Mount Pearl', 'St. John’s'],
-    'Northwest Territories': ['Yellowknife'],
-    'Nova Scotia': ['Dartmouth', 'Halifax', 'New Glasgow', 'Sydney'],
-    'Nunavut': ['Iqaluit'],
-    'Ontario': [
-      'Ajax',
-      'Aurora',
-      'Barrie',
-      'Belleville',
-      'Brampton',
-      'Brantford',
-      'Brockville',
-      'Burlington',
-      'Cambridge',
-      'Chatham-Kent',
-      'Clarence-Rockland',
-      'Collingwood',
-      'Cornwall',
-      'Elliot Lake',
-      'Greater Sudbury',
-      'Guelph',
-      'Hamilton',
-      'Kawartha Lakes',
-      'Kenora',
-      'Kingston',
-      'Kitchener',
-      'London',
-      'Markham',
-      'Mississauga',
-      'Niagara Falls',
-      'North Bay',
-      'Oakville',
-      'Orangeville',
-      'Orillia',
-      'Oshawa',
-      'Ottawa',
-      'Owen Sound',
-      'Pembroke',
-      'Peterborough',
-      'Pickering',
-      'Quinte West',
-      'Richmond Hill',
-      'Sarnia',
-      'Sault Ste. Marie',
-      'St. Catharines',
-      'St. Thomas',
-      'Stratford',
-      'Thunder Bay',
-      'Timmins',
-      'Toronto',
-      'Vaughan',
-      'Waterloo',
-      'Welland',
-      'Windsor',
-      'Woodstock',
-    ],
-    'Prince Edward Island': ['Charlottetown'],
-    'Quebec': [
-      'Alma',
-      'Amos',
-      'Blainville',
-      'Boisbriand',
-      'Boucherville',
-      'Brossard',
-      'Châteauguay',
-      'Côte Saint-Luc',
-      'Dollard-des-Ormeaux',
-      'Drummondville',
-      'Gatineau',
-      'Granby',
-      'Joliette',
-      'Kirkland',
-      'La Prairie',
-      'Laval',
-      'Lévis',
-      'Longueuil',
-      'Mirabel',
-      'Mont-Laurier',
-      'Montréal',
-      'Québec City',
-      'Repentigny',
-      'Rimouski',
-      'Rivière-du-Loup',
-      'Rouyn-Noranda',
-      'Saguenay',
-      'Saint-Bruno-de-Montarville',
-      'Saint-Constant',
-      'Saint-Eustache',
-      'Saint-Georges',
-      'Saint-Hyacinthe',
-      'Saint-Jean-sur-Richelieu',
-      'Saint-Jérôme',
-      'Saint-Lambert',
-      'Sainte-Julie',
-      'Sept-Îles',
-      'Sherbrooke',
-      'Terrebonne',
-      'Thetford Mines',
-      'Trois-Rivières',
-      'Val-d’Or',
-    ],
-    'Saskatchewan': [
-      'Estevan',
-      'Lloydminster',
-      'Moose Jaw',
-      'Prince Albert',
-      'Regina',
-      'Saskatoon',
-      'Swift Current',
-    ],
-    'Yukon': ['Whitehorse'],
-  },
-  'United States': {
-    'California': ['Los Angeles', 'San Diego', 'San Francisco'],
-    'Florida': ['Miami'],
-    'Illinois': ['Chicago'],
-    'Massachusetts': ['Boston'],
-    'New York': ['New York'],
-    'Pennsylvania': ['Philadelphia'],
-    'Texas': ['Austin', 'Dallas', 'Houston', 'San Antonio'],
-    'Washington': ['Seattle'],
-  },
-  'France': {
-    'Auvergne-Rhône-Alpes': ['Lyon'],
-    'Île-de-France': ['Paris'],
-    'Nouvelle-Aquitaine': ['Bordeaux'],
-    'Occitanie': ['Toulouse'],
-    'Provence-Alpes-Côte d’Azur': ['Marseille', 'Nice'],
-  },
-  'United Kingdom': {
-    'England': ['Birmingham', 'London', 'Manchester'],
-    'Scotland': ['Edinburgh', 'Glasgow'],
-  },
-};
-
 List<String> _citiesForCountryRegion(String country, String region) {
-  if (region == 'Any region' || region == 'Other region') {
-    return _registrationCitiesByCountry[country] ?? const [];
-  }
-  if (country == 'Cameroon') return _cameroonCitiesByRegion[region] ?? const [];
-  final regionalCities = _citiesByCountryAndRegion[country];
-  if (regionalCities != null) return regionalCities[region] ?? const [];
-  return _registrationCitiesByCountry[country] ?? const [];
+  final countryValue = _geography.countryByName(country);
+  if (countryValue == null) return const [];
+  final regionValue = _geography.regionByName(countryValue.id, region);
+  if (regionValue == null) return const [];
+  return _geography
+      .cachedCities(regionValue.id)
+      .map((city) => city.name)
+      .toList(growable: false);
 }
 
 String _firstRegionForCountry(String country, {bool allowAny = false}) {
@@ -424,12 +48,45 @@ bool _cityBelongsToSelection(String country, String region, String city) =>
     _citiesForCountryRegion(country, region).contains(city);
 
 String? _regionForKnownCity(String country, String city) {
-  final regions = country == 'Cameroon'
-      ? _cameroonCitiesByRegion
-      : _citiesByCountryAndRegion[country];
-  if (regions == null) return null;
-  for (final entry in regions.entries) {
-    if (entry.value.contains(city)) return entry.key;
+  final countryValue = _geography.countryByName(country);
+  if (countryValue == null) return null;
+  for (final region in _geography.cachedRegions(countryValue.id)) {
+    if (_geography.cachedCities(region.id).any((value) => value.name == city)) {
+      return region.name;
+    }
   }
   return null;
+}
+
+String? _countryId(String? name) => _geography.countryByName(name)?.id;
+
+String? _regionId(String? countryName, String? regionName) {
+  final country = _geography.countryByName(countryName);
+  return country == null
+      ? null
+      : _geography.regionByName(country.id, regionName)?.id;
+}
+
+String? _cityId(String? countryName, String? regionName, String? cityName) {
+  final region = _regionId(countryName, regionName);
+  return region == null ? null : _geography.cityByName(region, cityName)?.id;
+}
+
+Future<List<GeographyCountry>> _loadCountries() => _geography.getCountries();
+
+Future<List<GeographyRegion>> _loadRegions(String countryName) async {
+  final country = _geography.countryByName(countryName);
+  if (country == null) return const [];
+  return _geography.getRegionsByCountry(country.id);
+}
+
+Future<List<GeographyCity>> _loadCities(
+  String countryName,
+  String regionName,
+) async {
+  final country = _geography.countryByName(countryName);
+  if (country == null) return const [];
+  final region = _geography.regionByName(country.id, regionName);
+  if (region == null) return const [];
+  return _geography.getCitiesByRegion(region.id);
 }

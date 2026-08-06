@@ -40,9 +40,15 @@ class UserProfile {
     this.isNew = false,
     this.country = 'Canada',
     this.region = '',
+    this.countryId = '',
+    this.regionId = '',
+    this.cityId = '',
     this.originCountry = '',
     this.originRegion = '',
     this.originCity = '',
+    this.originCountryId = '',
+    this.originRegionId = '',
+    this.originCityId = '',
     this.bio = '',
     this.photoUrls = const [],
     this.photoIds = const [],
@@ -93,9 +99,15 @@ class UserProfile {
   final bool isNew;
   final String country;
   final String region;
+  final String countryId;
+  final String regionId;
+  final String cityId;
   final String originCountry;
   final String originRegion;
   final String originCity;
+  final String originCountryId;
+  final String originRegionId;
+  final String originCityId;
   final String bio;
   final List<String> photoUrls;
   final List<String> photoIds;

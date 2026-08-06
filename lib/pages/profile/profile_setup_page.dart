@@ -29,6 +29,15 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   bool originCountryLocked = false;
   bool originRegionLocked = false;
   bool originCityLocked = false;
+  bool loadingResidenceRegions = false;
+  bool loadingResidenceCities = false;
+  bool loadingOriginRegions = false;
+  bool loadingOriginCities = false;
+  String? residenceRegionError;
+  String? residenceCityError;
+  String? originRegionError;
+  String? originCityError;
+  int _originGeographyRequest = 0;
   late Future<List<Map<String, dynamic>>> photos;
   Uint8List? pendingProfilePhoto;
   bool uploadingPhoto = false;
@@ -57,20 +66,42 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
 
   Future<void> _loadGeography() async {
     try {
+      await _loadCountries();
       final profile = await MapLovRepository.instance.myProfileDetails();
       if (profile != null && mounted) {
-        final savedResidenceCountry =
+        var savedResidenceCountry =
             profile['residence_country_name'] as String? ??
             profile['country_name'] as String? ??
             'Canada';
+        if (!_worldCountries.contains(savedResidenceCountry)) {
+          savedResidenceCountry = _worldCountries.contains('Canada')
+              ? 'Canada'
+              : (_worldCountries.firstOrNull ?? '');
+        }
+        await _loadRegions(savedResidenceCountry);
         final savedResidenceCity =
             profile['residence_city'] as String? ??
             profile['city'] as String? ??
             'Toronto';
         final savedResidenceRegion =
             profile['residence_region'] as String? ??
-            _regionForKnownCity(savedResidenceCountry, savedResidenceCity) ??
             _firstRegionForCountry(savedResidenceCountry);
+        if (savedResidenceRegion.isNotEmpty) {
+          await _loadCities(savedResidenceCountry, savedResidenceRegion);
+        }
+        var savedOriginCountry =
+            profile['origin_country_name'] as String? ?? 'Canada';
+        if (!_worldCountries.contains(savedOriginCountry)) {
+          savedOriginCountry = savedResidenceCountry;
+        }
+        await _loadRegions(savedOriginCountry);
+        final savedOriginCity = profile['origin_city'] as String?;
+        final savedOriginRegion =
+            profile['origin_region'] as String? ??
+            _firstRegionForCountry(savedOriginCountry);
+        if (savedOriginRegion.isNotEmpty) {
+          await _loadCities(savedOriginCountry, savedOriginRegion);
+        }
         final storedGender = profile['gender'] as String?;
         final savedGender =
             const {'Woman', 'Man', 'Non-binary'}.contains(storedGender)
@@ -83,9 +114,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
             profile['body_type'] as String?,
             savedGender,
           );
-          residenceCountry = _worldCountries.contains(savedResidenceCountry)
-              ? savedResidenceCountry
-              : 'Canada';
+          residenceCountry = savedResidenceCountry;
           final regions = _regionsByCountry[residenceCountry] ?? const [];
           if (regions.contains(savedResidenceRegion)) {
             residenceRegion = savedResidenceRegion;
@@ -99,22 +128,12 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
             savedResidenceCity,
             residenceCityOther,
           );
-          final savedOriginCountry = profile['origin_country_name'] as String?;
-          if (savedOriginCountry != null &&
-              savedOriginCountry.trim().isNotEmpty &&
-              _worldCountries.contains(savedOriginCountry)) {
-            originCountry = savedOriginCountry;
-            originCountryLocked = true;
-          }
-          final savedOriginCity = profile['origin_city'] as String?;
-          final savedOriginRegion =
-              profile['origin_region'] as String? ??
-              (savedOriginCity == null || savedOriginCity.trim().isEmpty
-                  ? null
-                  : _regionForKnownCity(originCountry, savedOriginCity));
-          if (savedOriginRegion != null &&
-              savedOriginRegion.trim().isNotEmpty) {
-            final regions = _regionsByCountry[originCountry] ?? const [];
+          originCountry = savedOriginCountry;
+          originCountryLocked =
+              (profile['origin_country_name'] as String?)?.trim().isNotEmpty ==
+              true;
+          if (savedOriginRegion.trim().isNotEmpty) {
+            final regions = _regionsByCountry[savedOriginCountry] ?? const [];
             if (regions.contains(savedOriginRegion)) {
               originRegion = savedOriginRegion;
             } else {
@@ -123,7 +142,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
             }
             originRegionLocked = true;
           } else {
-            originRegion = _firstRegionForCountry(originCountry);
+            originRegion = _firstRegionForCountry(savedOriginCountry);
           }
           if (savedOriginCity != null && savedOriginCity.trim().isNotEmpty) {
             originCity = _citySelection(
@@ -169,6 +188,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
           'MapLov does not yet support profiles from ${detected.country}.',
         );
       }
+      await _loadRegions(country);
       final regions = _regionsByCountry[country] ?? const <String>[];
       final exactRegion = regions
           .where(
@@ -179,6 +199,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
           exactRegion ??
           _regionForKnownCity(country, detected.city) ??
           (regions.isEmpty ? 'Other region' : regions.first);
+      await _loadCities(country, selectedRegion);
       final cities = _citiesForCountryRegion(country, selectedRegion);
       final selectedCity = cities
           .where((city) => city.toLowerCase() == detected.city.toLowerCase())
@@ -216,6 +237,55 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
         residenceDetectionError =
             'GPS location is required to verify your country of residence.';
       });
+    }
+  }
+
+  Future<void> _changeOriginCountry(String value) async {
+    final request = ++_originGeographyRequest;
+    setState(() {
+      originCountry = value;
+      originRegion = '';
+      originCity = '';
+      originRegionOther.clear();
+      originCityOther.clear();
+      loadingOriginRegions = true;
+      loadingOriginCities = false;
+      originRegionError = null;
+      originCityError = null;
+    });
+    try {
+      await _loadRegions(value);
+      if (!mounted || request != _originGeographyRequest) return;
+    } catch (_) {
+      if (!mounted || request != _originGeographyRequest) return;
+      setState(() => originRegionError = 'Unable to load regions.');
+    } finally {
+      if (mounted && request == _originGeographyRequest) {
+        setState(() => loadingOriginRegions = false);
+      }
+    }
+  }
+
+  Future<void> _changeOriginRegion(String value) async {
+    final request = ++_originGeographyRequest;
+    setState(() {
+      originRegion = value;
+      originCity = '';
+      originCityOther.clear();
+      loadingOriginCities = value != 'Other region';
+      originCityError = null;
+    });
+    if (value == 'Other region') return;
+    try {
+      await _loadCities(originCountry, value);
+      if (!mounted || request != _originGeographyRequest) return;
+    } catch (_) {
+      if (!mounted || request != _originGeographyRequest) return;
+      setState(() => originCityError = 'Unable to load cities.');
+    } finally {
+      if (mounted && request == _originGeographyRequest) {
+        setState(() => loadingOriginCities = false);
+      }
     }
   }
 
@@ -416,9 +486,19 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
         'city': savedResidenceCity,
         'residence_city': savedResidenceCity,
         'residence_region': savedResidenceRegion,
+        'residence_country_id': _countryId(residenceCountry),
+        'residence_region_id': _regionId(residenceCountry, residenceRegion),
+        'residence_city_id': _cityId(
+          residenceCountry,
+          residenceRegion,
+          residenceCity,
+        ),
         'origin_country_name': originCountry,
         'origin_region': savedOriginRegion,
         'origin_city': savedOriginCity,
+        'origin_country_id': _countryId(originCountry),
+        'origin_region_id': _regionId(originCountry, originRegion),
+        'origin_city_id': _cityId(originCountry, originRegion, originCity),
       });
       await MapLovRepository.instance.completeProfileIfReady();
       if (mounted) Navigator.pushNamed(context, AppRoutes.preferences);
@@ -608,12 +688,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
         otherController: residenceCityOther,
         countryLabel: 'Current country of residence',
         cityLabel: 'Current city of residence',
-        onCountryChanged: (value) => setState(() {
-          residenceCountry = value;
-          residenceRegion = _regionsByCountry[value]?.first ?? 'Other region';
-          residenceCity = _firstCityForCountryRegion(value, residenceRegion);
-          residenceCityOther.clear();
-        }),
+        onCountryChanged: (value) {},
         onCityChanged: (value) => setState(() => residenceCity = value),
         onRegionChanged: (value) => setState(() {
           residenceRegion = value;
@@ -629,6 +704,10 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
         countryRefreshing: detectingResidence,
         countryError: residenceDetectionError,
         onRefreshCountry: () => unawaited(_detectResidence()),
+        loadingRegions: loadingResidenceRegions,
+        loadingCities: loadingResidenceCities,
+        regionError: residenceRegionError,
+        cityError: residenceCityError,
       ),
       const _SectionTitle('Your origin'),
       _geographyFields(
@@ -638,23 +717,17 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
         otherController: originCityOther,
         countryLabel: 'Country of origin',
         cityLabel: 'City of origin',
-        onCountryChanged: (value) => setState(() {
-          originCountry = value;
-          originRegion = _firstRegionForCountry(value);
-          originCity = _firstCityForCountryRegion(value, originRegion);
-          originRegionOther.clear();
-          originCityOther.clear();
-        }),
+        onCountryChanged: (value) => unawaited(_changeOriginCountry(value)),
         onCityChanged: (value) => setState(() => originCity = value),
-        onRegionChanged: (value) => setState(() {
-          originRegion = value;
-          originCity = _firstCityForCountryRegion(originCountry, originRegion);
-          originCityOther.clear();
-        }),
+        onRegionChanged: (value) => unawaited(_changeOriginRegion(value)),
         regionOtherController: originRegionOther,
         countryReadOnly: originCountryLocked,
         regionReadOnly: originRegionLocked,
         cityReadOnly: originCityLocked,
+        loadingRegions: loadingOriginRegions,
+        loadingCities: loadingOriginCities,
+        regionError: originRegionError,
+        cityError: originCityError,
       ),
       const SizedBox(height: 12),
       DropdownButtonFormField<String>(
@@ -724,6 +797,10 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     bool countryUsesGps = false,
     bool countryRefreshing = false,
     String? countryError,
+    bool loadingRegions = false,
+    bool loadingCities = false,
+    String? regionError,
+    String? cityError,
     VoidCallback? onRefreshCountry,
   }) {
     final cities = [
@@ -734,7 +811,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       children: [
         DropdownButtonFormField<String>(
           key: ValueKey('${countryLabel}_$country'),
-          initialValue: country,
+          initialValue: _worldCountries.contains(country) ? country : null,
           isExpanded: true,
           menuMaxHeight: 360,
           decoration: InputDecoration(
@@ -785,17 +862,28 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
         if (region != null && onRegionChanged != null) ...[
           DropdownButtonFormField<String>(
             key: ValueKey('${countryLabel}_region_$country'),
-            initialValue:
-                [
-                  ...?_regionsByCountry[country],
-                  'Other region',
-                ].contains(region)
+            initialValue: region.isEmpty
+                ? null
+                : [
+                    ...?_regionsByCountry[country],
+                    'Other region',
+                  ].contains(region)
                 ? region
                 : 'Other region',
             isExpanded: true,
             decoration: InputDecoration(
               labelText: context.tr('Region'),
               prefixIcon: const Icon(Icons.map_outlined),
+              errorText: regionError,
+              suffixIcon: loadingRegions
+                  ? const Padding(
+                      padding: EdgeInsets.all(13),
+                      child: SizedBox.square(
+                        dimension: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    )
+                  : null,
             ),
             items: [...?_regionsByCountry[country], 'Other region']
                 .map(
@@ -805,7 +893,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                   ),
                 )
                 .toList(),
-            onChanged: saving || regionReadOnly
+            onChanged: saving || regionReadOnly || loadingRegions
                 ? null
                 : (value) {
                     if (value != null) onRegionChanged(value);
@@ -826,13 +914,27 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
         ],
         DropdownButtonFormField<String>(
           key: ValueKey('${cityLabel}_${country}_$city'),
-          initialValue: cities.contains(city) ? city : 'Other city',
+          initialValue: city.isEmpty
+              ? null
+              : cities.contains(city)
+              ? city
+              : 'Other city',
           isExpanded: true,
           decoration: InputDecoration(
             labelText: context.tr(cityLabel),
             prefixIcon: const Icon(Icons.location_city_outlined),
+            errorText: cityError,
             helperText: cityReadOnly
                 ? context.tr('City of origin can only be chosen once.')
+                : null,
+            suffixIcon: loadingCities
+                ? const Padding(
+                    padding: EdgeInsets.all(13),
+                    child: SizedBox.square(
+                      dimension: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  )
                 : null,
           ),
           items: cities
@@ -840,7 +942,12 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                 (value) => DropdownMenuItem(value: value, child: Text(value)),
               )
               .toList(),
-          onChanged: saving || cityReadOnly
+          onChanged:
+              saving ||
+                  cityReadOnly ||
+                  loadingRegions ||
+                  loadingCities ||
+                  region?.isEmpty == true
               ? null
               : (value) {
                   if (value != null) onCityChanged(value);

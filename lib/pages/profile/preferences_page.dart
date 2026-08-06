@@ -33,6 +33,9 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
   List<String> savedOriginCities = const [];
   DiscoveryFilters savedFilters = const DiscoveryFilters();
   List<Map<String, dynamic>> upcomingArrivals = const [];
+  int _geographyRequest = 0;
+  bool loadingGeography = false;
+  String? geographyError;
 
   @override
   void initState() {
@@ -41,12 +44,24 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
   }
 
   Future<void> _load() async {
+    await _loadCountries();
     final saved = await MapLovRepository.instance.myPreferences();
     final profile = await MapLovRepository.instance.myProfileDetails();
     final subscription = await MapLovRepository.instance.subscriptionInfo();
     final arrivals = subscription.isVip
         ? await MapLovRepository.instance.myUpcomingArrivals()
         : const <Map<String, dynamic>>[];
+    final loadedPreferredCountry = saved.countries.firstOrNull ?? 'Canada';
+    final loadedPreferredRegion = saved.regions.firstOrNull ?? 'Any region';
+    final loadedResidenceCountry =
+        profile?['country_name'] as String? ?? residenceCountry;
+    await _loadRegions(loadedResidenceCountry);
+    if (loadedPreferredCountry != loadedResidenceCountry) {
+      await _loadRegions(loadedPreferredCountry);
+    }
+    if (loadedPreferredRegion != 'Any region') {
+      await _loadCities(loadedPreferredCountry, loadedPreferredRegion);
+    }
     if (!mounted) return;
     setState(() {
       savedFilters = saved;
@@ -74,10 +89,9 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
       relationshipGoal = saved.relationshipGoals.firstOrNull ?? 'Long-term';
       language = saved.languages.firstOrNull ?? 'Any language';
       personality = saved.personalities.firstOrNull ?? 'Any personality';
-      preferredCountry = saved.countries.firstOrNull ?? 'Canada';
-      preferredRegion = saved.regions.firstOrNull ?? 'Any region';
-      residenceCountry =
-          profile?['country_name'] as String? ?? residenceCountry;
+      preferredCountry = loadedPreferredCountry;
+      preferredRegion = loadedPreferredRegion;
+      residenceCountry = loadedResidenceCountry;
       residenceRegion =
           profile?['residence_region'] as String? ?? residenceRegion;
       residenceCity = profile?['city'] as String? ?? residenceCity;
@@ -91,6 +105,54 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
       savedOriginCities = saved.originCities;
       loading = false;
     });
+  }
+
+  Future<void> _changePreferredCountry(String? value) async {
+    final country = value ?? 'Canada';
+    final request = ++_geographyRequest;
+    setState(() {
+      loadingGeography = true;
+      geographyError = null;
+      preferredCountry = country;
+      preferredRegion = 'Any region';
+      selectedCity = 'Any city';
+    });
+    try {
+      await _loadRegions(country);
+      if (mounted && request == _geographyRequest) setState(() {});
+    } catch (_) {
+      if (mounted && request == _geographyRequest) {
+        setState(() => geographyError = 'Unable to load regions.');
+      }
+    } finally {
+      if (mounted && request == _geographyRequest) {
+        setState(() => loadingGeography = false);
+      }
+    }
+  }
+
+  Future<void> _changePreferredRegion(String? value) async {
+    final region = value ?? 'Any region';
+    final request = ++_geographyRequest;
+    setState(() {
+      loadingGeography = region != 'Any region';
+      geographyError = null;
+      preferredRegion = region;
+      selectedCity = 'Any city';
+    });
+    if (region == 'Any region') return;
+    try {
+      await _loadCities(preferredCountry, region);
+      if (mounted && request == _geographyRequest) setState(() {});
+    } catch (_) {
+      if (mounted && request == _geographyRequest) {
+        setState(() => geographyError = 'Unable to load cities.');
+      }
+    } finally {
+      if (mounted && request == _geographyRequest) {
+        setState(() => loadingGeography = false);
+      }
+    }
   }
 
   void _backToProfileDetails() {
@@ -208,11 +270,26 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
             'International' => [preferredCountry],
             _ => const [],
           },
+          countryIds: switch (searchMode) {
+            'My country' => [_countryId(residenceCountry)].nonNulls.toList(),
+            'International' => [_countryId(preferredCountry)].nonNulls.toList(),
+            _ => const [],
+          },
           regions: searchMode == 'Near me' || preferredRegion == 'Any region'
               ? const []
               : [preferredRegion],
+          regionIds: searchMode == 'Near me' || preferredRegion == 'Any region'
+              ? const []
+              : [
+                  _regionId(preferredCountry, preferredRegion),
+                ].nonNulls.toList(),
           cities: searchMode != 'Near me' && selectedCity != 'Any city'
               ? [selectedCity]
+              : const [],
+          cityIds: searchMode != 'Near me' && selectedCity != 'Any city'
+              ? [
+                  _cityId(preferredCountry, preferredRegion, selectedCity),
+                ].nonNulls.toList()
               : const [],
           genders: [_storedGenderFilterValue(soughtGender!)],
           relationshipGoals: [relationshipGoal],
@@ -225,8 +302,11 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
               ? const []
               : [personality],
           originCountries: savedOriginCountries,
+          originCountryIds: savedFilters.originCountryIds,
           originRegions: savedOriginRegions,
+          originRegionIds: savedFilters.originRegionIds,
           originCities: savedOriginCities,
+          originCityIds: savedFilters.originCityIds,
           religions: savedFilters.religions,
           bodyTypes: savedFilters.bodyTypes
               .where(
@@ -363,6 +443,12 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
     var city = existing?['city_name'] as String?;
     var month = DateTime.tryParse(existing?['arrival_month'] as String? ?? '');
     var active = existing?['is_active'] as bool? ?? true;
+    var loadingRegions = false;
+    var loadingCities = false;
+    var dialogRequest = 0;
+    await _loadRegions(country);
+    if (region != null) await _loadCities(country, region);
+    if (!mounted) return;
     final saved = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => StatefulBuilder(
@@ -392,18 +478,37 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
                           ),
                         )
                         .toList(),
-                    onChanged: (value) => setDialogState(() {
-                      country = value ?? country;
-                      region = null;
-                      city = null;
-                    }),
+                    onChanged: (value) async {
+                      final selected = value ?? country;
+                      final request = ++dialogRequest;
+                      setDialogState(() {
+                        country = selected;
+                        region = null;
+                        city = null;
+                        loadingRegions = true;
+                        loadingCities = false;
+                      });
+                      try {
+                        await _loadRegions(selected);
+                        if (request == dialogRequest && dialogContext.mounted) {
+                          setDialogState(() {});
+                        }
+                      } finally {
+                        if (request == dialogRequest && dialogContext.mounted) {
+                          setDialogState(() => loadingRegions = false);
+                        }
+                      }
+                    },
                   ),
                   const SizedBox(height: 12),
                   DropdownButtonFormField<String>(
                     initialValue: regions.contains(region) ? region : null,
                     isExpanded: true,
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       labelText: 'Region (optional)',
+                      suffixIcon: loadingRegions
+                          ? const CircularProgressIndicator(strokeWidth: 2)
+                          : null,
                     ),
                     items: [
                       const DropdownMenuItem<String>(
@@ -415,17 +520,42 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
                             DropdownMenuItem(value: value, child: Text(value)),
                       ),
                     ],
-                    onChanged: (value) => setDialogState(() {
-                      region = value == null || value.isEmpty ? null : value;
-                      city = null;
-                    }),
+                    onChanged: loadingRegions
+                        ? null
+                        : (value) async {
+                            final selected = value == null || value.isEmpty
+                                ? null
+                                : value;
+                            final request = ++dialogRequest;
+                            setDialogState(() {
+                              region = selected;
+                              city = null;
+                              loadingCities = selected != null;
+                            });
+                            if (selected == null) return;
+                            try {
+                              await _loadCities(country, selected);
+                              if (request == dialogRequest &&
+                                  dialogContext.mounted) {
+                                setDialogState(() {});
+                              }
+                            } finally {
+                              if (request == dialogRequest &&
+                                  dialogContext.mounted) {
+                                setDialogState(() => loadingCities = false);
+                              }
+                            }
+                          },
                   ),
                   const SizedBox(height: 12),
                   DropdownButtonFormField<String>(
                     initialValue: cities.contains(city) ? city : null,
                     isExpanded: true,
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       labelText: 'City (optional)',
+                      suffixIcon: loadingCities
+                          ? const CircularProgressIndicator(strokeWidth: 2)
+                          : null,
                     ),
                     items: [
                       const DropdownMenuItem<String>(
@@ -437,7 +567,7 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
                             DropdownMenuItem(value: value, child: Text(value)),
                       ),
                     ],
-                    onChanged: region == null
+                    onChanged: region == null || loadingCities
                         ? null
                         : (value) => setDialogState(
                             () => city = value == null || value.isEmpty
@@ -619,6 +749,15 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
         onChanged: (value) => setState(() => ages = value),
       ),
       const _SectionTitle('Search location'),
+      if (loadingGeography) const LinearProgressIndicator(),
+      if (geographyError != null)
+        Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: Text(
+            geographyError!,
+            style: const TextStyle(color: Colors.red),
+          ),
+        ),
       _SearchLocationSelector(
         mode: searchMode,
         distance: distance,
@@ -632,15 +771,8 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
         onDistanceChanged: (value) => setState(() => distance = value),
         onCityChanged: (value) =>
             setState(() => selectedCity = value ?? 'Any city'),
-        onCountryChanged: (value) => setState(() {
-          preferredCountry = value ?? 'Canada';
-          preferredRegion = 'Any region';
-          selectedCity = 'Any city';
-        }),
-        onRegionChanged: (value) => setState(() {
-          preferredRegion = value ?? 'Any region';
-          selectedCity = 'Any city';
-        }),
+        onCountryChanged: (value) => unawaited(_changePreferredCountry(value)),
+        onRegionChanged: (value) => unawaited(_changePreferredRegion(value)),
       ),
       _upcomingArrivalsSection(),
       const _SectionTitle('Compatibility priorities'),

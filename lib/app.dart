@@ -21,6 +21,7 @@ import 'models/user_profile.dart';
 import 'routes/app_routes.dart';
 import 'services/auth_service.dart';
 import 'services/external_checkout_service.dart';
+import 'services/geography_repository.dart';
 import 'services/locale_service.dart';
 import 'services/location_service.dart';
 import 'services/maplov_repository.dart';
@@ -29,6 +30,8 @@ import 'shared/theme/app_colors.dart';
 
 export 'models/user_profile.dart';
 export 'services/locale_service.dart' show MapLovLocalizations;
+export 'services/geography_repository.dart'
+    show GeographyCity, GeographyCountry, GeographyRegion, GeographyRepository;
 export 'services/maplov_repository.dart'
     show
         DiscoveryFilters,

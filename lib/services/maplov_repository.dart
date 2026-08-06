@@ -39,9 +39,15 @@ class DiscoveryFilters {
     this.countries = const [],
     this.regions = const [],
     this.cities = const [],
+    this.countryIds = const [],
+    this.regionIds = const [],
+    this.cityIds = const [],
     this.originCountries = const [],
     this.originRegions = const [],
     this.originCities = const [],
+    this.originCountryIds = const [],
+    this.originRegionIds = const [],
+    this.originCityIds = const [],
     this.languages = const [],
     this.relationshipGoals = const [],
     this.verifiedOnly = false,
@@ -80,9 +86,15 @@ class DiscoveryFilters {
   final List<String> countries;
   final List<String> regions;
   final List<String> cities;
+  final List<String> countryIds;
+  final List<String> regionIds;
+  final List<String> cityIds;
   final List<String> originCountries;
   final List<String> originRegions;
   final List<String> originCities;
+  final List<String> originCountryIds;
+  final List<String> originRegionIds;
+  final List<String> originCityIds;
   final List<String> languages;
   final List<String> relationshipGoals;
   final bool verifiedOnly;
@@ -121,9 +133,15 @@ class DiscoveryFilters {
     'country_codes': countries,
     'regions': regions,
     'cities': cities,
+    'country_ids': countryIds,
+    'region_ids': regionIds,
+    'city_ids': cityIds,
     'origin_country_names': originCountries,
     'origin_regions': originRegions,
     'origin_cities': originCities,
+    'origin_country_ids': originCountryIds,
+    'origin_region_ids': originRegionIds,
+    'origin_city_ids': originCityIds,
     'languages': languages,
     'relationship_goals': relationshipGoals,
     'verified_only': verifiedOnly,
@@ -167,11 +185,19 @@ class DiscoveryFilters {
       countries: List<String>.from(row['country_codes'] ?? const []),
       regions: List<String>.from(row['regions'] ?? const []),
       cities: List<String>.from(row['cities'] ?? const []),
+      countryIds: List<String>.from(row['country_ids'] ?? const []),
+      regionIds: List<String>.from(row['region_ids'] ?? const []),
+      cityIds: List<String>.from(row['city_ids'] ?? const []),
       originCountries: List<String>.from(
         row['origin_country_names'] ?? const [],
       ),
       originRegions: List<String>.from(row['origin_regions'] ?? const []),
       originCities: List<String>.from(row['origin_cities'] ?? const []),
+      originCountryIds: List<String>.from(
+        row['origin_country_ids'] ?? const [],
+      ),
+      originRegionIds: List<String>.from(row['origin_region_ids'] ?? const []),
+      originCityIds: List<String>.from(row['origin_city_ids'] ?? const []),
       languages: List<String>.from(row['languages'] ?? const []),
       relationshipGoals: List<String>.from(
         row['relationship_goals'] ?? const [],
@@ -218,9 +244,15 @@ class DiscoveryFilters {
     List<String>? countries,
     List<String>? regions,
     List<String>? cities,
+    List<String>? countryIds,
+    List<String>? regionIds,
+    List<String>? cityIds,
     List<String>? originCountries,
     List<String>? originRegions,
     List<String>? originCities,
+    List<String>? originCountryIds,
+    List<String>? originRegionIds,
+    List<String>? originCityIds,
     bool? premiumOnly,
     bool? vipOnly,
     bool? mostLikedFirst,
@@ -232,9 +264,15 @@ class DiscoveryFilters {
     countries: countries ?? this.countries,
     regions: regions ?? this.regions,
     cities: cities ?? this.cities,
+    countryIds: countryIds ?? this.countryIds,
+    regionIds: regionIds ?? this.regionIds,
+    cityIds: cityIds ?? this.cityIds,
     originCountries: originCountries ?? this.originCountries,
     originRegions: originRegions ?? this.originRegions,
     originCities: originCities ?? this.originCities,
+    originCountryIds: originCountryIds ?? this.originCountryIds,
+    originRegionIds: originRegionIds ?? this.originRegionIds,
+    originCityIds: originCityIds ?? this.originCityIds,
     languages: languages,
     relationshipGoals: relationshipGoals,
     verifiedOnly: verifiedOnly,
@@ -704,6 +742,42 @@ class MapLovRepository {
         .eq('is_discoverable', true)
         .eq('gender', filters.genders.single)
         .neq('id', currentUserId!);
+    if (filters.requiredLocation && filters.countryIds.isNotEmpty) {
+      profileQuery = profileQuery.eq(
+        'residence_country_id',
+        filters.countryIds.first,
+      );
+    }
+    if (filters.requiredLocation && filters.regionIds.isNotEmpty) {
+      profileQuery = profileQuery.eq(
+        'residence_region_id',
+        filters.regionIds.first,
+      );
+    }
+    if (filters.requiredLocation && filters.cityIds.isNotEmpty) {
+      profileQuery = profileQuery.eq(
+        'residence_city_id',
+        filters.cityIds.first,
+      );
+    }
+    if (filters.originCountryIds.isNotEmpty) {
+      profileQuery = profileQuery.eq(
+        'origin_country_id',
+        filters.originCountryIds.first,
+      );
+    }
+    if (filters.originRegionIds.isNotEmpty) {
+      profileQuery = profileQuery.eq(
+        'origin_region_id',
+        filters.originRegionIds.first,
+      );
+    }
+    if (filters.originCityIds.isNotEmpty) {
+      profileQuery = profileQuery.eq(
+        'origin_city_id',
+        filters.originCityIds.first,
+      );
+    }
     if (filters.locationMode == 'specific_country' ||
         filters.locationMode == 'worldwide') {
       final viewerId = currentUserId;
@@ -3984,9 +4058,15 @@ class MapLovRepository {
       city: row['city'] as String? ?? '',
       country: row['country_name'] as String? ?? '',
       region: row['residence_region'] as String? ?? '',
+      countryId: row['residence_country_id'] as String? ?? '',
+      regionId: row['residence_region_id'] as String? ?? '',
+      cityId: row['residence_city_id'] as String? ?? '',
       originCountry: row['origin_country_name'] as String? ?? '',
       originRegion: row['origin_region'] as String? ?? '',
       originCity: row['origin_city'] as String? ?? '',
+      originCountryId: row['origin_country_id'] as String? ?? '',
+      originRegionId: row['origin_region_id'] as String? ?? '',
+      originCityId: row['origin_city_id'] as String? ?? '',
       compatibilityScore: 80,
       imagePath: urls.isEmpty
           ? 'assets/profile/profile_user_placeholder.png'
@@ -4070,9 +4150,15 @@ class MapLovRepository {
     city: value.city,
     country: value.country,
     region: value.region,
+    countryId: value.countryId,
+    regionId: value.regionId,
+    cityId: value.cityId,
     originCountry: value.originCountry,
     originRegion: value.originRegion,
     originCity: value.originCity,
+    originCountryId: value.originCountryId,
+    originRegionId: value.originRegionId,
+    originCityId: value.originCityId,
     compatibilityScore: compatibilityScore ?? value.compatibilityScore,
     imagePath: value.imagePath,
     photoUrls: value.photoUrls,

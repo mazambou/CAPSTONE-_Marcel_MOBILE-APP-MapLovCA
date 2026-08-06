@@ -1,0 +1,1794 @@
+{
+  "sources": {
+    "geonames": {
+      "url": "https://download.geonames.org/export/dump/cities500.zip",
+      "license": "CC BY 4.0",
+      "sha256": "e0ed86eff8f926488d4db7efac628926c61b4b90b4980e84832da7f5152e754b",
+      "admin1_url": "https://download.geonames.org/export/dump/admin1CodesASCII.txt",
+      "admin1_sha256": "34784457b76b988a669dff7c3e4b104e4902c0875643cff019281ac79dfa2992"
+    },
+    "wikidata": {
+      "endpoint": "https://query.wikidata.org/sparql",
+      "license": "CC0 1.0",
+      "snapshot": "docs/data/wikidata_city_geoname_ids.json",
+      "sha256": "dbb63a91c85f3f443b99e4424285b20dad744b3ea5baf3887311c85418700069"
+    }
+  },
+  "totals": {
+    "source_entries": 105164,
+    "verified_city": 10698,
+    "manual_review": 86535,
+    "excluded": 7931
+  },
+  "rejected_feature_codes": [
+    "PPLCH",
+    "PPLF",
+    "PPLH",
+    "PPLL",
+    "PPLQ",
+    "PPLR",
+    "PPLS",
+    "PPLW",
+    "PPLX",
+    "STLMT"
+  ],
+  "certain_parent_city_remaps": {
+    "5950268": 6167865,
+    "5950269": 6167865,
+    "6141900": 6167865,
+    "7871312": 6167865,
+    "12156827": 6167865
+  },
+  "manual_review_examples": [
+    {
+      "iso2": "AE",
+      "region_code": "01",
+      "name": "Al Araad",
+      "geoname_id": 12470177,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AE",
+      "region_code": "01",
+      "name": "Al Shamkhah City",
+      "geoname_id": 12047416,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AE",
+      "region_code": "01",
+      "name": "Al Wiqan",
+      "geoname_id": 12470174,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AE",
+      "region_code": "01",
+      "name": "Al'Arad",
+      "geoname_id": 12470175,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AE",
+      "region_code": "01",
+      "name": "Ar Ruways",
+      "geoname_id": 292688,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AE",
+      "region_code": "01",
+      "name": "Bani Yas City",
+      "geoname_id": 12042052,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AE",
+      "region_code": "01",
+      "name": "Khalifah A City",
+      "geoname_id": 8057551,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AE",
+      "region_code": "01",
+      "name": "Masdar City",
+      "geoname_id": 13118448,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AE",
+      "region_code": "01",
+      "name": "Mohammed Bin Zayed City",
+      "geoname_id": 13118447,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AE",
+      "region_code": "01",
+      "name": "Musaffah",
+      "geoname_id": 12042053,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AE",
+      "region_code": "01",
+      "name": "Muzayri‘",
+      "geoname_id": 291279,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AE",
+      "region_code": "01",
+      "name": "Suwayḩān",
+      "geoname_id": 413256,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AE",
+      "region_code": "01",
+      "name": "Zayed City",
+      "geoname_id": 291580,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AE",
+      "region_code": "03",
+      "name": "Al Lusaylī",
+      "geoname_id": 412981,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AE",
+      "region_code": "03",
+      "name": "Bur Dubai",
+      "geoname_id": 7289825,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AE",
+      "region_code": "03",
+      "name": "DAMAC Hills",
+      "geoname_id": 13118430,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AE",
+      "region_code": "03",
+      "name": "Dubai Motor City",
+      "geoname_id": 13118429,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AE",
+      "region_code": "03",
+      "name": "Jebel Ali",
+      "geoname_id": 11524601,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AE",
+      "region_code": "03",
+      "name": "Lahbab",
+      "geoname_id": 13118439,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AE",
+      "region_code": "03",
+      "name": "Margham",
+      "geoname_id": 394142,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AE",
+      "region_code": "03",
+      "name": "The Palm Jumeirah",
+      "geoname_id": 6691113,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AE",
+      "region_code": "03",
+      "name": "Warīsān",
+      "geoname_id": 290503,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AE",
+      "region_code": "04",
+      "name": "Dibba Al-Hisn",
+      "geoname_id": 292239,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AE",
+      "region_code": "04",
+      "name": "Fujairah",
+      "geoname_id": 292878,
+      "feature_code": "PPLA"
+    },
+    {
+      "iso2": "AE",
+      "region_code": "04",
+      "name": "Reef Al Fujairah City",
+      "geoname_id": 12047417,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AE",
+      "region_code": "04",
+      "name": "Ţarīf Kalbā",
+      "geoname_id": 290680,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AE",
+      "region_code": "05",
+      "name": "Al Jazīrah al Ḩamrā’",
+      "geoname_id": 291794,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AE",
+      "region_code": "05",
+      "name": "Ar Rams",
+      "geoname_id": 292692,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AE",
+      "region_code": "05",
+      "name": "Ash Sha‘m",
+      "geoname_id": 292674,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AE",
+      "region_code": "05",
+      "name": "Ras Al Khaimah",
+      "geoname_id": 291074,
+      "feature_code": "PPLA"
+    },
+    {
+      "iso2": "AE",
+      "region_code": "06",
+      "name": "Adh Dhayd",
+      "geoname_id": 292953,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AE",
+      "region_code": "06",
+      "name": "Al Madam",
+      "geoname_id": 13118445,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AE",
+      "region_code": "06",
+      "name": "Al Sajaah",
+      "geoname_id": 13118438,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AE",
+      "region_code": "06",
+      "name": "Al Ḩamrīyah",
+      "geoname_id": 292856,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AE",
+      "region_code": "06",
+      "name": "Halwan",
+      "geoname_id": 13118437,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AE",
+      "region_code": "06",
+      "name": "Kalbā",
+      "geoname_id": 291763,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AE",
+      "region_code": "06",
+      "name": "Khawr Fakkān",
+      "geoname_id": 291696,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AE",
+      "region_code": "06",
+      "name": "Murbaḩ",
+      "geoname_id": 291339,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AE",
+      "region_code": "06",
+      "name": "Sha'biyyat Milе̄hah",
+      "geoname_id": 13117825,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AE",
+      "region_code": "07",
+      "name": "Al Raafah",
+      "geoname_id": 13118446,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AE",
+      "region_code": "07",
+      "name": "Umm Al Quwain City",
+      "geoname_id": 290594,
+      "feature_code": "PPLA"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "01",
+      "name": "Jervis Bay Village",
+      "geoname_id": 2162322,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Aberdeen",
+      "geoname_id": 2178364,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Adelong",
+      "geoname_id": 2178267,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Agnes Banks",
+      "geoname_id": 8310674,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Albion Park Rail",
+      "geoname_id": 10108696,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Aldavilla",
+      "geoname_id": 2178167,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Alstonville",
+      "geoname_id": 2177999,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Appin",
+      "geoname_id": 2177806,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Ardlethan",
+      "geoname_id": 2177715,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Arrawarra",
+      "geoname_id": 8219728,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Arrawarra Headland",
+      "geoname_id": 11745855,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Ashford",
+      "geoname_id": 2177564,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Ballina",
+      "geoname_id": 2177069,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Balranald",
+      "geoname_id": 2177030,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Bangalow",
+      "geoname_id": 2176973,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Baradine",
+      "geoname_id": 2176916,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Bardia",
+      "geoname_id": 11703909,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Barellan",
+      "geoname_id": 2176877,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Bargo",
+      "geoname_id": 2176866,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Barham",
+      "geoname_id": 2176862,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Barooga",
+      "geoname_id": 2176780,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Barraba",
+      "geoname_id": 2176771,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Barrack Heights",
+      "geoname_id": 10108731,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Barrack Point",
+      "geoname_id": 10108732,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Basin View",
+      "geoname_id": 8219723,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Batemans Bay",
+      "geoname_id": 2176639,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Batlow",
+      "geoname_id": 2176625,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Bawley Point",
+      "geoname_id": 8310669,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Beechwood",
+      "geoname_id": 2176431,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Bega",
+      "geoname_id": 2176401,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Bellingen",
+      "geoname_id": 2176295,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Bemboka",
+      "geoname_id": 2176234,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Beresfield",
+      "geoname_id": 2176096,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Bermagui",
+      "geoname_id": 2176087,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Berridale",
+      "geoname_id": 2176067,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Berrigan",
+      "geoname_id": 2176065,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Berrima",
+      "geoname_id": 2176061,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Berry",
+      "geoname_id": 2176053,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Bilbul",
+      "geoname_id": 8613846,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Bilpin",
+      "geoname_id": 2175818,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Binalong",
+      "geoname_id": 2175793,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Bingara",
+      "geoname_id": 2175760,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Binnaway",
+      "geoname_id": 2175735,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Black Head",
+      "geoname_id": 11704373,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Blair Athol",
+      "geoname_id": 2175375,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Blaxland",
+      "geoname_id": 2175341,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Blayney",
+      "geoname_id": 2175338,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Boambee",
+      "geoname_id": 2175159,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Bodalla",
+      "geoname_id": 2175108,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Boggabilla",
+      "geoname_id": 2175077,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Boggabri",
+      "geoname_id": 2175076,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Bomaderry",
+      "geoname_id": 2174976,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Bombala",
+      "geoname_id": 2174973,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Bonny Hills",
+      "geoname_id": 8219734,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Bonville",
+      "geoname_id": 2174892,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Boorowa",
+      "geoname_id": 2174669,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Bourke",
+      "geoname_id": 2174467,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Bowen Mountain",
+      "geoname_id": 8310685,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Bowning",
+      "geoname_id": 2174406,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Bowral",
+      "geoname_id": 2174400,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Bowraville",
+      "geoname_id": 2174396,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Braidwood",
+      "geoname_id": 2174254,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Brewarrina",
+      "geoname_id": 2174123,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Broadwater",
+      "geoname_id": 2173951,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Broke",
+      "geoname_id": 2173926,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Brooklyn",
+      "geoname_id": 2173872,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Broulee",
+      "geoname_id": 2173824,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Brunswick Heads",
+      "geoname_id": 2173738,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Bulahdelah",
+      "geoname_id": 2173557,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Bundanoon",
+      "geoname_id": 2173306,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Bundarra",
+      "geoname_id": 2173300,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Bungendore",
+      "geoname_id": 2173248,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Buronga",
+      "geoname_id": 8310687,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Burradoo",
+      "geoname_id": 2173081,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Burrill Lake",
+      "geoname_id": 7290269,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Buxton",
+      "geoname_id": 2172930,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Byron Bay",
+      "geoname_id": 2172880,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Bywong",
+      "geoname_id": 2172874,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Caddens",
+      "geoname_id": 11704394,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Callala Bay",
+      "geoname_id": 8219742,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Callala Beach",
+      "geoname_id": 8614682,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Cambewarra Village",
+      "geoname_id": 2172688,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Camden Haven",
+      "geoname_id": 2160499,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Campbelltown",
+      "geoname_id": 2172586,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Candelo",
+      "geoname_id": 2172515,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Canowindra",
+      "geoname_id": 2172453,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Captains Flat",
+      "geoname_id": 2172389,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Cargo",
+      "geoname_id": 2172318,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Carrolls Creek",
+      "geoname_id": 9409900,
+      "feature_code": "PPLA2"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Casino",
+      "geoname_id": 2172153,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Central Coast",
+      "geoname_id": 8310663,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Charles Sturt University",
+      "geoname_id": 11551607,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Chisholm",
+      "geoname_id": 13632009,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Clarence Town",
+      "geoname_id": 2171465,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Clareville",
+      "geoname_id": 2171455,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Cliftleigh",
+      "geoname_id": 11704413,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Clifton Grove",
+      "geoname_id": 8219722,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Clunes",
+      "geoname_id": 2171272,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Cobar",
+      "geoname_id": 2171216,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Cobargo",
+      "geoname_id": 2171213,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Coleambally",
+      "geoname_id": 8310666,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Collarenebri",
+      "geoname_id": 2171022,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Collombatti",
+      "geoname_id": 8628218,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Colo Vale",
+      "geoname_id": 2170954,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Condobolin",
+      "geoname_id": 2170841,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Coolah",
+      "geoname_id": 2170643,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Coolamon",
+      "geoname_id": 2170634,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Cooma",
+      "geoname_id": 2170577,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Coomba Park",
+      "geoname_id": 8219744,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Coonabarabran",
+      "geoname_id": 2170540,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Coonamble",
+      "geoname_id": 2170534,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Coopernook",
+      "geoname_id": 2170485,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Cootamundra",
+      "geoname_id": 2170430,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Coraki",
+      "geoname_id": 2170375,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Coramba",
+      "geoname_id": 2170366,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Corindi",
+      "geoname_id": 2170314,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Corowa",
+      "geoname_id": 2170260,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Coutts Crossing",
+      "geoname_id": 2170190,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Cowra",
+      "geoname_id": 2170139,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Crescent Head",
+      "geoname_id": 2170013,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Crookwell",
+      "geoname_id": 2169928,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Cudal",
+      "geoname_id": 2169837,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Culburra Beach",
+      "geoname_id": 11704268,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Culcairn",
+      "geoname_id": 2169801,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Cumbalum",
+      "geoname_id": 2169760,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Cundletown",
+      "geoname_id": 2169736,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Curlewis",
+      "geoname_id": 2169699,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Dalmeny",
+      "geoname_id": 8310693,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Dareton",
+      "geoname_id": 2169405,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Darlington",
+      "geoname_id": 9972652,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Darlington Point",
+      "geoname_id": 2169371,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Delungra",
+      "geoname_id": 2169101,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Deniliquin",
+      "geoname_id": 2169068,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Denman",
+      "geoname_id": 2169056,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Diamond Beach",
+      "geoname_id": 8219754,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Dorrigo",
+      "geoname_id": 2168534,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Douglas Park",
+      "geoname_id": 2168459,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Dunbogan",
+      "geoname_id": 2168164,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Dunedoo",
+      "geoname_id": 2168128,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Dungog",
+      "geoname_id": 2168112,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Dunoon",
+      "geoname_id": 2168066,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Duri",
+      "geoname_id": 2168026,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "East Ballina",
+      "geoname_id": 2167943,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "East Lismore",
+      "geoname_id": 6697124,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Eden",
+      "geoname_id": 2167799,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Eglinton",
+      "geoname_id": 2167699,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Elizabeth Hills",
+      "geoname_id": 11704318,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Emerald Beach",
+      "geoname_id": 8219758,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Emmaville",
+      "geoname_id": 2167404,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Erowal Bay",
+      "geoname_id": 8358871,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Ettalong",
+      "geoname_id": 2167185,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Eugowra",
+      "geoname_id": 2167160,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Eulomogo",
+      "geoname_id": 2167145,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Euston",
+      "geoname_id": 2167065,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Evans Head",
+      "geoname_id": 2167050,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Ewingsdale",
+      "geoname_id": 2167004,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Exeter",
+      "geoname_id": 2166997,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Failford",
+      "geoname_id": 2166965,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Falls Creek",
+      "geoname_id": 2166893,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Faulconbridge",
+      "geoname_id": 2166826,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Federal",
+      "geoname_id": 2166814,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Fingal Bay",
+      "geoname_id": 8310703,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Finley",
+      "geoname_id": 2166675,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Forbes",
+      "geoname_id": 2166368,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Forster",
+      "geoname_id": 2166309,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Frederickton",
+      "geoname_id": 2166113,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Galston",
+      "geoname_id": 2165947,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Ganmain",
+      "geoname_id": 2165929,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Gerogery",
+      "geoname_id": 2165697,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Geurie",
+      "geoname_id": 2165688,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Gilgai",
+      "geoname_id": 2165597,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Gilgandra",
+      "geoname_id": 2165596,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Glen Innes",
+      "geoname_id": 2165291,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Glenbrook",
+      "geoname_id": 2165403,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Glenreagh",
+      "geoname_id": 2165214,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Gloucester",
+      "geoname_id": 2165159,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Gol Gol",
+      "geoname_id": 2165065,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Goonellabah",
+      "geoname_id": 2164966,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Gormans Hill",
+      "geoname_id": 11704410,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Green Hill",
+      "geoname_id": 2164572,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Greenwell Point",
+      "geoname_id": 2164487,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Grenfell",
+      "geoname_id": 2164457,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Grose Wold",
+      "geoname_id": 11704448,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Gulargambone",
+      "geoname_id": 2165973,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Gulgong",
+      "geoname_id": 2164352,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Gulmarrad",
+      "geoname_id": 8310711,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Gundagai",
+      "geoname_id": 2164253,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Gundaroo",
+      "geoname_id": 2164249,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Gunnedah",
+      "geoname_id": 2164206,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Gunning",
+      "geoname_id": 2164199,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Guyra",
+      "geoname_id": 2164149,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Hallidays Point",
+      "geoname_id": 8310713,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Hanwood",
+      "geoname_id": 2163953,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Harrington",
+      "geoname_id": 2163895,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Hawks Nest",
+      "geoname_id": 2163788,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Hay",
+      "geoname_id": 2163774,
+      "feature_code": "PPLA2"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Hazelbrook",
+      "geoname_id": 2163731,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Heddon Greta",
+      "geoname_id": 2163669,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Henty",
+      "geoname_id": 2163577,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Hill Top",
+      "geoname_id": 2163395,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Hillston",
+      "geoname_id": 2163398,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Holbrook",
+      "geoname_id": 2163314,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Holmesville",
+      "geoname_id": 2163275,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Hornsby",
+      "geoname_id": 2163137,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Howlong",
+      "geoname_id": 2162994,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Huskisson",
+      "geoname_id": 2162855,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Iluka",
+      "geoname_id": 2162762,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Inverell",
+      "geoname_id": 2162662,
+      "feature_code": "PPL"
+    },
+    {
+      "iso2": "AU",
+      "region_code": "02",
+      "name": "Jerilderie",
+      "geoname_id": 2162351,
+      "feature_code": "PPL"
+    }
+  ]
+}

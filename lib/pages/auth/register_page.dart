@@ -120,7 +120,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
         _residenceDetected = false;
         _detectingResidence = false;
         _errorText =
-            'Location is required to verify your country of residence. $error';
+            'Location is required to verify your country of residence. '
+            '${LocationService.residenceErrorMessage(error)}';
       });
     }
   }

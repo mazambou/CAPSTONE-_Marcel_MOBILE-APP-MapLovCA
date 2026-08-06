@@ -1,8 +1,10 @@
 import 'dart:ui';
 
+import 'package:flutter/foundation.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
 
+import '../config/supabase_config.dart';
 import 'maplov_repository.dart';
 
 enum MapLovLocationFailureReason { serviceDisabled, denied, deniedForever }
@@ -77,7 +79,73 @@ class LocationService {
     return position;
   }
 
-  Future<DetectedResidence> _reverseGeocode(Position position) async {
+  @visibleForTesting
+  static ({String country, String countryCode, String region, String city})
+  parseWebResidence(Object? value) {
+    if (value is! Map) {
+      throw const ResidenceDetectionFailure(
+        'Unable to determine the residence from this location.',
+      );
+    }
+    String field(String name) => value[name]?.toString().trim() ?? '';
+    final country = field('country');
+    final countryCode = field('countryCode').toUpperCase();
+    final region = field('region');
+    final city = field('city');
+    if (country.isEmpty || countryCode.length != 2) {
+      throw const ResidenceDetectionFailure(
+        'Unable to determine the residence country.',
+      );
+    }
+    return (
+      country: country,
+      countryCode: countryCode,
+      region: region,
+      city: city,
+    );
+  }
+
+  static String residenceErrorMessage(Object error) => switch (error) {
+    ResidenceDetectionFailure() => error.message,
+    MapLovLocationFailure() => error.toString(),
+    _ => 'Unable to verify your residence location. Please try again.',
+  };
+
+  Future<DetectedResidence> _reverseGeocodeWeb(Position position) async {
+    final client = SupabaseConfig.client;
+    if (client == null) {
+      throw const ResidenceDetectionFailure(
+        'The Web residence verification service is unavailable.',
+      );
+    }
+    try {
+      final response = await client.functions.invoke(
+        'reverse-geocode-location',
+        body: {'latitude': position.latitude, 'longitude': position.longitude},
+      );
+      if (response.status < 200 || response.status >= 300) {
+        throw const ResidenceDetectionFailure(
+          'Unable to determine the residence from this location.',
+        );
+      }
+      final address = parseWebResidence(response.data);
+      return DetectedResidence(
+        position: position,
+        country: address.country,
+        countryCode: address.countryCode,
+        region: address.region,
+        city: address.city,
+      );
+    } on ResidenceDetectionFailure {
+      rethrow;
+    } catch (_) {
+      throw const ResidenceDetectionFailure(
+        'Unable to verify your residence location. Please try again.',
+      );
+    }
+  }
+
+  Future<DetectedResidence> _reverseGeocodeNative(Position position) async {
     final placemarks = await Geocoding(
       locale: const Locale('en'),
     ).placemarkFromCoordinates(position.latitude, position.longitude);
@@ -104,6 +172,9 @@ class LocationService {
           .trim(),
     );
   }
+
+  Future<DetectedResidence> _reverseGeocode(Position position) =>
+      kIsWeb ? _reverseGeocodeWeb(position) : _reverseGeocodeNative(position);
 
   Future<DetectedResidence> detectResidence() async =>
       _reverseGeocode(await _currentPosition());

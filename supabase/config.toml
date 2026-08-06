@@ -419,6 +419,10 @@ verify_jwt = true
 [functions.external-billing-webhook]
 verify_jwt = false
 
+[functions.reverse-geocode-location]
+# Registration needs residence detection before the user has an account.
+verify_jwt = false
+
 [functions.admin-delete-account]
 # The function manually validates administrator JWTs. Its separate scheduled
 # action is authenticated with a 256-bit secret supplied by pg_cron.

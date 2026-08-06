@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:maplove/config/app_config.dart';
@@ -6,12 +7,20 @@ import 'package:maplove/services/purchase_service.dart';
 
 void main() {
   group('external checkout safety', () {
-    test(
-      'external checkout is disabled unless explicitly compiled for web',
-      () {
-        expect(AppConfig.externalCheckoutEnabled, isFalse);
-      },
-    );
+    test('external checkout follows the Flutter Web compile target', () {
+      expect(AppConfig.externalCheckoutEnabled, kIsWeb);
+      expect(ExternalCheckoutService.instance.available, kIsWeb);
+    });
+
+    test('Android and iOS reports do not decide web checkout', () {
+      addTearDown(() => debugDefaultTargetPlatformOverride = null);
+
+      for (final platform in [TargetPlatform.android, TargetPlatform.iOS]) {
+        debugDefaultTargetPlatformOverride = platform;
+        expect(AppConfig.externalCheckoutEnabled, kIsWeb);
+        expect(ExternalCheckoutService.instance.available, kIsWeb);
+      }
+    });
 
     test('store product identifiers map to server-controlled tiers', () {
       expect(

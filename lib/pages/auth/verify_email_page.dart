@@ -35,9 +35,9 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
       return;
     }
     final code = _codeController.text.trim();
-    if (!RegExp(r'^\d{6}$').hasMatch(code)) {
+    if (!RegExp(r'^\d{6,8}$').hasMatch(code)) {
       setState(() {
-        _message = 'Enter the 6-digit code sent by email.';
+        _message = 'Enter the verification code sent by email.';
         _messageIsError = true;
       });
       return;
@@ -86,7 +86,7 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
       if (mounted) {
         setState(() {
           _codeController.clear();
-          _message = 'A new 6-digit verification code has been sent.';
+          _message = 'A new verification code has been sent.';
           _messageIsError = false;
         });
       }
@@ -130,7 +130,7 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
       ),
       const SizedBox(height: 10),
       Text(
-        'We sent a 6-digit verification code to $_email. Enter it below to continue creating your profile.',
+        'We sent a verification code to $_email. Enter it below to continue creating your profile.',
         textAlign: TextAlign.center,
         style: const TextStyle(color: AppColors.grayText),
       ),
@@ -140,12 +140,12 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
         controller: _codeController,
         keyboardType: TextInputType.number,
         textInputAction: TextInputAction.done,
-        maxLength: 6,
+        maxLength: 8,
         autofillHints: const [AutofillHints.oneTimeCode],
         enabled: !_isLoading,
         onSubmitted: (_) => _verify(),
         decoration: InputDecoration(
-          labelText: context.tr('6-digit code'),
+          labelText: context.tr('Verification code'),
           prefixIcon: const Icon(Icons.password_outlined),
         ),
       ),

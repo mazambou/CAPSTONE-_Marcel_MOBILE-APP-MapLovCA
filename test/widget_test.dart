@@ -350,7 +350,7 @@ void main() {
     expect(find.byKey(const Key('email_verification_code')), findsOneWidget);
     expect(
       find.text(
-        'We sent a 6-digit verification code to jamie@example.com. Enter it below to continue creating your profile.',
+        'We sent a verification code to jamie@example.com. Enter it below to continue creating your profile.',
       ),
       findsOneWidget,
     );
@@ -362,7 +362,7 @@ void main() {
     await tester.tap(find.text('Verify email'));
     await tester.pump();
 
-    expect(find.text('Enter the 6-digit code sent by email.'), findsOneWidget);
+    expect(find.text('Enter the verification code sent by email.'), findsOneWidget);
 
     await tester.enterText(
       find.byKey(const Key('email_verification_code')),
@@ -499,7 +499,7 @@ void main() {
     await tester.tap(find.text('Verify phone number'));
     await tester.pump();
 
-    expect(find.text('Enter the 6-digit code sent by SMS.'), findsOneWidget);
+    expect(find.text('Enter the verification code sent by SMS.'), findsOneWidget);
 
     await tester.drag(find.byType(ListView), const Offset(0, -500));
     await tester.pumpAndSettle();
@@ -2542,9 +2542,9 @@ void main() {
     expect(translations.translate('2 Comments'), '2 commentaires');
     expect(
       translations.translate(
-        'We sent a 6-digit verification code to jamie@example.com. Enter it below to continue creating your profile.',
+        'We sent a verification code to jamie@example.com. Enter it below to continue creating your profile.',
       ),
-      'Nous avons envoyé un code de vérification à 6 chiffres à jamie@example.com. Saisissez-le ci-dessous pour poursuivre la création de votre profil.',
+      'Nous avons envoyé un code de vérification à jamie@example.com. Saisissez-le ci-dessous pour poursuivre la création de votre profil.',
     );
     expect(
       translations.translate('Feminine silhouette'),

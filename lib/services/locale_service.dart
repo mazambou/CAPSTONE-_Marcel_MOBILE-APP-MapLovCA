@@ -619,10 +619,10 @@ class MapLovLocalizations {
     'Verify your email': 'Vérifiez votre courriel',
     'Verify email': 'Vérifier le courriel',
     'Email verified. Continuing…': 'Courriel vérifié. Poursuite…',
-    'Enter the 6-digit code sent by email.':
-        'Saisissez le code à 6 chiffres envoyé par courriel.',
-    'A new 6-digit verification code has been sent.':
-        'Un nouveau code de vérification à 6 chiffres a été envoyé.',
+    'Enter the verification code sent by email.':
+        'Saisissez le code de vérification envoyé par courriel.',
+    'A new verification code has been sent.':
+        'Un nouveau code de vérification a été envoyé.',
     'Return to registration and enter your email address.':
         'Retournez à l’inscription et saisissez votre adresse courriel.',
     'Create new password': 'Créer un nouveau mot de passe',
@@ -647,6 +647,7 @@ class MapLovLocalizations {
         'Vous pourrez vérifier votre numéro de téléphone plus tard. Pour le moment, cela ne bloque pas la création du compte.',
     'Continue for now': 'Continuer pour l’instant',
     'Continuing…': 'Ouverture…',
+    'Verification code': 'Code de vérification',
     'Send verification code': 'Envoyer le code de vérification',
     'Resend code': 'Renvoyer le code',
     'Sending…': 'Envoi…',
@@ -655,8 +656,8 @@ class MapLovLocalizations {
     'Phone number unavailable': 'Numéro de téléphone indisponible',
     'The phone number could not be recovered. Return to the previous steps or continue for now.':
         'Le numéro de téléphone n’a pas pu être récupéré. Revenez aux étapes précédentes ou continuez pour l’instant.',
-    'Enter the 6-digit code sent by SMS.':
-        'Saisissez le code à 6 chiffres envoyé par SMS.',
+    'Enter the verification code sent by SMS.':
+        'Saisissez le code de vérification envoyé par SMS.',
     'Back to dating preferences': 'Retour aux préférences de rencontre',
     'Create your profile': 'Créer votre profil',
     'Add profile photo': 'Ajouter une photo de profil',
@@ -1204,10 +1205,10 @@ class MapLovLocalizations {
       return '${privatePhotos.group(1)} photos privées';
     }
     final emailVerification = RegExp(
-      r'^We sent a 6-digit verification code to (.+)\. Enter it below to continue creating your profile\.$',
+      r'^We sent a verification code to (.+)\. Enter it below to continue creating your profile\.$',
     ).firstMatch(value);
     if (emailVerification != null) {
-      return 'Nous avons envoyé un code de vérification à 6 chiffres à ${emailVerification.group(1)}. Saisissez-le ci-dessous pour poursuivre la création de votre profil.';
+      return 'Nous avons envoyé un code de vérification à ${emailVerification.group(1)}. Saisissez-le ci-dessous pour poursuivre la création de votre profil.';
     }
     final photos = RegExp(r'^(\d+) photos$').firstMatch(value);
     if (photos != null) {

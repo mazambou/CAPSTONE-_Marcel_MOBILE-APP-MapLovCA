@@ -67,7 +67,7 @@ class _VerifyPhoneScreenState extends State<VerifyPhoneScreen> {
         setState(() {
           _codeSent = true;
           _message =
-              'A 6-digit verification code was sent to ${_phone ?? 'this number'}.';
+              'A verification code was sent to ${_phone ?? 'this number'}.';
           _messageIsError = false;
         });
       }
@@ -119,9 +119,9 @@ class _VerifyPhoneScreenState extends State<VerifyPhoneScreen> {
 
   Future<void> _verify() async {
     final code = _codeController.text.trim();
-    if (!RegExp(r'^\d{6}$').hasMatch(code)) {
+    if (!RegExp(r'^\d{6,8}$').hasMatch(code)) {
       setState(() {
-        _message = 'Enter the 6-digit code sent by SMS.';
+        _message = 'Enter the verification code sent by SMS.';
         _messageIsError = true;
       });
       return;
@@ -195,11 +195,11 @@ class _VerifyPhoneScreenState extends State<VerifyPhoneScreen> {
           controller: _codeController,
           keyboardType: TextInputType.number,
           textInputAction: TextInputAction.done,
-          maxLength: 6,
+          maxLength: 8,
           autofillHints: const [AutofillHints.oneTimeCode],
           onSubmitted: (_) => _verify(),
           decoration: InputDecoration(
-            labelText: context.tr('6-digit code'),
+            labelText: context.tr('Verification code'),
             prefixIcon: const Icon(Icons.password_outlined),
           ),
         ),

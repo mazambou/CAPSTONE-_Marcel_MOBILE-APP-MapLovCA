@@ -24,6 +24,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool savingInternationalDiscovery = false;
   bool showOriginOnProfile = true;
   bool savingOriginVisibility = false;
+  bool discoverable = true;
+  bool vip = false;
+  bool savingDiscoverVisibility = false;
   String? loadError;
 
   @override
@@ -38,13 +41,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (mounted) setState(() => loading = true);
     try {
       if (id == null) throw StateError('No authenticated account was found.');
-      final loaded = await MapLovRepository.instance.getProfile(id);
+      final results = await Future.wait([
+        MapLovRepository.instance.getProfile(id),
+        MapLovRepository.instance.myProfileDetails(),
+        MapLovRepository.instance.subscriptionInfo(),
+      ]);
+      final loaded = results[0] as UserProfile?;
       if (loaded == null) throw StateError('Your profile could not be loaded.');
+      final profileDetails = results[1] as Map<String, dynamic>?;
+      final subscription = results[2] as SubscriptionInfo;
       if (mounted) {
         setState(() {
           profile = loaded;
           allowInternationalDiscovery = loaded.allowsInternationalDiscovery;
           showOriginOnProfile = loaded.showsOriginOnProfile;
+          discoverable = profileDetails?['is_discoverable'] as bool? ?? true;
+          vip = subscription.isVip;
           loadError = null;
         });
       }
@@ -109,6 +121,34 @@ class _ProfileScreenState extends State<ProfileScreen> {
       );
     } finally {
       if (mounted) setState(() => savingOriginVisibility = false);
+    }
+  }
+
+  Future<void> _setDiscoverVisibility(bool value) async {
+    if (!vip) {
+      await _requireSubscriptionFeature(
+        context,
+        requirement: _SubscriptionRequirement.vip,
+        feature: 'Invisible navigation',
+      );
+      return;
+    }
+    if (savingDiscoverVisibility) return;
+    final previous = discoverable;
+    setState(() {
+      discoverable = value;
+      savingDiscoverVisibility = true;
+    });
+    try {
+      await MapLovRepository.instance.setDiscoverable(value);
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => discoverable = previous);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Unable to update Discover visibility: $error')),
+      );
+    } finally {
+      if (mounted) setState(() => savingDiscoverVisibility = false);
     }
   }
 
@@ -258,6 +298,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
           style: const TextStyle(color: AppColors.grayText),
         ),
       const SizedBox(height: 14),
+      Card(
+        color: AppColors.palePink,
+        child: SwitchListTile.adaptive(
+          key: const Key('profile_discover_visibility_switch'),
+          secondary: Icon(
+            discoverable
+                ? Icons.visibility_outlined
+                : Icons.visibility_off_outlined,
+            color: AppColors.coral,
+          ),
+          value: discoverable,
+          onChanged: savingDiscoverVisibility ? null : _setDiscoverVisibility,
+          title: const Text(
+            'Show my profile in Discover',
+            style: TextStyle(fontWeight: FontWeight.w800),
+          ),
+          subtitle: const Text(
+            'VIP members can choose whether their profile appears in Discover.',
+          ),
+        ),
+      ),
       Card(
         color: AppColors.palePink,
         child: SwitchListTile.adaptive(

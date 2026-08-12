@@ -368,16 +368,17 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       final selfie = await ImagePicker().pickImage(
         source: ImageSource.camera,
         preferredCameraDevice: CameraDevice.front,
-        imageQuality: 85,
-        maxWidth: 1600,
-        maxHeight: 1600,
+        imageQuality: kIsWeb ? null : 85,
+        maxWidth: kIsWeb ? null : 1600,
+        maxHeight: kIsWeb ? null : 1600,
       );
       if (selfie == null) return;
       if (mounted) setState(() => enrollingFaceReference = true);
+      final preparedSelfie = await prepareReferenceSelfie(selfie);
       await LocationService.instance.updateMyLocation();
       await MapLovRepository.instance.enrollFaceReference(
-        bytes: await selfie.readAsBytes(),
-        extension: selfie.name.split('.').last.toLowerCase(),
+        bytes: preparedSelfie.bytes,
+        extension: preparedSelfie.extension,
       );
       if (mounted) {
         setState(() => faceReferenceReady = true);

@@ -2,63 +2,28 @@ import { createClient } from 'jsr:@supabase/supabase-js@2.110.7';
 import {
   CompareFacesCommand,
   DetectFacesCommand,
-  RekognitionClient,
+  IndexFacesCommand,
+  SearchFacesByImageCommand,
 } from 'npm:@aws-sdk/client-rekognition@3.1090.0';
+import {
+  collectionIdForCountry,
+  deleteIndexedFace,
+  deleteIndexedFaces,
+  ensureCollection,
+  normalizeRekognitionError,
+  rekognitionClient,
+  RekognitionError,
+} from '../_shared/rekognition_faces.ts';
 
 const maxImageBytes = 5 * 1024 * 1024;
 
 type JsonRecord = Record<string, unknown>;
-
-class RekognitionError extends Error {
-  constructor(
-    message: string,
-    readonly code: string,
-    readonly requestId?: string,
-  ) {
-    super(message);
-  }
-}
 
 function response(status: number, body: JsonRecord) {
   return Response.json(body, {
     status,
     headers: { 'Cache-Control': 'no-store' },
   });
-}
-
-function rekognitionClient(): RekognitionClient {
-  const accessKey = Deno.env.get('AWS_ACCESS_KEY_ID');
-  const secretKey = Deno.env.get('AWS_SECRET_ACCESS_KEY');
-  const sessionToken = Deno.env.get('AWS_SESSION_TOKEN');
-  const region = Deno.env.get('AWS_REGION') ?? 'ca-central-1';
-  if (!accessKey || !secretKey) {
-    throw new RekognitionError(
-      'AWS Rekognition is not configured',
-      'rekognition_not_configured',
-    );
-  }
-  return new RekognitionClient({
-    region,
-    credentials: {
-      accessKeyId: accessKey,
-      secretAccessKey: secretKey,
-      ...(sessionToken ? { sessionToken } : {}),
-    },
-  });
-}
-
-function normalizeRekognitionError(error: unknown): RekognitionError {
-  if (error instanceof RekognitionError) return error;
-  const value = error as {
-    name?: string;
-    message?: string;
-    $metadata?: { requestId?: string };
-  };
-  return new RekognitionError(
-    value.message ?? 'AWS Rekognition rejected the image',
-    value.name ?? 'rekognition_error',
-    value.$metadata?.requestId,
-  );
 }
 
 function validOwnedPath(path: unknown, userId: string): path is string {
@@ -70,6 +35,28 @@ function validOwnedPath(path: unknown, userId: string): path is string {
 
 function mimeType(path: string): string {
   return path.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg';
+}
+
+async function queueFaceCleanup(
+  admin: ReturnType<typeof createClient>,
+  collectionId: string,
+  faceId: string,
+  userId: string,
+  reason: string,
+): Promise<void> {
+  const { error } = await admin.from('face_index_cleanup_queue').upsert({
+    collection_id: collectionId,
+    face_id: faceId,
+    user_id: userId,
+    reason,
+  });
+  if (error) {
+    console.error('Unable to persist orphan face cleanup', {
+      userId,
+      collectionId,
+      error: error.message,
+    });
+  }
 }
 
 Deno.serve(async (request) => {
@@ -211,7 +198,7 @@ Deno.serve(async (request) => {
       const { data: profile, error: profileError } = await admin
         .from('profiles')
         .select(
-          'country_name, residence_location_verified_at, profile_completed_at',
+          'country_name, country_code, residence_country_id, residence_location_verified_at, profile_completed_at',
         )
         .eq('id', user.id)
         .maybeSingle();
@@ -230,7 +217,20 @@ Deno.serve(async (request) => {
       const recentResidence =
         Number.isFinite(residenceVerifiedAt) &&
         residenceVerifiedAt >= Date.now() - 10 * 60 * 1000;
-      if (profileError || !residenceCountry || !recentResidence) {
+      const countryCode = profile?.country_code?.trim().toUpperCase() ?? '';
+      let countryId = profile?.residence_country_id as string | undefined;
+      if (!countryId && /^[A-Z]{2}$/.test(countryCode)) {
+        const { data: country } = await admin
+          .from('countries')
+          .select('id')
+          .eq('iso2', countryCode)
+          .maybeSingle();
+        countryId = country?.id;
+      }
+      if (
+        profileError || !residenceCountry || !countryId ||
+        !/^[A-Z]{2}$/.test(countryCode) || !recentResidence
+      ) {
         await admin.storage.from('identity-selfies').remove([storagePath]);
         return response(422, {
           code: 'residence_verification_required',
@@ -245,136 +245,263 @@ Deno.serve(async (request) => {
       const duplicateThreshold = Number.isFinite(duplicateThresholdValue)
         ? Math.min(100, Math.max(95, duplicateThresholdValue))
         : 98;
+      const collectionId = collectionIdForCountry(countryCode);
+      const externalImageId = user.id;
+      const lockOwner = crypto.randomUUID();
+      let lockHeld = false;
+      let indexedFaceId: string | undefined;
+      let indexedByThisRequest = false;
+      let indexRequestId: string | undefined;
+      let faceModelVersion: string | undefined;
+      let searchCallCount = 0;
+      let indexCallCount = 0;
       let duplicate:
-        | {
-          userId: string;
-          similarity: number;
-          requestId?: string;
-        }
+        | { userId?: string; similarity: number; requestId?: string }
         | undefined;
-      const pageSize = 100;
-      let page = 0;
-      while (!duplicate) {
-        const { data: references, error: referencesError } = await admin
-          .from('face_references')
-          .select('user_id, storage_path')
-          .neq('user_id', user.id)
-          .order('user_id')
-          .range(page * pageSize, (page + 1) * pageSize - 1);
-        if (referencesError) throw new Error(referencesError.message);
 
-        for (const reference of references ?? []) {
-          const referenceDownload = await admin.storage
-            .from('identity-selfies')
-            .download(reference.storage_path);
-          if (referenceDownload.error || !referenceDownload.data) continue;
-          const referenceBytes = new Uint8Array(
-            await referenceDownload.data.arrayBuffer(),
-          );
-          if (
-            referenceBytes.length === 0 ||
-            referenceBytes.length > maxImageBytes
-          ) {
-            continue;
-          }
-          try {
-            const comparison = await client.send(
-              new CompareFacesCommand({
-                SourceImage: { Bytes: bytes },
-                TargetImage: { Bytes: referenceBytes },
-                SimilarityThreshold: duplicateThreshold,
-                QualityFilter: 'HIGH',
-              }),
-            );
-            const similarity = (comparison.FaceMatches ?? []).reduce(
-              (highest, match) =>
-                Math.max(highest, Number(match.Similarity ?? 0)),
-              0,
-            );
-            if (similarity >= duplicateThreshold) {
-              duplicate = {
-                userId: reference.user_id,
-                similarity,
-                requestId: comparison.$metadata.requestId,
-              };
-              break;
-            }
-          } catch (error) {
-            const comparisonError = normalizeRekognitionError(error);
-            if (!comparisonError.code.includes('InvalidParameterException')) {
-              throw error;
-            }
-          }
+      for (let attempt = 0; attempt < 40; attempt += 1) {
+        const { data: acquired, error: lockError } = await admin.rpc(
+          'try_acquire_face_enrollment_lock',
+          {
+            collection_id_value: collectionId,
+            owner_token_value: lockOwner,
+            lease_seconds_value: 300,
+          },
+        );
+        if (lockError) throw new Error(lockError.message);
+        if (acquired === true) {
+          lockHeld = true;
+          break;
         }
-        if ((references?.length ?? 0) < pageSize) break;
-        page += 1;
+        await new Promise((resolve) => setTimeout(resolve, 250));
+      }
+      if (!lockHeld) {
+        throw new RekognitionError(
+          'Face enrollment is busy. Try again shortly.',
+          'face_enrollment_busy',
+        );
       }
 
-      if (duplicate) {
-        const { error: duplicateLogError } = await admin
-          .from('duplicate_account_checks')
-          .insert({
-            candidate_user_id: user.id,
-            matched_user_id: duplicate.userId,
-            residence_country: residenceCountry,
+      try {
+        const collection = await ensureCollection(client, collectionId);
+        faceModelVersion = collection.faceModelVersion;
+
+        const { data: renewed, error: renewError } = await admin.rpc(
+          'try_acquire_face_enrollment_lock',
+          {
+            collection_id_value: collectionId,
+            owner_token_value: lockOwner,
+            lease_seconds_value: 300,
+          },
+        );
+        if (renewError || renewed !== true) {
+          throw new RekognitionError(
+            'The face enrollment lock expired',
+            'face_enrollment_lock_lost',
+          );
+        }
+
+        searchCallCount += 1;
+        const search = await client.send(
+          new SearchFacesByImageCommand({
+            CollectionId: collectionId,
+            Image: { Bytes: bytes },
+            FaceMatchThreshold: duplicateThreshold,
+            MaxFaces: 100,
+            QualityFilter: 'HIGH',
+          }),
+        );
+        const matches = search.FaceMatches ?? [];
+        const matchFaceIds = matches
+          .map((match) => match.Face?.FaceId)
+          .filter((faceId): faceId is string => Boolean(faceId));
+        const { data: mappedReferences, error: mappingError } = matchFaceIds.length
+          ? await admin
+            .from('face_references')
+            .select('user_id, face_id')
+            .eq('collection_id', collectionId)
+            .in('face_id', matchFaceIds)
+          : { data: [], error: null };
+        if (mappingError) throw new Error(mappingError.message);
+        const usersByFaceId = new Map(
+          (mappedReferences ?? []).map((reference) => [
+            reference.face_id,
+            reference.user_id,
+          ]),
+        );
+
+        const otherMatch = matches.find((match) => {
+          const faceId = match.Face?.FaceId;
+          const mappedUser = faceId ? usersByFaceId.get(faceId) : undefined;
+          return mappedUser
+            ? mappedUser !== user.id
+            : match.Face?.ExternalImageId !== externalImageId;
+        });
+        if (otherMatch) {
+          const faceId = otherMatch.Face?.FaceId;
+          duplicate = {
+            userId: faceId ? usersByFaceId.get(faceId) : undefined,
+            similarity: Number(otherMatch.Similarity ?? 0),
+            requestId: search.$metadata.requestId,
+          };
+        } else {
+          // Recover an orphan left by a prior IndexFaces success followed by a
+          // failed DB write. Keep one FaceId and remove any duplicate copies.
+          const ownMatches = matches.filter((match) => {
+            const faceId = match.Face?.FaceId;
+            return match.Face?.ExternalImageId === externalImageId ||
+              (faceId && usersByFaceId.get(faceId) === user.id);
+          });
+          indexedFaceId = ownMatches[0]?.Face?.FaceId;
+          const extraOwnFaceIds = ownMatches
+            .slice(1)
+            .map((match) => match.Face?.FaceId)
+            .filter((faceId): faceId is string => Boolean(faceId));
+          await deleteIndexedFaces(client, collectionId, extraOwnFaceIds);
+
+          if (!indexedFaceId) {
+            indexCallCount += 1;
+            const indexing = await client.send(
+              new IndexFacesCommand({
+                CollectionId: collectionId,
+                Image: { Bytes: bytes },
+                ExternalImageId: externalImageId,
+                MaxFaces: 1,
+                QualityFilter: 'HIGH',
+                DetectionAttributes: ['DEFAULT'],
+              }),
+            );
+            indexedFaceId = indexing.FaceRecords?.[0]?.Face?.FaceId;
+            indexRequestId = indexing.$metadata.requestId;
+            faceModelVersion = indexing.FaceModelVersion ?? faceModelVersion;
+            indexedByThisRequest = Boolean(indexedFaceId);
+            if (!indexedFaceId) {
+              throw new RekognitionError(
+                'AWS Rekognition could not index the detected face',
+                'face_not_indexed',
+                indexing.$metadata.requestId,
+              );
+            }
+          }
+        }
+
+        if (duplicate) {
+          if (duplicate.userId) {
+            const { error: duplicateLogError } = await admin
+              .from('duplicate_account_checks')
+              .insert({
+                candidate_user_id: user.id,
+                matched_user_id: duplicate.userId,
+                residence_country: residenceCountry,
+                similarity: duplicate.similarity,
+                threshold: duplicateThreshold,
+                provider_request_id: duplicate.requestId,
+              });
+            if (duplicateLogError) throw new Error(duplicateLogError.message);
+          }
+          await admin.from('profile_photo_face_checks').insert({
+            user_id: user.id,
+            check_type: 'reference_selfie',
+            status: 'rejected',
             similarity: duplicate.similarity,
             threshold: duplicateThreshold,
             provider_request_id: duplicate.requestId,
+            failure_reason: 'duplicate_account_detected',
           });
-        if (duplicateLogError) throw new Error(duplicateLogError.message);
-        await admin.from('profile_photo_face_checks').insert({
-          user_id: user.id,
-          check_type: 'reference_selfie',
-          status: 'rejected',
-          similarity: duplicate.similarity,
-          threshold: duplicateThreshold,
-          provider_request_id: duplicate.requestId,
-          failure_reason: 'duplicate_account_detected',
-        });
-        await admin.storage.from('identity-selfies').remove([storagePath]);
+          await admin.storage.from('identity-selfies').remove([storagePath]);
 
-        // The authenticated row only exists provisionally so the private
-        // selfie can be uploaded. A rejected duplicate is not a MapLov
-        // account and must not remain in Auth or any profile table.
-        const { error: deleteUserError } = await admin.auth.admin.deleteUser(
-          user.id,
-        );
-        if (deleteUserError) {
-          // Keep the unusable provisional row hidden until the scheduled
-          // cleanup retries the permanent deletion.
-          await admin
-            .from('profiles')
-            .update({ status: 'suspended', is_discoverable: false })
-            .eq('id', user.id);
+          const { error: deleteUserError } = await admin.auth.admin.deleteUser(
+            user.id,
+          );
+          if (deleteUserError) {
+            await admin
+              .from('profiles')
+              .update({ status: 'suspended', is_discoverable: false })
+              .eq('id', user.id);
+          }
+          return response(409, {
+            code: 'duplicate_account_detected',
+            message:
+              'A MapLov account already exists for this person. Use account recovery or contact support.',
+            registrationRemoved: !deleteUserError,
+          });
         }
-        return response(409, {
-          code: 'duplicate_account_detected',
-          message:
-            'A MapLov account already exists for this person. Use account recovery or contact support.',
-          registrationRemoved: !deleteUserError,
+
+        const { error: registrationError } = await admin.rpc(
+          'register_indexed_face_reference',
+          {
+            owner_user: user.id,
+            country_id_value: countryId,
+            storage_path_value: storagePath,
+            face_id_value: indexedFaceId,
+            collection_id_value: collectionId,
+            external_image_id_value: externalImageId,
+            face_confidence_value: confidence,
+            consent_version_value: payload.consentVersion,
+            detect_request_id_value: detection.$metadata.requestId ?? null,
+            index_request_id_value: indexRequestId ?? null,
+            face_model_version_value: faceModelVersion ?? null,
+            lock_owner_token_value: lockOwner,
+          },
+        );
+        if (registrationError) {
+          if (indexedByThisRequest && indexedFaceId) {
+            await deleteIndexedFace(client, collectionId, indexedFaceId);
+            indexedByThisRequest = false;
+          }
+          throw new RekognitionError(
+            registrationError.message,
+            'reference_enrollment_failed',
+          );
+        }
+        return response(200, { enrolled: true });
+      } catch (error) {
+        if (indexedByThisRequest && indexedFaceId) {
+          try {
+            await deleteIndexedFace(client, collectionId, indexedFaceId);
+            indexedByThisRequest = false;
+          } catch (cleanupError) {
+            await queueFaceCleanup(
+              admin,
+              collectionId,
+              indexedFaceId,
+              user.id,
+              'enrollment_db_write_failed',
+            );
+            console.error('Orphan face compensation failed', {
+              userId: user.id,
+              collectionId,
+              error: normalizeRekognitionError(cleanupError).code,
+            });
+          }
+        }
+        throw error;
+      } finally {
+        if (lockHeld) {
+          const { error: releaseError } = await admin.rpc(
+            'release_face_enrollment_lock',
+            {
+              collection_id_value: collectionId,
+              owner_token_value: lockOwner,
+            },
+          );
+          if (releaseError) {
+            console.error('Face enrollment lock release failed', {
+              userId: user.id,
+              collectionId,
+              error: releaseError.message,
+            });
+          }
+        }
+        console.info('Face enrollment AWS call summary', {
+          userId: user.id,
+          countryCode,
+          detectFaces: 1,
+          searchFacesByImage: searchCallCount,
+          indexFaces: indexCallCount,
+          compareFacesDuplicateScan: 0,
         });
       }
-      const { error } = await admin.from('face_references').insert({
-        user_id: user.id,
-        storage_path: storagePath,
-        provider_request_id: detection.$metadata.requestId,
-        face_confidence: confidence,
-        consent_version: payload.consentVersion,
-        consented_at: new Date().toISOString(),
-      });
-      if (error) {
-        await admin.storage.from('identity-selfies').remove([storagePath]);
-        return response(409, { code: 'reference_enrollment_failed', message: error.message });
-      }
-      await admin.from('profile_photo_face_checks').insert({
-        user_id: user.id,
-        check_type: 'reference_selfie',
-        status: 'accepted',
-        similarity: confidence,
-        threshold: 99,
-        provider_request_id: detection.$metadata.requestId,
-      });
-      return response(200, { enrolled: true });
     } catch (error) {
       await admin.storage.from('identity-selfies').remove([storagePath]);
       const awsError = normalizeRekognitionError(error);

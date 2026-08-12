@@ -89,6 +89,40 @@ class AuthService {
       _client?.auth.currentUser != null &&
       _client?.auth.currentUser?.userMetadata?['preferences_completed'] != true;
 
+  bool get isSocialAccount {
+    final metadata = _client?.auth.currentUser?.appMetadata ?? const {};
+    final provider = metadata['provider'];
+    final providers = metadata['providers'];
+    return provider == 'google' ||
+        provider == 'apple' ||
+        providers is List &&
+            (providers.contains('google') || providers.contains('apple'));
+  }
+
+  Future<bool> requiresSocialRegistrationGate() async {
+    final client = _client;
+    if (client == null || !isSocialAccount) return false;
+    final completed = await client.rpc('has_completed_my_registration_gate');
+    return completed != true;
+  }
+
+  Future<void> completeSocialRegistrationGate({
+    required DateTime dateOfBirth,
+    required Map<String, String> acceptedDocuments,
+    required DateTime acceptedAt,
+  }) async {
+    final client = _client;
+    if (client == null || !isSocialAccount) return;
+    await client.rpc(
+      'complete_my_social_registration_gate',
+      params: {
+        'date_of_birth_value': _dateOnly(dateOfBirth),
+        'accepted_documents_value': acceptedDocuments,
+        'accepted_at_value': acceptedAt.toUtc().toIso8601String(),
+      },
+    );
+  }
+
   Stream<MapLovAuthEvent> get events {
     final client = _client;
     if (client == null) return const Stream<MapLovAuthEvent>.empty();

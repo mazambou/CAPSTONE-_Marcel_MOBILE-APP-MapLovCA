@@ -11,6 +11,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   static const _onlineRefreshInterval = Duration(seconds: 30);
+  static const _discoverPageSize = 30;
 
   late String selectedTab;
   final Set<String> likedProfiles = {};
@@ -21,16 +22,23 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       : [];
   DiscoveryFilters _filters = const DiscoveryFilters();
   bool _loading = false;
+  bool _loadingFirstPage = false;
   bool _refreshingOnline = false;
+  bool _loadingMore = false;
+  bool _hasMore = false;
+  Map<String, dynamic>? _nextCursor;
+  int _loadGeneration = 0;
   bool _isForeground = true;
   Timer? _onlineRefreshTimer;
   MapLovLocationFailure? _locationFailure;
+  final ScrollController _gridController = ScrollController();
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     selectedTab = widget.initialTab;
+    _gridController.addListener(_loadMoreNearGridEnd);
     _syncOnlineRefreshTimer();
     unawaited(_initializeDiscovery());
   }
@@ -60,6 +68,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         refreshNearbyLocation: false,
         showLoading: false,
         reportErrors: false,
+        forceRefresh: true,
       );
     } finally {
       _refreshingOnline = false;
@@ -131,6 +140,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _onlineRefreshTimer?.cancel();
+    _gridController
+      ..removeListener(_loadMoreNearGridEnd)
+      ..dispose();
     super.dispose();
   }
 
@@ -171,11 +183,29 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     bool refreshNearbyLocation = true,
     bool showLoading = true,
     bool reportErrors = true,
+    bool append = false,
+    bool forceRefresh = false,
   }) async {
-    if (mounted && showLoading) setState(() => _loading = true);
+    if (append) {
+      if (_loadingFirstPage ||
+          _loadingMore ||
+          !_hasMore ||
+          _nextCursor == null) {
+        return;
+      }
+      _loadingMore = true;
+    } else {
+      _loadGeneration += 1;
+      _loadingFirstPage = true;
+      if (mounted && showLoading) setState(() => _loading = true);
+    }
+    final generation = _loadGeneration;
+    final requestedTab = selectedTab;
+    final requestedFilters = _filters;
     try {
       if (selectedTab == 'Nearby' &&
           refreshNearbyLocation &&
+          !append &&
           MapLovRepository.instance.isLive) {
         try {
           await LocationService.instance.updateMyLocation();
@@ -193,16 +223,33 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           !_filters.requiredLocation) {
         _locationFailure = null;
       }
-      final profiles = await MapLovRepository.instance.discoverProfiles(
-        tab: selectedTab,
-        filters: _filters,
+      final page = await MapLovRepository.instance.discoverProfilesPage(
+        tab: requestedTab,
+        filters: requestedFilters,
+        cursor: append ? _nextCursor : null,
+        pageSize: _discoverPageSize,
+        forceRefresh: forceRefresh,
       );
-      if (mounted) {
+      if (mounted &&
+          generation == _loadGeneration &&
+          requestedTab == selectedTab &&
+          identical(requestedFilters, _filters)) {
         setState(() {
-          _profiles = profiles;
-          likedProfiles
-            ..clear()
-            ..addAll(profiles.where((p) => p.likedByMe).map((p) => p.name));
+          if (append) {
+            final existingIds = _profiles.map((profile) => profile.id).toSet();
+            _profiles = [
+              ..._profiles,
+              ...page.profiles.where((profile) => existingIds.add(profile.id)),
+            ];
+          } else {
+            _profiles = page.profiles;
+            likedProfiles.clear();
+          }
+          likedProfiles.addAll(
+            page.profiles.where((p) => p.likedByMe).map((p) => p.name),
+          );
+          _nextCursor = page.nextCursor;
+          _hasMore = page.hasMore;
         });
       }
     } catch (error) {
@@ -213,7 +260,25 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       }
     } finally {
       if (mounted && showLoading) setState(() => _loading = false);
+      if (!append && generation == _loadGeneration) {
+        _loadingFirstPage = false;
+      }
+      _loadingMore = false;
     }
+  }
+
+  void _loadMoreNearGridEnd() {
+    if (!_gridController.hasClients ||
+        _gridController.position.extentAfter > 700) {
+      return;
+    }
+    unawaited(
+      _loadProfiles(
+        append: true,
+        refreshNearbyLocation: false,
+        showLoading: false,
+      ),
+    );
   }
 
   Future<void> _resolveLocationFailure() async {
@@ -338,17 +403,25 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   Future<void> _openPhoto(UserProfile profile) async {
     if (!await _requireProfilePhotos(context, minimum: 1) || !mounted) return;
+    final details = await MapLovRepository.instance.discoverProfileDetails(
+      profile,
+    );
+    if (!mounted) return;
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => PhotoViewerScreen(profile: profile)),
+      MaterialPageRoute(builder: (_) => PhotoViewerScreen(profile: details)),
     );
   }
 
   Future<void> _openProfile(UserProfile profile) async {
     if (!await _requireProfilePhotos(context, minimum: 3) || !mounted) return;
+    final details = await MapLovRepository.instance.discoverProfileDetails(
+      profile,
+    );
+    if (!mounted) return;
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => PublicProfileScreen(profile: profile)),
+      MaterialPageRoute(builder: (_) => PublicProfileScreen(profile: details)),
     );
   }
 
@@ -366,7 +439,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         ),
       ),
     );
-    if (mounted) await _loadProfiles();
+    if (mounted) await _loadProfiles(forceRefresh: true);
   }
 
   Future<void> _toggleLike(UserProfile profile) async {
@@ -466,7 +539,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     )
                   : RefreshIndicator(
                       key: Key('discover_refresh_$selectedTab'),
-                      onRefresh: _loadProfiles,
+                      onRefresh: () => _loadProfiles(forceRefresh: true),
                       child: profiles.isEmpty
                           ? LayoutBuilder(
                               builder: (context, constraints) => ListView(
@@ -481,6 +554,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                             )
                           : GridView.builder(
                               key: Key('discover_grid_$selectedTab'),
+                              controller: _gridController,
                               physics: const AlwaysScrollableScrollPhysics(),
                               padding: const EdgeInsets.fromLTRB(
                                 12,

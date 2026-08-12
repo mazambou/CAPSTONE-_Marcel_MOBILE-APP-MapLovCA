@@ -10,6 +10,7 @@ import 'package:maplove/services/external_checkout_service.dart';
 import 'package:maplove/services/locale_service.dart';
 import 'package:maplove/services/location_service.dart';
 import 'package:maplove/services/maplov_repository.dart';
+import 'package:maplove/services/reference_selfie_image.dart';
 
 void main() {
   SupabaseConfig.forceUiOnlyForTesting = true;
@@ -76,6 +77,18 @@ void main() {
     expect(const SubscriptionInfo(tier: 'elite').displayName, 'VIP');
     expect(const SubscriptionInfo(tier: 'vip').isVip, isTrue);
     expect(const SubscriptionInfo(tier: 'plus').isVip, isFalse);
+  });
+
+  test('reference selfie file types are normalized safely', () {
+    expect(supportedReferenceSelfieExtension('selfie.JPEG', null), 'jpg');
+    expect(
+      supportedReferenceSelfieExtension('iphone-capture', 'image/jpeg'),
+      'jpg',
+    );
+    expect(
+      supportedReferenceSelfieExtension('iphone-capture.HEIC', 'image/heic'),
+      isEmpty,
+    );
   });
 
   test('premium catalog keeps included products visible for paid tiers', () {
@@ -362,7 +375,10 @@ void main() {
     await tester.tap(find.text('Verify email'));
     await tester.pump();
 
-    expect(find.text('Enter the verification code sent by email.'), findsOneWidget);
+    expect(
+      find.text('Enter the verification code sent by email.'),
+      findsOneWidget,
+    );
 
     await tester.enterText(
       find.byKey(const Key('email_verification_code')),
@@ -499,7 +515,10 @@ void main() {
     await tester.tap(find.text('Verify phone number'));
     await tester.pump();
 
-    expect(find.text('Enter the verification code sent by SMS.'), findsOneWidget);
+    expect(
+      find.text('Enter the verification code sent by SMS.'),
+      findsOneWidget,
+    );
 
     await tester.drag(find.byType(ListView), const Offset(0, -500));
     await tester.pumpAndSettle();
@@ -835,6 +854,28 @@ void main() {
     await tester.pump();
 
     expect(tester.widget<SwitchListTile>(finder).value, isFalse);
+  });
+
+  testWidgets('profile shows Discover visibility to non-VIP and opens popup', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 1400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(const MaterialApp(home: ProfileScreen()));
+    await tester.pump();
+
+    final finder = find.byKey(const Key('profile_discover_visibility_switch'));
+    expect(finder, findsOneWidget);
+    expect(tester.widget<SwitchListTile>(finder).onChanged, isNotNull);
+
+    await tester.tap(finder);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Premium VIP required'), findsOneWidget);
+    expect(find.widgetWithText(FilledButton, 'Upgrade'), findsOneWidget);
   });
 
   testWidgets('switches between the three geographic filter modes', (
@@ -1779,6 +1820,11 @@ void main() {
       find.byKey(const Key('profile_photo_display_button')),
       300,
     );
+    await Scrollable.ensureVisible(
+      tester.element(find.byKey(const Key('profile_photo_display_button'))),
+      alignment: 0.5,
+    );
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('profile_photo_display_button')));
     await tester.pumpAndSettle();
 

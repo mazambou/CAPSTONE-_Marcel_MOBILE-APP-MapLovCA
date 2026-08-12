@@ -122,6 +122,7 @@ supabase db lint --linked --level error
 - [Authentication and verified links](docs/production_auth.md)
 - [Supabase/PostgreSQL setup](docs/supabase_postgres_setup.md)
 - [External payments](docs/external_payments_setup.md)
+- [Face verification operations](docs/face_verification_operations.md)
 - [Google Play release checklist](docs/play_store/release_checklist.md)
 - [Google Play data safety](docs/play_store/data_safety_checklist.md)
 - [Legal review notes](docs/legal/LEGAL_REVIEW_NOTES_2026-07-30.md)

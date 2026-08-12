@@ -21,7 +21,9 @@ const _legalDocumentVersions = <String, String>{
 };
 
 class AgeGateScreen extends StatefulWidget {
-  const AgeGateScreen({super.key});
+  const AgeGateScreen({super.key, this.completeExistingSocialAccount = false});
+
+  final bool completeExistingSocialAccount;
 
   @override
   State<AgeGateScreen> createState() => _AgeGateScreenState();
@@ -30,6 +32,8 @@ class AgeGateScreen extends StatefulWidget {
 class _AgeGateScreenState extends State<AgeGateScreen> {
   final Set<String> acceptedDocuments = {};
   DateTime? dateOfBirth;
+  bool saving = false;
+  String? errorText;
 
   bool get _allAccepted =>
       acceptedDocuments.length == _legalDocumentVersions.length;
@@ -99,6 +103,53 @@ class _AgeGateScreenState extends State<AgeGateScreen> {
         '${value.day.toString().padLeft(2, '0')}';
   }
 
+  RegistrationGateData _gateData() => RegistrationGateData(
+    dateOfBirth: dateOfBirth!,
+    acceptedDocuments: Map.unmodifiable(
+      acceptedDocuments.fold(
+        <String, String>{},
+        (result, key) => result..[key] = _legalDocumentVersions[key]!,
+      ),
+    ),
+    acceptedAt: DateTime.now().toUtc(),
+  );
+
+  Future<void> _continue() async {
+    if (!_allAccepted || dateOfBirth == null || saving) return;
+    final gateData = _gateData();
+    if (!widget.completeExistingSocialAccount) {
+      Navigator.pushReplacementNamed(
+        context,
+        AppRoutes.register,
+        arguments: gateData,
+      );
+      return;
+    }
+    setState(() {
+      saving = true;
+      errorText = null;
+    });
+    try {
+      await AuthService.instance.completeSocialRegistrationGate(
+        dateOfBirth: gateData.dateOfBirth,
+        acceptedDocuments: gateData.acceptedDocuments,
+        acceptedAt: gateData.acceptedAt,
+      );
+      if (!mounted) return;
+      Navigator.pushNamedAndRemoveUntil(
+        context,
+        AppRoutes.profileSetup,
+        (_) => false,
+      );
+    } catch (error) {
+      if (mounted) {
+        setState(() => errorText = AuthService.instance.messageFor(error));
+      }
+    } finally {
+      if (mounted) setState(() => saving = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) => _AppPage(
     title: 'Age confirmation',
@@ -158,27 +209,26 @@ class _AgeGateScreenState extends State<AgeGateScreen> {
         'content, photo, reporting and safety rules',
       ),
       const SizedBox(height: 16),
+      if (errorText != null) ...[
+        Text(
+          errorText!,
+          textAlign: TextAlign.center,
+          style: const TextStyle(color: AppColors.error),
+        ),
+        const SizedBox(height: 12),
+      ],
       SizedBox(
         width: double.infinity,
         child: FilledButton(
-          onPressed: _allAccepted && dateOfBirth != null
-              ? () => Navigator.pushReplacementNamed(
-                  context,
-                  AppRoutes.register,
-                  arguments: RegistrationGateData(
-                    dateOfBirth: dateOfBirth!,
-                    acceptedDocuments: Map.unmodifiable(
-                      acceptedDocuments.fold(
-                        <String, String>{},
-                        (result, key) =>
-                            result..[key] = _legalDocumentVersions[key]!,
-                      ),
-                    ),
-                    acceptedAt: DateTime.now().toUtc(),
-                  ),
-                )
+          onPressed: _allAccepted && dateOfBirth != null && !saving
+              ? _continue
               : null,
-          child: const Text('Continue'),
+          child: saving
+              ? const SizedBox.square(
+                  dimension: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Text('Continue'),
         ),
       ),
     ],

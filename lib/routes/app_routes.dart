@@ -6,6 +6,7 @@ class AppRoutes {
   static const login = '/login';
   static const register = '/register';
   static const ageGate = '/age-gate';
+  static const socialAgeGate = '/social-age-gate';
   static const forgotPassword = '/forgot-password';
   static const magicLink = '/magic-link';
   static const authCallback = '/auth/callback';

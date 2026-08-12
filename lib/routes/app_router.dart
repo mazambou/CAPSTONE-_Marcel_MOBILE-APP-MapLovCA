@@ -17,6 +17,8 @@ class AppRouter {
       );
     },
     AppRoutes.ageGate: (_) => const AgeGateScreen(),
+    AppRoutes.socialAgeGate: (_) =>
+        const AgeGateScreen(completeExistingSocialAccount: true),
     AppRoutes.forgotPassword: (_) => const ForgotPasswordScreen(),
     AppRoutes.magicLink: (_) => const MagicLinkScreen(),
     AppRoutes.authCallback: (_) => const AuthCallbackScreen(),

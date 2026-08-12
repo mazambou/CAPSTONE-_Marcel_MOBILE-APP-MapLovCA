@@ -1,4 +1,8 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2.110.7';
+import {
+  deleteIndexedFace,
+  rekognitionClient,
+} from '../_shared/rekognition_faces.ts';
 
 type JsonRecord = Record<string, unknown>;
 type AdminClient = ReturnType<typeof createClient>;
@@ -94,12 +98,56 @@ async function removeUserStorage(
   return removed;
 }
 
+async function removeFaceReference(
+  admin: AdminClient,
+  userId: string,
+): Promise<'deleted' | 'already_absent' | 'not_indexed'> {
+  const { data: reference, error: referenceError } = await admin
+    .from('face_references')
+    .select('face_id, collection_id')
+    .eq('user_id', userId)
+    .maybeSingle();
+  if (referenceError) {
+    throw new Error(
+      `Unable to load the face reference: ${referenceError.message}`,
+    );
+  }
+
+  let awsResult: 'deleted' | 'already_absent' | 'not_indexed' = 'not_indexed';
+  if (reference?.face_id && reference.collection_id) {
+    awsResult = await deleteIndexedFace(
+      rekognitionClient(),
+      reference.collection_id,
+      reference.face_id,
+    );
+  }
+
+  const { error: deleteError } = await admin
+    .from('face_references')
+    .delete()
+    .eq('user_id', userId);
+  if (deleteError) {
+    throw new Error(
+      `Unable to remove the face reference row: ${deleteError.message}`,
+    );
+  }
+  console.info('Account face reference removal completed', {
+    userId,
+    collectionId: reference?.collection_id ?? null,
+    awsResult,
+  });
+  return awsResult;
+}
+
 async function eraseAccount(
   admin: AdminClient,
   userId: string,
   requestedBy: string | null,
   requestOrigin: string,
 ): Promise<number> {
+  // Delete the indexed biometric before DB cascades erase its authoritative
+  // FaceId. DeleteFaces is idempotent when the face or collection is absent.
+  await removeFaceReference(admin, userId);
   let removedFiles = await removeUserStorage(admin, userId);
 
   const { error: purgeError } = await admin.rpc(
@@ -139,6 +187,13 @@ async function eraseAccount(
 }
 
 async function processDue(admin: AdminClient): Promise<Response> {
+  const { data: incompleteQueued, error: incompleteQueueError } = await admin
+    .rpc('enqueue_stale_incomplete_registrations');
+  if (incompleteQueueError) {
+    console.error('Unable to queue stale incomplete registrations', {
+      error: incompleteQueueError.message,
+    });
+  }
   const { data, error } = await admin.rpc('claim_due_account_deletions', {
     batch_size_value: 25,
   });
@@ -168,7 +223,11 @@ async function processDue(admin: AdminClient): Promise<Response> {
       });
     }
   }
-  return response(200, { processed, failed });
+  return response(200, {
+    incompleteQueued: Number(incompleteQueued ?? 0),
+    processed,
+    failed,
+  });
 }
 
 Deno.serve(async (request) => {

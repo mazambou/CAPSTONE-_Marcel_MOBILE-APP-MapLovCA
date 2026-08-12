@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -305,6 +306,25 @@ class DiscoveryFilters {
   );
 }
 
+class DiscoveryPage {
+  const DiscoveryPage({
+    required this.profiles,
+    required this.nextCursor,
+    required this.hasMore,
+  });
+
+  final List<UserProfile> profiles;
+  final Map<String, dynamic>? nextCursor;
+  final bool hasMore;
+}
+
+class _DiscoveryCacheEntry {
+  const _DiscoveryCacheEntry(this.page, this.createdAt);
+
+  final DiscoveryPage page;
+  final DateTime createdAt;
+}
+
 class ProfileLikeResult {
   const ProfileLikeResult({required this.liked, required this.matched});
   final bool liked;
@@ -513,6 +533,8 @@ class MapLovNotification {
 class MapLovRepository {
   MapLovRepository._();
   static final instance = MapLovRepository._();
+  static const _discoveryCacheLifetime = Duration(seconds: 20);
+  final Map<String, _DiscoveryCacheEntry> _discoveryCache = {};
 
   final _uuid = const Uuid();
   final List<MapLovPost> _demoPosts = [];
@@ -596,272 +618,136 @@ class MapLovRepository {
       return profiles;
     }
 
+    final profiles = <UserProfile>[];
+    Map<String, dynamic>? cursor;
+    do {
+      final page = await discoverProfilesPage(
+        tab: tab,
+        filters: filters,
+        cursor: cursor,
+        pageSize: 30,
+      );
+      profiles.addAll(page.profiles);
+      cursor = page.nextCursor;
+      if (!page.hasMore || profiles.length >= 100) break;
+    } while (cursor != null);
+    return profiles.take(100).toList(growable: false);
+  }
+
+  Future<DiscoveryPage> discoverProfilesPage({
+    String tab = 'Discover',
+    DiscoveryFilters filters = const DiscoveryFilters(),
+    Map<String, dynamic>? cursor,
+    int pageSize = 30,
+    bool forceRefresh = false,
+  }) async {
+    final normalizedPageSize = pageSize.clamp(20, 40);
+    if (!isLive) {
+      if (_client != null) {
+        return const DiscoveryPage(
+          profiles: [],
+          nextCursor: null,
+          hasMore: false,
+        );
+      }
+      final matching = mockProfiles.where((profile) {
+        if (_demoBlockedIds.contains(profile.id)) return false;
+        if (!_profileMatchesFilters(profile, filters)) return false;
+        if (tab == 'Nearby' && profile.distanceKm > filters.distanceKm) {
+          return false;
+        }
+        if (tab == 'Online' && !profile.isOnline) return false;
+        if (tab == 'New' && !profile.isNew) return false;
+        return true;
+      }).toList()..sort(_compareDiscoverProfiles);
+      final offset = (cursor?['demo_offset'] as num?)?.toInt() ?? 0;
+      final end = (offset + normalizedPageSize).clamp(0, matching.length);
+      final hasMore = end < matching.length;
+      return DiscoveryPage(
+        profiles: matching.sublist(offset.clamp(0, matching.length), end),
+        nextCursor: hasMore ? {'demo_offset': end} : null,
+        hasMore: hasMore,
+      );
+    }
     if (filters.genders.length != 1) {
       throw StateError('Choose exactly one gender before using Discover.');
     }
 
-    final viewerTier = (await subscriptionInfo()).tier;
-    final entitlements = await activePaymentEntitlements();
-    final hasCountryPass = entitlements.any(
-      (item) => item['entitlement_kind'] == 'country_pass',
-    );
-    final hasInternationalPass = entitlements.any(
-      (item) => item['entitlement_kind'] == 'international_pass',
-    );
-    if (filters.vipOnly && viewerTier != 'elite' && viewerTier != 'vip') {
-      throw StateError('VIP profiles require a VIP subscription.');
-    }
-    if (filters.premiumOnly &&
-        viewerTier != 'plus' &&
-        viewerTier != 'elite' &&
-        viewerTier != 'vip') {
-      throw StateError('Premium profile discovery requires Premium Plus.');
-    }
-    if ((filters.originCountries.isNotEmpty ||
-            filters.originRegions.isNotEmpty ||
-            filters.originCities.isNotEmpty) &&
-        viewerTier != 'plus' &&
-        viewerTier != 'elite' &&
-        viewerTier != 'vip') {
-      throw StateError('Origin filters require Premium Plus.');
-    }
-    if (filters.locationMode == 'my_country' &&
-        !hasCountryPass &&
-        viewerTier != 'plus' &&
-        viewerTier != 'elite' &&
-        viewerTier != 'vip') {
-      throw StateError('Country search requires Premium Plus.');
-    }
-    if ((filters.locationMode == 'specific_country' ||
-            filters.locationMode == 'worldwide') &&
-        !hasInternationalPass &&
-        viewerTier != 'elite' &&
-        viewerTier != 'vip') {
-      throw StateError('International search requires Premium VIP.');
+    final cacheKey = jsonEncode({
+      'user': currentUserId,
+      'tab': tab,
+      'filters': filters.toDatabase(),
+      'cursor': cursor,
+      'page_size': normalizedPageSize,
+    });
+    final cached = _discoveryCache[cacheKey];
+    if (!forceRefresh &&
+        cached != null &&
+        DateTime.now().difference(cached.createdAt) < _discoveryCacheLifetime) {
+      return cached.page;
     }
 
-    final vipRanking = <String, int>{};
-    if (filters.vipOnly || filters.premiumOnly || filters.mostLikedFirst) {
-      final rankingRows =
-          await _client!.rpc(
-                'vip_discovery_ranking',
-                params: {
-                  'vip_only_value': filters.vipOnly,
-                  'premium_only_value': filters.premiumOnly,
-                  'most_liked_first_value': filters.mostLikedFirst,
-                },
-              )
-              as List<dynamic>;
-      for (final row in rankingRows.cast<Map<String, dynamic>>()) {
-        vipRanking[row['profile_id'] as String] =
-            (row['popularity_score'] as num?)?.toInt() ?? 0;
-      }
-      if (vipRanking.isEmpty) return const [];
-    }
-
-    try {
-      await _client!.rpc('refresh_my_compatibility_scores');
-    } on PostgrestException {
-      // The additive MVP migration may not have reached this environment yet.
-    }
-
-    final arrivalByProfile = await _upcomingArrivalsForDiscovery(filters);
-
-    if (tab == 'Nearby' ||
-        (filters.locationMode == 'near_me' && filters.requiredLocation)) {
-      try {
-        final nearby =
-            await _client!.rpc(
-                  'find_nearby_profiles',
-                  params: {
-                    'radius_km': filters.distanceKm,
-                    'result_limit': 100,
-                  },
-                )
-                as List<dynamic>;
-        final nearbyRows = nearby.cast<Map<String, dynamic>>();
-        final distanceById = <String, int>{
-          for (final raw in nearbyRows)
-            if (raw['id'] case final String id)
-              id: (raw['distance_km'] as num?)?.round() ?? 0,
-        };
-        final candidateIds = <String>{
-          ...distanceById.keys,
-          ...arrivalByProfile.keys,
-        };
-        if (candidateIds.isEmpty) return const [];
-        final profileRows = await _client!
-            .from('profiles')
-            .select()
-            .eq('status', 'active')
-            .eq('is_discoverable', true)
-            .eq('gender', filters.genders.single)
-            .inFilter('id', candidateIds.toList());
-        final hydrated = await _mapInBatches(
-          profileRows.cast<Map<String, dynamic>>(),
-          _profileFromRow,
-        );
-        final result = hydrated
-            .where((profile) => profile.id != currentUserId)
-            .where((profile) => profile.photoUrls.isNotEmpty)
-            .where(
-              (profile) =>
-                  vipRanking.isEmpty || vipRanking.containsKey(profile.id),
+    final raw =
+        await _client!.rpc(
+              'discover_profiles_page',
+              params: {
+                'tab_value': tab,
+                'filters_value': filters.toDatabase(),
+                'cursor_value': cursor,
+                'page_size_value': normalizedPageSize,
+              },
             )
-            .map(
-              (profile) => _profileWithArrival(
-                _copyProfile(
-                  profile,
-                  distanceKm: distanceById[profile.id] ?? 0,
-                ),
-                arrivalByProfile[profile.id],
-              ),
-            )
-            .toList();
-        final enriched = await _mapInBatches(result, _enrichCompatibility);
-        return enriched
-            .where(
-              (profile) =>
-                  _profileMatchesFilters(profile, filters) &&
-                  _newAccountVisibleToViewer(profile, viewerTier),
-            )
-            .toList()
-          ..sort((a, b) => _compareWithVipRanking(a, b, filters, vipRanking));
-      } on PostgrestException {
-        // Never replace a failed geographic query with ordinary discovery:
-        // those rows do not contain a measured distance and would make the
-        // selected Nearby radius misleading.
-        rethrow;
-      }
-    }
-
-    var profileQuery = _client!
-        .from('profiles')
-        .select()
-        .eq('status', 'active')
-        .eq('is_discoverable', true)
-        .eq('gender', filters.genders.single)
-        .neq('id', currentUserId!);
-    if (filters.requiredLocation && filters.countryIds.isNotEmpty) {
-      profileQuery = profileQuery.eq(
-        'residence_country_id',
-        filters.countryIds.first,
-      );
-    }
-    if (filters.requiredLocation && filters.regionIds.isNotEmpty) {
-      profileQuery = profileQuery.eq(
-        'residence_region_id',
-        filters.regionIds.first,
-      );
-    }
-    if (filters.requiredLocation && filters.cityIds.isNotEmpty) {
-      profileQuery = profileQuery.eq(
-        'residence_city_id',
-        filters.cityIds.first,
-      );
-    }
-    if (filters.originCountryIds.isNotEmpty) {
-      profileQuery = profileQuery.eq(
-        'origin_country_id',
-        filters.originCountryIds.first,
-      );
-    }
-    if (filters.originRegionIds.isNotEmpty) {
-      profileQuery = profileQuery.eq(
-        'origin_region_id',
-        filters.originRegionIds.first,
-      );
-    }
-    if (filters.originCityIds.isNotEmpty) {
-      profileQuery = profileQuery.eq(
-        'origin_city_id',
-        filters.originCityIds.first,
-      );
-    }
-    if (filters.locationMode == 'specific_country' ||
-        filters.locationMode == 'worldwide') {
-      final viewerId = currentUserId;
-      profileQuery = viewerId == null
-          ? profileQuery.eq('allow_international_discovery', true)
-          : profileQuery.or(
-              'allow_international_discovery.eq.true,id.eq.$viewerId',
-            );
-    }
-    if (filters.vipOnly || filters.premiumOnly || filters.mostLikedFirst) {
-      if (vipRanking.isEmpty) return const [];
-      final rankedIds = filters.mostLikedFirst
-          ? vipRanking.keys.take(100).toList()
-          : vipRanking.keys.toList();
-      profileQuery = profileQuery.inFilter('id', rankedIds);
-    }
-    final rows = await profileQuery.limit(100);
-    final ordinaryRows = rows.cast<Map<String, dynamic>>().toList();
-    final returnedIds = ordinaryRows
-        .map((row) => row['id'] as String?)
-        .whereType<String>()
-        .toSet();
-    final missingArrivalIds = arrivalByProfile.keys
-        .where((id) => !returnedIds.contains(id))
-        .toList();
-    if (missingArrivalIds.isNotEmpty) {
-      final arrivalRows = await _client!
-          .from('profiles')
-          .select()
-          .eq('status', 'active')
-          .eq('is_discoverable', true)
-          .eq('gender', filters.genders.single)
-          .inFilter('id', missingArrivalIds);
-      ordinaryRows.addAll(arrivalRows.cast<Map<String, dynamic>>());
-    }
-    final hydrated = await _mapInBatches(ordinaryRows, _profileFromRow);
-    final candidates = hydrated
+            as List<dynamic>;
+    final rows = raw.cast<Map<String, dynamic>>();
+    final items = rows
         .map(
-          (profile) =>
-              _profileWithArrival(profile, arrivalByProfile[profile.id]),
+          (row) => Map<String, dynamic>.from(
+            row['item'] as Map? ?? const <String, dynamic>{},
+          ),
         )
-        .where((profile) {
-          if (!_newAccountVisibleToViewer(profile, viewerTier)) return false;
-          if (profile.photoUrls.isEmpty) return false;
-          if (profile.age < filters.minimumAge ||
-              profile.age > filters.maximumAge) {
-            return false;
-          }
-          if (tab == 'Online' && !profile.isOnline) return false;
-          if (tab == 'New' && !profile.isNew) return false;
-          return true;
-        })
-        .toList();
-    final enriched = await _mapInBatches(candidates, _enrichCompatibility);
-    final profiles = enriched
-        .where((profile) => _profileMatchesFilters(profile, filters))
-        .toList();
-    profiles.sort((a, b) => _compareWithVipRanking(a, b, filters, vipRanking));
-    return profiles;
-  }
-
-  int _compareWithVipRanking(
-    UserProfile a,
-    UserProfile b,
-    DiscoveryFilters filters,
-    Map<String, int> ranking,
-  ) {
-    if (filters.mostLikedFirst) {
-      final result = (ranking[b.id] ?? 0).compareTo(ranking[a.id] ?? 0);
-      if (result != 0) return result;
+        .toList(growable: false);
+    final paths = <String>{};
+    for (final item in items) {
+      for (final key in const ['primary_photo', 'popular_photo']) {
+        final photo = item[key] as Map?;
+        final path = photo?['storage_path'] as String?;
+        if (path?.isNotEmpty == true) paths.add(path!);
+      }
     }
-    return _compareDiscoverProfiles(a, b);
+    final signedByPath = <String, String>{};
+    if (paths.isNotEmpty) {
+      final signed = await _client!.storage
+          .from('profile-media')
+          .createSignedUrlsResult(paths.toList(growable: false), 3600);
+      for (final result in signed) {
+        if (result case SignedUrlSuccess(:final path, :final signedUrl)) {
+          signedByPath[path] = signedUrl;
+        }
+      }
+    }
+    final profiles = items
+        .map((item) => _profileFromDiscoverItem(item, signedByPath))
+        .toList(growable: false);
+    final hasMore = rows.firstOrNull?['has_more'] as bool? ?? false;
+    final nextCursor = hasMore && rows.isNotEmpty
+        ? Map<String, dynamic>.from(
+            rows.last['item_cursor'] as Map? ?? const <String, dynamic>{},
+          )
+        : null;
+    final page = DiscoveryPage(
+      profiles: profiles,
+      nextCursor: nextCursor?.isEmpty == true ? null : nextCursor,
+      hasMore: hasMore && nextCursor?.isNotEmpty == true,
+    );
+    _discoveryCache[cacheKey] = _DiscoveryCacheEntry(page, DateTime.now());
+    _discoveryCache.removeWhere(
+      (_, value) =>
+          DateTime.now().difference(value.createdAt) >= _discoveryCacheLifetime,
+    );
+    return page;
   }
 
-  bool _newAccountVisibleToViewer(UserProfile profile, String viewerTier) {
-    if (!profile.isNew || profile.id == currentUserId) return true;
-    final createdAt = profile.createdAt;
-    if (createdAt == null) return true;
-    return newAccountVisibleToTier(
-      createdAt: createdAt,
-      viewerTier: viewerTier,
-      isOwner: profile.id == currentUserId,
-    );
-  }
+  void clearDiscoveryCache() => _discoveryCache.clear();
 
   int _compareDiscoverProfiles(UserProfile a, UserProfile b) {
     if (a.isNew != b.isNew) return a.isNew ? -1 : 1;
@@ -1159,6 +1045,23 @@ class MapLovRepository {
     return row == null ? null : _profileFromRow(row);
   }
 
+  Future<UserProfile> discoverProfileDetails(UserProfile summary) async {
+    if (!isLive) return summary;
+    final full = await getProfile(summary.id);
+    if (full == null) return summary;
+    return _copyProfile(
+      full,
+      compatibilityScore: summary.compatibilityScore,
+      compatibilityBreakdown: summary.compatibilityBreakdown,
+      likedByMe: summary.likedByMe,
+      distanceKm: summary.distanceKm,
+      arrivalCountry: summary.arrivalCountry,
+      arrivalRegion: summary.arrivalRegion,
+      arrivalCity: summary.arrivalCity,
+      arrivalMonth: summary.arrivalMonth,
+    );
+  }
+
   Future<void> saveMyProfile(Map<String, Object?> values) async {
     if (!isLive) return;
     final editableValues = Map<String, Object?>.from(values)
@@ -1185,6 +1088,7 @@ class MapLovRepository {
         .from('profiles')
         .update({'is_discoverable': discoverable})
         .eq('id', currentUserId!);
+    clearDiscoveryCache();
   }
 
   Future<void> setOriginProfileVisibility(bool visible) async {
@@ -1292,64 +1196,6 @@ class MapLovRepository {
     );
   }
 
-  Future<Map<String, Map<String, dynamic>>> _upcomingArrivalsForDiscovery(
-    DiscoveryFilters filters,
-  ) async {
-    final profile = await myProfileDetails();
-    final searchCountry =
-        filters.countries.firstOrNull ??
-        (profile?['country_name'] as String?) ??
-        '';
-    if (searchCountry.trim().isEmpty) return const {};
-    final localSearch =
-        filters.locationMode == 'near_me' ||
-        filters.locationMode == 'my_country';
-    final searchRegion =
-        filters.regions.firstOrNull ??
-        (localSearch ? (profile?['residence_region'] as String?) : null);
-    final searchCity =
-        filters.cities.firstOrNull ??
-        (localSearch
-            ? ((profile?['residence_city'] as String?) ??
-                  (profile?['city'] as String?))
-            : null);
-    try {
-      final rows =
-          await _client!.rpc(
-                'upcoming_arrivals_for_discovery',
-                params: {
-                  'search_country_value': searchCountry,
-                  'search_region_value': searchRegion,
-                  'search_city_value': searchCity,
-                },
-              )
-              as List<dynamic>;
-      return {
-        for (final row in rows.cast<Map<String, dynamic>>())
-          if (row['profile_id'] case final String id) id: row,
-      };
-    } on PostgrestException catch (error) {
-      if (error.code == '42883' || error.code == '42P01') return const {};
-      rethrow;
-    }
-  }
-
-  UserProfile _profileWithArrival(
-    UserProfile profile,
-    Map<String, dynamic>? arrival,
-  ) {
-    if (arrival == null) return profile;
-    return _copyProfile(
-      profile,
-      arrivalCountry: arrival['destination_country'] as String? ?? '',
-      arrivalRegion: arrival['destination_region'] as String? ?? '',
-      arrivalCity: arrival['destination_city'] as String? ?? '',
-      arrivalMonth: DateTime.tryParse(
-        arrival['arrival_month'] as String? ?? '',
-      ),
-    );
-  }
-
   Future<void> savePreferences(DiscoveryFilters filters) async {
     if (!isLive) return;
     if (filters.genders.length != 1) {
@@ -1360,12 +1206,7 @@ class MapLovRepository {
       ...filters.toDatabase(),
       'required_genders': true,
     });
-    try {
-      await _client!.rpc('refresh_my_compatibility_scores');
-    } on PostgrestException {
-      // Preferences remain valid if the optional compatibility RPC has not
-      // been deployed yet.
-    }
+    clearDiscoveryCache();
   }
 
   Future<DiscoveryFilters> myPreferences() async {
@@ -1407,6 +1248,7 @@ class MapLovRepository {
           .delete()
           .eq('liker_id', currentUserId!)
           .eq('liked_id', profileId);
+      clearDiscoveryCache();
       return const ProfileLikeResult(liked: false, matched: false);
     }
     final wasMatched = await _hasMatchWith(profileId);
@@ -1414,6 +1256,7 @@ class MapLovRepository {
       'liker_id': currentUserId!,
       'liked_id': profileId,
     });
+    clearDiscoveryCache();
     final isMatched = await _hasMatchWith(profileId);
     return ProfileLikeResult(liked: true, matched: !wasMatched && isMatched);
   }
@@ -3087,6 +2930,7 @@ class MapLovRepository {
       'blocker_id': currentUserId!,
       'blocked_id': userId,
     });
+    clearDiscoveryCache();
   }
 
   Future<void> unblockUser(String userId) async {
@@ -3099,6 +2943,7 @@ class MapLovRepository {
         .delete()
         .eq('blocker_id', currentUserId!)
         .eq('blocked_id', userId);
+    clearDiscoveryCache();
   }
 
   Future<List<UserProfile>> blockedUsers() async {
@@ -3986,6 +3831,122 @@ class MapLovRepository {
       'target_type': type,
       'target_id': id,
     });
+  }
+
+  UserProfile _profileFromDiscoverItem(
+    Map<String, dynamic> row,
+    Map<String, String> signedByPath,
+  ) {
+    final primary = Map<String, dynamic>.from(
+      row['primary_photo'] as Map? ?? const <String, dynamic>{},
+    );
+    final popular = Map<String, dynamic>.from(
+      row['popular_photo'] as Map? ?? const <String, dynamic>{},
+    );
+    final primaryPath = primary['storage_path'] as String?;
+    final primaryUrl = primaryPath == null ? null : signedByPath[primaryPath];
+    if (primaryUrl == null) {
+      throw StateError('A Discover profile photo could not be loaded.');
+    }
+    final photoUrls = <String>[primaryUrl];
+    final photoIds = <String>[primary['id'] as String];
+    final likeCounts = <int>[(primary['likes'] as num?)?.toInt() ?? 0];
+    final superLikeCounts = <int>[
+      (primary['super_likes'] as num?)?.toInt() ?? 0,
+    ];
+    final commentCounts = <int>[(primary['comments'] as num?)?.toInt() ?? 0];
+    final photoCreatedAts = <DateTime?>[
+      DateTime.tryParse(primary['created_at'] as String? ?? ''),
+    ];
+    final popularId = popular['id'] as String?;
+    final popularPath = popular['storage_path'] as String?;
+    final popularUrl = popularPath == null ? null : signedByPath[popularPath];
+    if (popularId != null &&
+        popularId != photoIds.first &&
+        popularUrl != null) {
+      photoUrls.add(popularUrl);
+      photoIds.add(popularId);
+      likeCounts.add((popular['likes'] as num?)?.toInt() ?? 0);
+      superLikeCounts.add((popular['super_likes'] as num?)?.toInt() ?? 0);
+      commentCounts.add((popular['comments'] as num?)?.toInt() ?? 0);
+      photoCreatedAts.add(
+        DateTime.tryParse(popular['created_at'] as String? ?? ''),
+      );
+    }
+    final birth = DateTime.tryParse(row['date_of_birth'] as String? ?? '');
+    final now = DateTime.now();
+    final age = birth == null
+        ? 18
+        : now.year -
+              birth.year -
+              ((now.month < birth.month ||
+                      (now.month == birth.month && now.day < birth.day))
+                  ? 1
+                  : 0);
+    return UserProfile(
+      id: row['id'] as String,
+      name: row['first_name'] as String? ?? 'MapLov member',
+      age: age,
+      city: row['city'] as String? ?? '',
+      country: row['country_name'] as String? ?? '',
+      region: row['residence_region'] as String? ?? '',
+      countryId: row['residence_country_id'] as String? ?? '',
+      regionId: row['residence_region_id'] as String? ?? '',
+      cityId: row['residence_city_id'] as String? ?? '',
+      originCountry: row['origin_country_name'] as String? ?? '',
+      originRegion: row['origin_region'] as String? ?? '',
+      originCity: row['origin_city'] as String? ?? '',
+      originCountryId: row['origin_country_id'] as String? ?? '',
+      originRegionId: row['origin_region_id'] as String? ?? '',
+      originCityId: row['origin_city_id'] as String? ?? '',
+      compatibilityScore: (row['compatibility_score'] as num?)?.toInt() ?? 80,
+      compatibilityBreakdown: Map<String, dynamic>.from(
+        row['compatibility_breakdown'] as Map? ?? const {},
+      ),
+      imagePath: primaryUrl,
+      photoUrls: photoUrls,
+      photoIds: photoIds,
+      photoLikeCounts: likeCounts,
+      photoSuperLikeCounts: superLikeCounts,
+      photoCommentCounts: commentCounts,
+      photoCreatedAts: photoCreatedAts,
+      photoDisplayStyle: row['photo_display_style'] == 'social'
+          ? PhotoDisplayStyle.social
+          : PhotoDisplayStyle.profileDetails,
+      profession: row['profession'] as String? ?? 'MapLov member',
+      distanceKm: (row['distance_km'] as num?)?.round() ?? 5,
+      isOnline: row['is_online'] as bool? ?? false,
+      isNew: row['is_new'] as bool? ?? false,
+      bio: row['bio'] as String? ?? '',
+      isVerified: row['is_verified'] as bool? ?? false,
+      isVip: row['is_vip'] as bool? ?? false,
+      gender: row['gender'] as String? ?? '',
+      languages: List<String>.from(row['spoken_languages'] ?? const []),
+      relationshipGoal: row['relationship_goal'] as String? ?? '',
+      interests: List<String>.from(row['interest_slugs'] ?? const []),
+      religion: row['religion'] as String? ?? '',
+      bodyType: row['body_type'] as String? ?? '',
+      eyeColor: row['eye_color'] as String? ?? '',
+      hairColor: row['hair_color'] as String? ?? '',
+      heightCm: (row['height_cm'] as num?)?.toInt(),
+      childrenPreference: row['children_preference'] as String? ?? '',
+      relationshipStatus: row['relationship_status'] as String? ?? '',
+      educationLevel: row['education_level'] as String? ?? '',
+      beardStyle: row['beard_style'] as String? ?? '',
+      smokingStatus: row['smoking_status'] as String? ?? '',
+      incomeLevel: row['income_level'] as String? ?? '',
+      isPhotoVerified: row['is_photo_verified'] as bool? ?? false,
+      allowsInternationalDiscovery:
+          row['allow_international_discovery'] as bool? ?? true,
+      showsOriginOnProfile: row['show_origin_on_profile'] as bool? ?? true,
+      likedByMe: row['liked_by_me'] as bool? ?? false,
+      lastActiveAt: DateTime.tryParse(row['last_active_at'] as String? ?? ''),
+      createdAt: DateTime.tryParse(row['created_at'] as String? ?? ''),
+      arrivalCountry: row['arrival_country'] as String? ?? '',
+      arrivalRegion: row['arrival_region'] as String? ?? '',
+      arrivalCity: row['arrival_city'] as String? ?? '',
+      arrivalMonth: DateTime.tryParse(row['arrival_month'] as String? ?? ''),
+    );
   }
 
   Future<UserProfile> _profileFromRow(Map<String, dynamic> row) async {

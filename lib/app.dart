@@ -26,6 +26,7 @@ import 'services/locale_service.dart';
 import 'services/location_service.dart';
 import 'services/maplov_repository.dart';
 import 'services/purchase_service.dart';
+import 'services/reference_selfie_image.dart';
 import 'shared/theme/app_colors.dart';
 
 export 'models/user_profile.dart';
@@ -217,6 +218,9 @@ class MapLoveApp extends StatefulWidget {
 
 Future<String> _authenticatedLandingRoute() async {
   await AuthService.instance.validateCurrentAccount();
+  if (await AuthService.instance.requiresSocialRegistrationGate()) {
+    return AppRoutes.socialAgeGate;
+  }
   final complete = await AuthService.instance.isCurrentProfileComplete();
   return !complete
       ? AppRoutes.profileSetup

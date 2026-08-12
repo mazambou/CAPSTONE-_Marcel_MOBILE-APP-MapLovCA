@@ -1,7 +1,7 @@
 begin;
 
 create extension if not exists pgtap with schema extensions;
-select plan(21);
+select plan(35);
 
 select has_table('public', 'face_references',
   'private reference selfie metadata is stored');
@@ -15,6 +15,20 @@ select has_column('public', 'face_references', 'consent_version',
   'biometric consent version is recorded');
 select has_column('public', 'face_references', 'consented_at',
   'biometric consent time is recorded');
+select has_column('public', 'face_references', 'country_id',
+  'face references retain their normalized residence country');
+select has_column('public', 'face_references', 'face_id',
+  'the authoritative Rekognition FaceId is retained');
+select has_column('public', 'face_references', 'collection_id',
+  'the country collection identifier is retained');
+select has_column('public', 'face_references', 'external_image_id',
+  'the server-derived Rekognition external identifier is retained');
+select has_column('public', 'face_references', 'indexed_at',
+  'the Rekognition indexing time is retained');
+select has_table('private', 'face_enrollment_locks',
+  'country collection enrollment leases are stored privately');
+select has_table('public', 'face_index_cleanup_queue',
+  'failed AWS compensation is retained for retry');
 select has_column('public', 'profile_photo_face_checks', 'check_type',
   'reference enrollment and profile comparisons are distinguished');
 select has_column('public', 'profiles', 'residence_location_verified_at',
@@ -26,6 +40,43 @@ select has_function(
   'register_verified_profile_photo',
   array['uuid', 'text', 'numeric', 'numeric', 'text'],
   'trusted verification registers accepted photos atomically'
+);
+select has_function(
+  'public',
+  'try_acquire_face_enrollment_lock',
+  array['text', 'uuid', 'integer'],
+  'the backend can atomically acquire a country enrollment lease'
+);
+select has_function(
+  'public',
+  'release_face_enrollment_lock',
+  array['text', 'uuid'],
+  'the backend can release its country enrollment lease'
+);
+select has_function(
+  'public',
+  'register_indexed_face_reference',
+  array[
+    'uuid', 'uuid', 'text', 'text', 'text', 'text', 'numeric', 'text',
+    'text', 'text', 'text', 'uuid'
+  ],
+  'indexed reference metadata is committed atomically while holding the lease'
+);
+select has_index(
+  'public', 'face_references', 'face_references_face_id_idx',
+  'FaceId lookups are indexed'
+);
+select has_index(
+  'public', 'face_references', 'face_references_collection_id_idx',
+  'collection lookups are indexed'
+);
+select ok(
+  not has_function_privilege(
+    'authenticated',
+    'public.try_acquire_face_enrollment_lock(text,uuid,integer)',
+    'EXECUTE'
+  ),
+  'members cannot acquire face enrollment locks'
 );
 select ok(
   exists(select 1 from storage.buckets where id = 'identity-selfies' and not public),
@@ -46,6 +97,10 @@ select ok(
 select ok(
   not has_table_privilege('authenticated', 'public.duplicate_account_checks', 'select'),
   'authenticated users cannot read duplicate identity matches'
+);
+select ok(
+  not has_table_privilege('authenticated', 'public.face_index_cleanup_queue', 'select'),
+  'authenticated users cannot read orphan face cleanup metadata'
 );
 select has_function(
   'public',

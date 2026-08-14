@@ -1336,7 +1336,9 @@ class MapLovRepository {
             (profile) => MatchItem(
               id: 'demo-match-${profile.id}',
               profile: profile,
-              date: DateTime.now(),
+              // Demo fixtures must stay deterministic for screenshots and
+              // offline previews. Live matches keep their database timestamp.
+              date: DateTime.utc(2026, 8, 4),
             ),
           )
           .toList();

@@ -157,7 +157,7 @@ class _MapLovNavigationBar extends StatelessWidget {
         NavigationDestination(
           icon: const Icon(Icons.favorite_border),
           selectedIcon: const Icon(Icons.favorite),
-          label: context.tr('Matches'),
+          label: context.tr('Likes & Matches'),
         ),
         NavigationDestination(
           icon: StreamBuilder<int>(

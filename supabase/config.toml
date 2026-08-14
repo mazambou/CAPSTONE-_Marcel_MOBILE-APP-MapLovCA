@@ -232,7 +232,7 @@ secure_password_change = false
 # Controls the minimum amount of time that must pass before sending another signup confirmation or password reset email.
 max_frequency = "1m"
 # Number of characters used in the email OTP.
-otp_length = 6
+otp_length = 8
 # Number of seconds before the email OTP expires (defaults to 1 hour).
 otp_expiry = 3600
 
@@ -266,12 +266,12 @@ content_path = "./supabase/templates/email_change.html"
 [auth.email.notification.password_changed]
 enabled = true
 subject = "Your MapLov password was changed"
-content_path = "./templates/password_changed_notification.html"
+content_path = "./supabase/templates/password_changed_notification.html"
 
 [auth.email.notification.email_changed]
 enabled = true
 subject = "Your MapLov email was changed"
-content_path = "./templates/email_changed_notification.html"
+content_path = "./supabase/templates/email_changed_notification.html"
 
 [auth.sms]
 # Allow/disallow new user signups via SMS to your project.
@@ -303,6 +303,11 @@ max_frequency = "5s"
 # [auth.hook.custom_access_token]
 # enabled = true
 # uri = "pg-functions://<database>/<schema>/<hook_name>"
+
+[auth.hook.send_email]
+enabled = true
+uri = "http://host.docker.internal:54321/functions/v1/bright-action"
+secrets = "env(SEND_EMAIL_HOOK_SECRET)"
 
 # Configure one of the supported SMS providers: `twilio`, `twilio_verify`, `messagebird`, `textlocal`, `vonage`.
 [auth.sms.twilio]
@@ -426,6 +431,11 @@ verify_jwt = false
 [functions.admin-delete-account]
 # The function manually validates administrator JWTs. Its separate scheduled
 # action is authenticated with a 256-bit secret supplied by pg_cron.
+verify_jwt = false
+
+[functions.bright-action]
+# Supabase Auth calls this public HTTP hook without a user JWT. The request is
+# authenticated inside the function with the Standard Webhooks signature.
 verify_jwt = false
 
 [functions.migrate-face-references]

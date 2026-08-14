@@ -1,10 +1,39 @@
+import 'dart:io';
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:maplove/app.dart';
 import 'package:maplove/config/supabase_config.dart';
 
+class _CrossPlatformGoldenComparator extends LocalFileComparator {
+  _CrossPlatformGoldenComparator(super.testFile);
+
+  static const double _renderingTolerance = 0.02;
+
+  @override
+  Future<bool> compare(Uint8List imageBytes, Uri golden) async {
+    final result = await GoldenFileComparator.compareLists(
+      imageBytes,
+      await getGoldenBytes(golden),
+    );
+    final passed = result.passed || result.diffPercent <= _renderingTolerance;
+    if (passed) {
+      result.dispose();
+      return true;
+    }
+
+    final error = await generateFailureOutput(result, golden, basedir);
+    result.dispose();
+    throw FlutterError(error);
+  }
+}
+
 void main() {
   SupabaseConfig.forceUiOnlyForTesting = true;
+  goldenFileComparator = _CrossPlatformGoldenComparator(
+    Uri.file('${Directory.current.path}/test/play_store_screenshots_test.dart'),
+  );
 
   Future<void> capture(
     WidgetTester tester,

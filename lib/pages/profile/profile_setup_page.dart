@@ -6,6 +6,36 @@ class ProfileSetupScreen extends StatefulWidget {
   State<ProfileSetupScreen> createState() => _ProfileSetupScreenState();
 }
 
+enum DuplicateAccountResolution { login, recoverAndDelete }
+
+Future<DuplicateAccountResolution?> showDuplicateAccountResolutionDialog(
+  BuildContext context,
+) => showDialog<DuplicateAccountResolution>(
+  context: context,
+  barrierDismissible: false,
+  builder: (context) => AlertDialog(
+    key: const Key('duplicate_account_dialog'),
+    title: const Text('This person already exists in the system'),
+    content: const Text(
+      'The new provisional registration and its uploaded selfie have been removed. For security, recover and sign in to the existing account before deleting all its data, including the private selfie, and creating a new account.',
+    ),
+    actions: [
+      TextButton(
+        key: const Key('duplicate_account_login'),
+        onPressed: () =>
+            Navigator.pop(context, DuplicateAccountResolution.login),
+        child: const Text('Go to login'),
+      ),
+      FilledButton(
+        key: const Key('duplicate_account_recover_delete'),
+        onPressed: () =>
+            Navigator.pop(context, DuplicateAccountResolution.recoverAndDelete),
+        child: const Text('Recover account to delete data'),
+      ),
+    ],
+  ),
+);
+
 class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   final bio = TextEditingController();
   final residenceCityOther = TextEditingController();
@@ -411,25 +441,14 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
 
   Future<void> _handleRejectedDuplicateRegistration() async {
     if (!mounted) return;
-    await showDialog<void>(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        title: const Text('Account not created'),
-        content: const Text(
-          'MapLov rejected this registration because the selfie matches an existing private reference. The provisional account and uploaded selfie are removed. Use account recovery or contact support.',
-        ),
-        actions: [
-          FilledButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Go to login'),
-          ),
-        ],
-      ),
-    );
+    final resolution = await showDuplicateAccountResolutionDialog(context);
     await AuthService.instance.discardRejectedRegistration();
     if (!mounted) return;
-    Navigator.pushNamedAndRemoveUntil(context, AppRoutes.login, (_) => false);
+    final destination =
+        resolution == DuplicateAccountResolution.recoverAndDelete
+        ? AppRoutes.forgotPassword
+        : AppRoutes.login;
+    Navigator.pushNamedAndRemoveUntil(context, destination, (_) => false);
   }
 
   Future<void> _continue() async {

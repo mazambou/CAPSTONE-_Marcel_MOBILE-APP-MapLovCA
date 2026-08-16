@@ -529,6 +529,27 @@ class AuthService {
     }
   }
 
+  Future<void> deleteCurrentAccountImmediately() async {
+    final client = _client;
+    if (client == null) return;
+    try {
+      await client.functions.invoke(
+        'admin-delete-account',
+        body: const {'action': 'delete_self', 'confirmation': 'DELETE'},
+      );
+      await client.auth.signOut(scope: SignOutScope.local);
+    } on FunctionException catch (error) {
+      final details = error.details;
+      final body = details is Map
+          ? Map<String, dynamic>.from(details)
+          : const <String, dynamic>{};
+      throw AuthException(
+        body['message'] as String? ??
+            'Permanent account deletion could not be completed.',
+      );
+    }
+  }
+
   Future<void> _rememberAuthIntent(MapLovAuthIntent intent) async {
     _pendingAuthIntent = intent;
     final preferences = await SharedPreferences.getInstance();

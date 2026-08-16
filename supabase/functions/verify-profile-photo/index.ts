@@ -17,12 +17,20 @@ import {
 
 const maxImageBytes = 5 * 1024 * 1024;
 
+const corsHeaders: HeadersInit = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers':
+    'authorization, apikey, content-type, x-client-info',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Max-Age': '86400',
+};
+
 type JsonRecord = Record<string, unknown>;
 
 function response(status: number, body: JsonRecord) {
   return Response.json(body, {
     status,
-    headers: { 'Cache-Control': 'no-store' },
+    headers: { ...corsHeaders, 'Cache-Control': 'no-store' },
   });
 }
 
@@ -60,6 +68,9 @@ async function queueFaceCleanup(
 }
 
 Deno.serve(async (request) => {
+  if (request.method === 'OPTIONS') {
+    return new Response(null, { status: 204, headers: corsHeaders });
+  }
   if (request.method !== 'POST') {
     return response(405, { code: 'method_not_allowed', message: 'POST required' });
   }

@@ -2520,6 +2520,49 @@ void main() {
     expect(accepted, isTrue);
   });
 
+  testWidgets('duplicate selfie offers secure recovery before data deletion', (
+    tester,
+  ) async {
+    DuplicateAccountResolution? resolution;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (context) => FilledButton(
+            onPressed: () async {
+              resolution = await showDuplicateAccountResolutionDialog(context);
+            },
+            child: const material.Text('Show duplicate'),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Show duplicate'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('duplicate_account_dialog')), findsOneWidget);
+    expect(
+      find.text('This person already exists in the system'),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining('uploaded selfie have been removed'),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.byKey(const Key('duplicate_account_recover_delete')));
+    await tester.pumpAndSettle();
+    expect(resolution, DuplicateAccountResolution.recoverAndDelete);
+  });
+
+  testWidgets('account deletion explains immediate selfie erasure', (
+    tester,
+  ) async {
+    await tester.pumpWidget(const MaterialApp(home: DeleteAccountScreen()));
+
+    expect(find.textContaining('private reference selfie'), findsOneWidget);
+    expect(find.text('Delete all my data permanently'), findsOneWidget);
+  });
+
   test('face verification errors keep a safe user-facing message', () {
     const error = FaceVerificationException(
       'face_mismatch',

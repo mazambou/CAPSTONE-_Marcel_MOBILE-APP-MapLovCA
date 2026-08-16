@@ -28,7 +28,7 @@ class _DeleteAccountScreenState extends State<DeleteAccountScreen> {
       _errorText = null;
     });
     try {
-      await AuthService.instance.requestAccountDeletion();
+      await AuthService.instance.deleteCurrentAccountImmediately();
       if (!mounted) return;
       Navigator.pushNamedAndRemoveUntil(context, AppRoutes.login, (_) => false);
     } catch (error) {
@@ -53,7 +53,7 @@ class _DeleteAccountScreenState extends State<DeleteAccountScreen> {
       ),
       const SizedBox(height: 10),
       const Text(
-        'Your profile will immediately become unavailable. Your data will then follow the legal retention and deletion process.',
+        'Your authentication account, profile, stored files, private reference selfie and biometric index will be permanently erased. You can then create a new account.',
         textAlign: TextAlign.center,
         style: TextStyle(color: AppColors.grayText),
       ),
@@ -75,7 +75,7 @@ class _DeleteAccountScreenState extends State<DeleteAccountScreen> {
         style: FilledButton.styleFrom(backgroundColor: AppColors.error),
         onPressed: _isLoading ? null : _deleteAccount,
         child: Text(
-          _isLoading ? 'Deleting account...' : 'Permanently delete my account',
+          _isLoading ? 'Deleting account...' : 'Delete all my data permanently',
         ),
       ),
       TextButton(

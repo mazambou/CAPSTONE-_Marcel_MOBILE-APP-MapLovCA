@@ -269,7 +269,7 @@ Deno.serve(async (request) => {
     return await processDue(admin);
   }
 
-  if (payload.action !== 'delete') {
+  if (payload.action !== 'delete' && payload.action !== 'delete_self') {
     return response(400, {
       code: 'invalid_action',
       message: 'Unsupported action',
@@ -293,6 +293,39 @@ Deno.serve(async (request) => {
       code: 'invalid_session',
       message: 'Invalid session',
     });
+  }
+
+  if (payload.action === 'delete_self') {
+    if (payload.confirmation !== 'DELETE') {
+      return response(400, {
+        code: 'confirmation_required',
+        message: 'Type DELETE exactly to confirm permanent deletion',
+      });
+    }
+    const { data: currentProfile } = await admin
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .maybeSingle();
+    if (currentProfile?.role === 'admin' || currentProfile?.role === 'moderator') {
+      return response(409, {
+        code: 'privileged_account',
+        message: 'A privileged account cannot be deleted here',
+      });
+    }
+    try {
+      const removedFiles = await eraseAccount(admin, user.id, null, 'self');
+      return response(200, { deleted: true, removedFiles });
+    } catch (error) {
+      console.error('Immediate self-deletion failed', {
+        userId: user.id,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return response(503, {
+        code: 'self_deletion_failed',
+        message: 'Permanent deletion could not be completed. Try again.',
+      });
+    }
   }
 
   const { data: administrator } = await admin

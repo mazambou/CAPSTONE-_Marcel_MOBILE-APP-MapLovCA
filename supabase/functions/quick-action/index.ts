@@ -113,9 +113,11 @@ Deno.serve(async (req) => {
         403,
       );
     }
-    const accountPhone = String(
-      user.phone ?? user.user_metadata?.phone_number ?? "",
+    const authPhone = String(user.phone ?? "").trim();
+    const metadataPhone = String(
+      user.user_metadata?.phone_number ?? "",
     ).trim();
+    const accountPhone = authPhone || metadataPhone;
     if (!accountPhone || accountPhone !== phone) {
       return jsonResponse({ error: "Phone number does not match account" }, 403);
     }

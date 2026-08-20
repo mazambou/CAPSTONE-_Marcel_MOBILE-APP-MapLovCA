@@ -1468,11 +1468,23 @@ class MapLovRepository {
             contentType: _faceImageContentType(extension),
           ),
         );
-    await _invokeFaceVerification(
-      action: 'enroll',
-      storagePath: path,
-      consentVersion: 'face-verification-v3-global-dedup',
-    );
+    try {
+      await _invokeFaceVerification(
+        action: 'enroll',
+        storagePath: path,
+        consentVersion: 'face-verification-v3-global-dedup',
+      );
+    } catch (_) {
+      // A browser can fail before the Edge Function receives the request
+      // (for example during CORS preflight). Remove the sensitive upload from
+      // the client as a best-effort fallback; server cleanup remains active.
+      try {
+        await _client!.storage.from('identity-selfies').remove([path]);
+      } catch (_) {
+        // The server may already have removed the object.
+      }
+      rethrow;
+    }
   }
 
   String _faceImageContentType(String extension) =>

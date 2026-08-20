@@ -119,16 +119,23 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
         if (savedResidenceRegion.isNotEmpty) {
           await _loadCities(savedResidenceCountry, savedResidenceRegion);
         }
-        var savedOriginCountry =
-            profile['origin_country_name'] as String? ?? 'Canada';
+        final storedOriginCountry = (profile['origin_country_name'] as String?)
+            ?.trim();
+        final originWasPreviouslySaved =
+            storedOriginCountry?.isNotEmpty == true;
+        var savedOriginCountry = originWasPreviouslySaved
+            ? storedOriginCountry!
+            : 'Canada';
         if (!_worldCountries.contains(savedOriginCountry)) {
           savedOriginCountry = savedResidenceCountry;
         }
         await _loadRegions(savedOriginCountry);
         final savedOriginCity = profile['origin_city'] as String?;
-        final savedOriginRegion =
-            profile['origin_region'] as String? ??
-            _firstRegionForCountry(savedOriginCountry);
+        final storedOriginRegion = (profile['origin_region'] as String?)
+            ?.trim();
+        final savedOriginRegion = storedOriginRegion?.isNotEmpty == true
+            ? storedOriginRegion!
+            : _firstRegionForCountry(savedOriginCountry);
         if (savedOriginRegion.isNotEmpty) {
           await _loadCities(savedOriginCountry, savedOriginRegion);
         }
@@ -159,9 +166,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
             residenceCityOther,
           );
           originCountry = savedOriginCountry;
-          originCountryLocked =
-              (profile['origin_country_name'] as String?)?.trim().isNotEmpty ==
-              true;
+          originCountryLocked = originWasPreviouslySaved;
           if (savedOriginRegion.trim().isNotEmpty) {
             final regions = _regionsByCountry[savedOriginCountry] ?? const [];
             if (regions.contains(savedOriginRegion)) {
@@ -170,7 +175,9 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
               originRegion = 'Other region';
               originRegionOther.text = savedOriginRegion;
             }
-            originRegionLocked = true;
+            originRegionLocked =
+                originWasPreviouslySaved &&
+                storedOriginRegion?.isNotEmpty == true;
           } else {
             originRegion = _firstRegionForCountry(savedOriginCountry);
           }
@@ -181,7 +188,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
               savedOriginCity,
               originCityOther,
             );
-            originCityLocked = true;
+            originCityLocked = originWasPreviouslySaved;
           }
         });
       }
@@ -278,6 +285,8 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       originCity = '';
       originRegionOther.clear();
       originCityOther.clear();
+      originRegionLocked = false;
+      originCityLocked = false;
       loadingOriginRegions = true;
       loadingOriginCities = false;
       originRegionError = null;

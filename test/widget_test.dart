@@ -655,6 +655,26 @@ void main() {
       ),
     );
     expect(residenceRegion.onChanged, isNotNull);
+    final originRegion = tester.widget<DropdownButton<String>>(
+      find.descendant(
+        of: find.byKey(
+          const ValueKey<String>('Country of origin_region_Canada'),
+          skipOffstage: false,
+        ),
+        matching: find.byType(DropdownButton<String>),
+      ),
+    );
+    expect(originRegion.onChanged, isNotNull);
+    final originCity = tester.widget<DropdownButton<String>>(
+      find.descendant(
+        of: find.byKey(
+          const ValueKey<String>('City of origin_Canada_Toronto'),
+          skipOffstage: false,
+        ),
+        matching: find.byType(DropdownButton<String>),
+      ),
+    );
+    expect(originCity.onChanged, isNotNull);
   });
 
   testWidgets('registration defers origin choices to profile setup', (

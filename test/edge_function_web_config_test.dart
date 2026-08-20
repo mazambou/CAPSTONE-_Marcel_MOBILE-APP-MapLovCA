@@ -33,6 +33,10 @@ void main() {
       expect(source, contains('req.method === "OPTIONS"'));
       expect(source, contains('"Access-Control-Allow-Origin": "*"'));
       expect(source, contains('AFRICAN_COUNTRY_CODES.has(countryCode)'));
+      expect(
+        source,
+        contains('const accountPhone = authPhone || metadataPhone'),
+      );
       expect(source, contains('accountPhone !== phone'));
       expect(config, contains('[functions.$slug]\nverify_jwt = true'));
     }

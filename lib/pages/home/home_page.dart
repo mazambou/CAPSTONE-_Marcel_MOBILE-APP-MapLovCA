@@ -303,6 +303,24 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
   }
 
+  Future<void> _resetDiscoveryFilters() async {
+    final resetFilters = _filters.resetOptionalCriteria();
+    try {
+      await MapLovRepository.instance.savePreferences(resetFilters);
+      if (!mounted) return;
+      setState(() => _filters = resetFilters);
+      await _loadProfiles(
+        refreshNearbyLocation: selectedTab == 'Nearby',
+        forceRefresh: true,
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Unable to reset filters: $error')),
+      );
+    }
+  }
+
   Future<void> _setMainDiscoveryFilter(String mode) async {
     if (mode == 'vip') {
       final allowed = await _requireSubscriptionFeature(
@@ -547,7 +565,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                                 children: [
                                   SizedBox(
                                     height: constraints.maxHeight,
-                                    child: const _EmptyDiscoverState(),
+                                    child: _EmptyDiscoverState(
+                                      hasActiveFilters:
+                                          _filters.hasOptionalCriteria,
+                                      onResetFilters: () =>
+                                          unawaited(_resetDiscoveryFilters()),
+                                    ),
                                   ),
                                 ],
                               ),
@@ -1186,9 +1209,7 @@ class _DiscoverGridCard extends StatelessWidget {
                         backgroundColor: Color(0xFFFFE89A),
                       ),
                     ),
-                  if (profile.isArrivingSoon &&
-                      (profile.isNew || profile.isOnline))
-                    const SizedBox(width: 5),
+                  if (profile.isArrivingSoon) const SizedBox(width: 5),
                   if (profile.isNew)
                     const Flexible(
                       child: _GridStatusBadge(
@@ -1197,18 +1218,19 @@ class _DiscoverGridCard extends StatelessWidget {
                         backgroundColor: Colors.white,
                       ),
                     ),
-                  if (profile.isNew && profile.isOnline)
-                    const SizedBox(width: 5),
+                  if (profile.isNew) const SizedBox(width: 5),
                   if (!profile.isNew && !profile.isArrivingSoon) const Spacer(),
                   if (profile.isArrivingSoon) const Spacer(),
-                  if (profile.isOnline)
-                    const Flexible(
-                      child: _GridStatusBadge(
-                        label: '● Online',
-                        foregroundColor: Color(0xFF37E19A),
-                        backgroundColor: Color(0xA6000000),
-                      ),
+                  Flexible(
+                    child: _GridStatusBadge(
+                      statusKey: Key('profile_status_${profile.id}'),
+                      label: profile.isOnline ? '● Online' : '● Offline',
+                      foregroundColor: profile.isOnline
+                          ? const Color(0xFF37E19A)
+                          : const Color(0xFF9E9E9E),
+                      backgroundColor: const Color(0xA6000000),
                     ),
+                  ),
                 ],
               ),
             ),
@@ -1310,11 +1332,13 @@ class _DiscoverGridCard extends StatelessWidget {
 
 class _GridStatusBadge extends StatelessWidget {
   const _GridStatusBadge({
+    this.statusKey,
     required this.label,
     required this.foregroundColor,
     required this.backgroundColor,
   });
 
+  final Key? statusKey;
   final String label;
   final Color foregroundColor;
   final Color backgroundColor;
@@ -1328,6 +1352,7 @@ class _GridStatusBadge extends StatelessWidget {
         borderRadius: BorderRadius.circular(999),
       ),
       child: Text(
+        key: statusKey,
         label,
         style: TextStyle(
           color: foregroundColor,
@@ -1340,27 +1365,44 @@ class _GridStatusBadge extends StatelessWidget {
 }
 
 class _EmptyDiscoverState extends StatelessWidget {
-  const _EmptyDiscoverState();
+  const _EmptyDiscoverState({
+    required this.hasActiveFilters,
+    required this.onResetFilters,
+  });
+
+  final bool hasActiveFilters;
+  final VoidCallback onResetFilters;
 
   @override
   Widget build(BuildContext context) {
-    return const Center(
+    return Center(
       child: Padding(
-        padding: EdgeInsets.all(30),
+        padding: const EdgeInsets.all(30),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.search_off, size: 64, color: AppColors.softPink),
-            SizedBox(height: 12),
-            Text(
+            const Icon(Icons.search_off, size: 64, color: AppColors.softPink),
+            const SizedBox(height: 12),
+            const Text(
               'No profiles found',
               style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
             ),
             Text(
-              'Try another tab or adjust your filters.',
+              hasActiveFilters
+                  ? 'Your saved filters also apply to Nearby.'
+                  : 'Try another tab or adjust your filters.',
               textAlign: TextAlign.center,
-              style: TextStyle(color: AppColors.grayText),
+              style: const TextStyle(color: AppColors.grayText),
             ),
+            if (hasActiveFilters) ...[
+              const SizedBox(height: 16),
+              FilledButton.icon(
+                key: const Key('reset_empty_discover_filters'),
+                onPressed: onResetFilters,
+                icon: const Icon(Icons.filter_alt_off_outlined),
+                label: const Text('Reset filters'),
+              ),
+            ],
           ],
         ),
       ),

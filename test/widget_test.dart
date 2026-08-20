@@ -4,6 +4,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:maplove/app.dart';
+import 'package:maplove/app.dart' as app show Text;
 import 'package:maplove/config/supabase_config.dart';
 import 'package:maplove/routes/app_routes.dart';
 import 'package:maplove/services/auth_service.dart';
@@ -1646,6 +1647,41 @@ void main() {
     );
   });
 
+  test(
+    'resetting Discover filters keeps gender and clears optional criteria',
+    () {
+      const filters = DiscoveryFilters(
+        genders: ['Woman'],
+        minimumAge: 30,
+        maximumAge: 45,
+        distanceKm: 10,
+        originCountries: ['Cameroon'],
+        originRegions: ['West'],
+        originCities: ['Dschang'],
+        requiredGenders: true,
+        requiredLocation: true,
+        requiredRelationshipGoal: true,
+        relationshipGoals: ['Long-term relationship'],
+        vipOnly: true,
+      );
+
+      expect(filters.hasOptionalCriteria, isTrue);
+
+      final reset = filters.resetOptionalCriteria();
+
+      expect(reset.genders, ['Woman']);
+      expect(reset.requiredGenders, isTrue);
+      expect(reset.requiredLocation, isTrue);
+      expect(reset.originCountries, isEmpty);
+      expect(reset.originRegions, isEmpty);
+      expect(reset.originCities, isEmpty);
+      expect(reset.relationshipGoals, isEmpty);
+      expect(reset.requiredRelationshipGoal, isFalse);
+      expect(reset.vipOnly, isFalse);
+      expect(reset.hasOptionalCriteria, isFalse);
+    },
+  );
+
   testWidgets(
     'social photo display supports likes and comments without share',
     (tester) async {
@@ -2341,6 +2377,32 @@ void main() {
     expect(tester.takeException(), isNull);
 
     await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('Discover uses green and gray online status indicators', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(const MaterialApp(home: HomeScreen()));
+    await tester.pumpAndSettle();
+
+    final online = tester.widget<app.Text>(
+      find.byKey(
+        const Key('profile_status_00000000-0000-4000-8000-000000000001'),
+      ),
+    );
+    final offline = tester.widget<app.Text>(
+      find.byKey(
+        const Key('profile_status_00000000-0000-4000-8000-000000000002'),
+      ),
+    );
+
+    expect(online.style?.color, const Color(0xFF37E19A));
+    expect(offline.style?.color, const Color(0xFF9E9E9E));
   });
 
   testWidgets('incoming like must be opened before liking back', (

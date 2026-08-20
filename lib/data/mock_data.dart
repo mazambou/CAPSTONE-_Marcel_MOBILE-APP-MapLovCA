@@ -49,6 +49,7 @@ const mockProfiles = [
     photoCommentCounts: [2],
     profession: 'Graphic Designer',
     distanceKm: 5,
+    isOnline: false,
   ),
   UserProfile(
     id: '00000000-0000-4000-8000-000000000003',

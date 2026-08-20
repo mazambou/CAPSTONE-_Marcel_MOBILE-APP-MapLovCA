@@ -497,6 +497,7 @@ class MapLovLocalizations {
     'NEW': 'NOUVEAU',
     'New ✨': 'Nouveau ✨',
     '● Online': '● En ligne',
+    '● Offline': '● Hors ligne',
     'Activity status': 'Statut d’activité',
     'Automatic': 'Automatique',
     'Updated automatically when you use MapLov':

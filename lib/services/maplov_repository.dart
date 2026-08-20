@@ -126,6 +126,51 @@ class DiscoveryFilters {
   final bool vipOnly;
   final bool mostLikedFirst;
 
+  bool get hasOptionalCriteria =>
+      minimumAge != 18 ||
+      maximumAge != 80 ||
+      distanceKm != 50 ||
+      locationMode != 'near_me' ||
+      countries.isNotEmpty ||
+      regions.isNotEmpty ||
+      cities.isNotEmpty ||
+      countryIds.isNotEmpty ||
+      regionIds.isNotEmpty ||
+      cityIds.isNotEmpty ||
+      originCountries.isNotEmpty ||
+      originRegions.isNotEmpty ||
+      originCities.isNotEmpty ||
+      originCountryIds.isNotEmpty ||
+      originRegionIds.isNotEmpty ||
+      originCityIds.isNotEmpty ||
+      (requiredLanguages && languages.isNotEmpty) ||
+      (requiredRelationshipGoal && relationshipGoals.isNotEmpty) ||
+      verifiedOnly ||
+      activeTodayOnly ||
+      interestSlugs.isNotEmpty ||
+      religions.isNotEmpty ||
+      bodyTypes.isNotEmpty ||
+      eyeColors.isNotEmpty ||
+      hairColors.isNotEmpty ||
+      minimumHeightCm != null ||
+      maximumHeightCm != null ||
+      childrenPreferences.isNotEmpty ||
+      relationshipStatuses.isNotEmpty ||
+      educationLevels.isNotEmpty ||
+      beardStyles.isNotEmpty ||
+      smokingStatuses.isNotEmpty ||
+      professionCategories.isNotEmpty ||
+      incomeLevels.isNotEmpty ||
+      photoVerifiedOnly ||
+      premiumOnly ||
+      vipOnly;
+
+  DiscoveryFilters resetOptionalCriteria() => DiscoveryFilters(
+    genders: genders.take(1).toList(growable: false),
+    requiredGenders: genders.isNotEmpty,
+    requiredLocation: true,
+  );
+
   Map<String, Object?> toDatabase() => {
     'minimum_age': minimumAge,
     'maximum_age': maximumAge,

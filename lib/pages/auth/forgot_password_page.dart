@@ -9,6 +9,7 @@ class ForgotPasswordScreen extends StatefulWidget {
 
 class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   final _emailController = TextEditingController();
+  final _codeController = TextEditingController();
   bool _isLoading = false;
   bool _emailSent = false;
   String? _errorText;
@@ -16,6 +17,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   @override
   void dispose() {
     _emailController.dispose();
+    _codeController.dispose();
     super.dispose();
   }
 
@@ -41,6 +43,33 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     }
   }
 
+  Future<void> _verifyCode() async {
+    final code = _codeController.text.trim();
+    if (!RegExp(r'^\d{6}$').hasMatch(code)) {
+      setState(() => _errorText = 'Enter the 6-digit code from your email.');
+      return;
+    }
+    setState(() {
+      _isLoading = true;
+      _errorText = null;
+    });
+    try {
+      await AuthService.instance.verifyPasswordRecoveryCode(
+        email: _emailController.text,
+        code: code,
+      );
+      if (mounted) {
+        Navigator.pushNamed(context, AppRoutes.resetPassword);
+      }
+    } catch (error) {
+      if (mounted) {
+        setState(() => _errorText = AuthService.instance.messageFor(error));
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) => _AppPage(
     title: 'Forgot password',
@@ -57,8 +86,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       const SizedBox(height: 8),
       Text(
         _emailSent
-            ? 'If an account exists for this email, a secure reset link has been sent.'
-            : 'Enter the email connected to your MapLov account. We will send you a secure reset link.',
+            ? 'If an account exists for this email, enter the 6-digit code we sent you.'
+            : 'Enter the email connected to your MapLov account. We will send you a secure recovery code.',
         textAlign: TextAlign.center,
         style: const TextStyle(color: AppColors.grayText),
       ),
@@ -73,15 +102,41 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         enabled: !_isLoading,
         onSubmitted: (_) => _sendResetLink(),
       ),
+      if (_emailSent) ...[
+        const SizedBox(height: 14),
+        TextField(
+          key: const Key('password_recovery_code'),
+          controller: _codeController,
+          keyboardType: TextInputType.number,
+          textInputAction: TextInputAction.done,
+          maxLength: 6,
+          autofillHints: const [AutofillHints.oneTimeCode],
+          enabled: !_isLoading,
+          onSubmitted: (_) => _verifyCode(),
+          decoration: InputDecoration(
+            labelText: context.tr('Recovery code'),
+            prefixIcon: const Icon(Icons.password_outlined),
+          ),
+        ),
+      ],
       if (_errorText != null) ...[
         const SizedBox(height: 10),
         Text(_errorText!, style: const TextStyle(color: AppColors.error)),
       ],
       const SizedBox(height: 20),
       _PrimaryButton(
-        _emailSent ? 'Resend reset link' : 'Send reset link',
-        onPressed: _isLoading ? () {} : _sendResetLink,
+        _emailSent ? 'Verify recovery code' : 'Send recovery code',
+        onPressed: _isLoading
+            ? () {}
+            : _emailSent
+            ? _verifyCode
+            : _sendResetLink,
       ),
+      if (_emailSent)
+        TextButton(
+          onPressed: _isLoading ? null : _sendResetLink,
+          child: const Text('Resend recovery code'),
+        ),
       TextButton(
         onPressed: () => Navigator.pop(context),
         child: const Text('Back to login'),

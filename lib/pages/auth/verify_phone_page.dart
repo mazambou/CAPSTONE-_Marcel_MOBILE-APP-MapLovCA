@@ -9,9 +9,10 @@ class VerifyPhoneScreen extends StatefulWidget {
 
 class _VerifyPhoneScreenState extends State<VerifyPhoneScreen> {
   final _codeController = TextEditingController();
+  final _phoneController = TextEditingController();
   bool _sending = true;
   bool _verifying = false;
-  bool _deferring = false;
+  bool _savingPhone = false;
   bool _codeSent = false;
   String? _message;
   bool _messageIsError = false;
@@ -30,9 +31,13 @@ class _VerifyPhoneScreenState extends State<VerifyPhoneScreen> {
       _phone = phone;
       _sending = false;
       if (phone == null || phone.isEmpty) {
-        _message =
-            'The phone number could not be recovered. Return to the previous steps or continue for now.';
-        _messageIsError = true;
+        _message = AuthService.instance.isPhoneVerificationExempt
+            ? 'A phone number is required. No SMS verification is required in your country.'
+            : 'Enter your phone number in international format to continue.';
+        _messageIsError = !AuthService.instance.isPhoneVerificationExempt;
+      } else if (AuthService.instance.isPhoneVerificationExempt) {
+        _message = 'No SMS verification is required in your country.';
+        _messageIsError = false;
       }
     });
   }
@@ -40,7 +45,41 @@ class _VerifyPhoneScreenState extends State<VerifyPhoneScreen> {
   @override
   void dispose() {
     _codeController.dispose();
+    _phoneController.dispose();
     super.dispose();
+  }
+
+  Future<void> _savePhoneAndSend() async {
+    setState(() {
+      _savingPhone = true;
+      _message = null;
+    });
+    try {
+      await AuthService.instance.setPhoneNumberForVerification(
+        _phoneController.text,
+      );
+      final phone = await AuthService.instance.phoneNumberForVerification();
+      if (!mounted) return;
+      setState(() => _phone = phone);
+      if (AuthService.instance.isPhoneVerificationExempt) {
+        Navigator.pushNamedAndRemoveUntil(
+          context,
+          AppRoutes.home,
+          (_) => false,
+        );
+        return;
+      }
+      await _sendCode();
+    } catch (error) {
+      if (mounted) {
+        setState(() {
+          _message = AuthService.instance.messageFor(error);
+          _messageIsError = true;
+        });
+      }
+    } finally {
+      if (mounted) setState(() => _savingPhone = false);
+    }
   }
 
   Future<void> _sendCode({bool resend = false}) async {
@@ -52,7 +91,7 @@ class _VerifyPhoneScreenState extends State<VerifyPhoneScreen> {
       setState(() {
         _sending = false;
         _message =
-            'The phone number could not be recovered. Return to the previous steps or continue for now.';
+            'Enter your phone number in international format to continue.';
         _messageIsError = true;
       });
       return;
@@ -91,35 +130,9 @@ class _VerifyPhoneScreenState extends State<VerifyPhoneScreen> {
     }
   }
 
-  Future<void> _continueWithoutVerification() async {
-    setState(() {
-      _deferring = true;
-      _message = null;
-    });
-    try {
-      await AuthService.instance.deferPhoneVerification();
-      if (mounted) {
-        Navigator.pushNamedAndRemoveUntil(
-          context,
-          AppRoutes.home,
-          (_) => false,
-        );
-      }
-    } catch (error) {
-      if (mounted) {
-        setState(() {
-          _message = AuthService.instance.messageFor(error);
-          _messageIsError = true;
-        });
-      }
-    } finally {
-      if (mounted) setState(() => _deferring = false);
-    }
-  }
-
   Future<void> _verify() async {
     final code = _codeController.text.trim();
-    if (!RegExp(r'^\d{6,8}$').hasMatch(code)) {
+    if (!RegExp(r'^\d{6}$').hasMatch(code)) {
       setState(() {
         _message = 'Enter the verification code sent by SMS.';
         _messageIsError = true;
@@ -154,8 +167,9 @@ class _VerifyPhoneScreenState extends State<VerifyPhoneScreen> {
   @override
   Widget build(BuildContext context) {
     final phone = _phone ?? 'Phone number unavailable';
+    final skipsSms = AuthService.instance.isPhoneVerificationExempt;
     return _AppPage(
-      title: 'Verify your phone number',
+      title: skipsSms ? 'Add your phone number' : 'Verify your phone number',
       children: [
         const Icon(Icons.sms_outlined, size: 88, color: AppColors.coral),
         const SizedBox(height: 20),
@@ -185,24 +199,58 @@ class _VerifyPhoneScreenState extends State<VerifyPhoneScreen> {
         ),
         const SizedBox(height: 10),
         const Text(
-          'Phone verification protects accounts and helps keep MapLov authentic.',
+          'A phone number is required for every MapLov account.',
           textAlign: TextAlign.center,
           style: TextStyle(color: AppColors.grayText),
         ),
-        const SizedBox(height: 24),
-        TextField(
-          key: const Key('phone_verification_code'),
-          controller: _codeController,
-          keyboardType: TextInputType.number,
-          textInputAction: TextInputAction.done,
-          maxLength: 8,
-          autofillHints: const [AutofillHints.oneTimeCode],
-          onSubmitted: (_) => _verify(),
-          decoration: InputDecoration(
-            labelText: context.tr('Verification code'),
-            prefixIcon: const Icon(Icons.password_outlined),
+        if (skipsSms) ...[
+          const SizedBox(height: 8),
+          const Text(
+            'SMS verification is not required in your country. Your selfie remains the identity verification method.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: AppColors.grayText),
           ),
-        ),
+        ],
+        const SizedBox(height: 24),
+        if (_phone == null || _phone!.isEmpty) ...[
+          TextField(
+            key: const Key('phone_number_for_verification'),
+            controller: _phoneController,
+            keyboardType: TextInputType.phone,
+            textInputAction: TextInputAction.done,
+            autofillHints: const [AutofillHints.telephoneNumber],
+            onSubmitted: (_) => _savePhoneAndSend(),
+            decoration: InputDecoration(
+              labelText: context.tr('Phone number (+country code)'),
+              prefixIcon: const Icon(Icons.phone_outlined),
+            ),
+          ),
+          const SizedBox(height: 12),
+          _PrimaryButton(
+            _savingPhone
+                ? 'Saving…'
+                : skipsSms
+                ? 'Save phone number'
+                : 'Save number and send code',
+            onPressed: _savingPhone ? () {} : _savePhoneAndSend,
+          ),
+          const SizedBox(height: 12),
+        ],
+        if (!skipsSms) ...[
+          TextField(
+            key: const Key('phone_verification_code'),
+            controller: _codeController,
+            keyboardType: TextInputType.number,
+            textInputAction: TextInputAction.done,
+            maxLength: 6,
+            autofillHints: const [AutofillHints.oneTimeCode],
+            onSubmitted: (_) => _verify(),
+            decoration: InputDecoration(
+              labelText: context.tr('Verification code'),
+              prefixIcon: const Icon(Icons.password_outlined),
+            ),
+          ),
+        ],
         if (_message != null) ...[
           const SizedBox(height: 8),
           Text(
@@ -214,44 +262,31 @@ class _VerifyPhoneScreenState extends State<VerifyPhoneScreen> {
           ),
         ],
         const SizedBox(height: 18),
-        _PrimaryButton(
-          _verifying ? 'Verifying…' : 'Verify phone number',
-          onPressed: _verifying ? () {} : _verify,
-        ),
-        TextButton(
-          onPressed: _sending || _verifying || _deferring
-              ? null
-              : () => _sendCode(resend: _codeSent),
-          child: Text(
-            _sending
-                ? 'Sending…'
-                : _codeSent
-                ? 'Resend code'
-                : 'Send verification code',
+        if (!skipsSms) ...[
+          _PrimaryButton(
+            _verifying ? 'Verifying…' : 'Verify phone number',
+            onPressed: _verifying ? () {} : _verify,
           ),
-        ),
+          TextButton(
+            onPressed: _sending || _verifying || _savingPhone
+                ? null
+                : () => _sendCode(resend: _codeSent),
+            child: Text(
+              _sending
+                  ? 'Sending…'
+                  : _codeSent
+                  ? 'Resend code'
+                  : 'Send verification code',
+            ),
+          ),
+        ],
         TextButton.icon(
           key: const Key('phone_back_to_preferences'),
-          onPressed: _sending || _verifying || _deferring
+          onPressed: _sending || _verifying || _savingPhone
               ? null
               : _backToPreferences,
           icon: const Icon(Icons.arrow_back),
           label: const Text('Back to dating preferences'),
-        ),
-        const SizedBox(height: 12),
-        const Divider(),
-        const SizedBox(height: 8),
-        const Text(
-          'You can verify your phone number later. It will not block account creation for now.',
-          textAlign: TextAlign.center,
-          style: TextStyle(color: AppColors.grayText, fontSize: 12),
-        ),
-        TextButton(
-          key: const Key('defer_phone_verification'),
-          onPressed: _verifying || _deferring
-              ? null
-              : _continueWithoutVerification,
-          child: Text(_deferring ? 'Continuing…' : 'Continue for now'),
         ),
       ],
     );

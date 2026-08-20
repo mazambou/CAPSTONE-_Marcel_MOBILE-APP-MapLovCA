@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:js_interop';
 
 import 'package:image_picker/image_picker.dart';
@@ -13,7 +14,18 @@ const _maximumDimension = 1600;
 /// the original HEIC bytes. MapLov accepts JPEG/PNG only, so reference selfies
 /// are explicitly rendered to a bounded JPEG on Web before upload.
 Future<PreparedReferenceSelfie> prepareReferenceSelfie(XFile selfie) async {
-  final image = web.HTMLImageElement()..src = selfie.path;
+  final sourceBytes = await selfie.readAsBytes();
+  if (sourceBytes.isEmpty) {
+    throw const FormatException('The captured selfie is empty.');
+  }
+  final mimeType = selfie.mimeType?.trim().isNotEmpty == true
+      ? selfie.mimeType!
+      : 'application/octet-stream';
+  // iOS Safari may revoke or make the image-picker blob URL unreadable before
+  // an asynchronous HTMLImageElement load. A data URL owns its bytes for the
+  // complete decode/resize operation and works for Safari camera HEIC input.
+  final sourceUrl = 'data:$mimeType;base64,${base64Encode(sourceBytes)}';
+  final image = web.HTMLImageElement()..src = sourceUrl;
   await image.onLoad.first.timeout(const Duration(seconds: 20));
 
   final sourceWidth = image.naturalWidth;

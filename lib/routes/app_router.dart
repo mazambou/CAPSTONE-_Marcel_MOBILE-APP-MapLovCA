@@ -3,8 +3,13 @@ part of '../app.dart';
 class AppRouter {
   const AppRouter._();
 
-  static Widget _protected(Widget child) =>
-      _AuthenticatedRouteGuard(child: child);
+  static Widget _protected(
+    Widget child, {
+    bool allowPendingPhoneVerification = false,
+  }) => _AuthenticatedRouteGuard(
+    allowPendingPhoneVerification: allowPendingPhoneVerification,
+    child: child,
+  );
 
   static final Map<String, WidgetBuilder> routes = {
     AppRoutes.splash: (_) => const SplashScreen(),
@@ -39,10 +44,16 @@ class AppRouter {
     AppRoutes.reportUser: (_) => _protected(const HomeScreen()),
     AppRoutes.blockUser: (_) => _protected(const HomeScreen()),
     AppRoutes.profile: (_) => _protected(const ProfileScreen()),
-    AppRoutes.profileSetup: (_) => _protected(const ProfileSetupScreen()),
+    AppRoutes.profileSetup: (_) => _protected(
+      const ProfileSetupScreen(),
+      allowPendingPhoneVerification: true,
+    ),
     AppRoutes.editProfile: (_) => _protected(const EditProfileScreen()),
     AppRoutes.managePhotos: (_) => _protected(const ManagePhotosScreen()),
-    AppRoutes.preferences: (_) => _protected(const PreferencesScreen()),
+    AppRoutes.preferences: (_) => _protected(
+      const PreferencesScreen(),
+      allowPendingPhoneVerification: true,
+    ),
     AppRoutes.publicProfile: (_) => _protected(const HomeScreen()),
     AppRoutes.compatibilityDetails: (_) => _protected(const MatchScreen()),
     AppRoutes.settings: (_) => _protected(const SettingsScreen()),
@@ -111,15 +122,64 @@ class AppRouter {
   }
 }
 
-class _AuthenticatedRouteGuard extends StatelessWidget {
-  const _AuthenticatedRouteGuard({required this.child});
+class _AuthenticatedRouteGuard extends StatefulWidget {
+  const _AuthenticatedRouteGuard({
+    required this.child,
+    this.allowPendingPhoneVerification = false,
+  });
   final Widget child;
+  final bool allowPendingPhoneVerification;
+
+  @override
+  State<_AuthenticatedRouteGuard> createState() =>
+      _AuthenticatedRouteGuardState();
+}
+
+class _AuthenticatedRouteGuardState extends State<_AuthenticatedRouteGuard> {
+  Future<bool>? _phoneRequirement;
+
+  @override
+  void initState() {
+    super.initState();
+    if (!widget.allowPendingPhoneVerification &&
+        AuthService.instance.hasActiveSession) {
+      _phoneRequirement = AuthService.instance
+          .requiresPhoneVerificationForCurrentUser();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     if (AuthService.instance.hasActiveSession ||
         (!AuthService.instance.isConfigured && AppConfig.allowDemoData)) {
-      return child;
+      if (widget.allowPendingPhoneVerification ||
+          !AuthService.instance.isConfigured) {
+        return widget.child;
+      }
+      return FutureBuilder<bool>(
+        future: _phoneRequirement,
+        builder: (context, snapshot) {
+          if (!snapshot.hasData) {
+            return const Scaffold(
+              body: Center(child: CircularProgressIndicator()),
+            );
+          }
+          if (snapshot.data == true) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (!context.mounted) return;
+              Navigator.pushNamedAndRemoveUntil(
+                context,
+                AppRoutes.verifyPhone,
+                (_) => false,
+              );
+            });
+            return const Scaffold(
+              body: Center(child: CircularProgressIndicator()),
+            );
+          }
+          return widget.child;
+        },
+      );
     }
     if (!AuthService.instance.isConfigured) {
       return const Scaffold(

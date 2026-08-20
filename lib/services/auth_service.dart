@@ -44,8 +44,79 @@ class AuthService {
   static const _pendingPhoneCountryKey = 'maplov_pending_phone_country';
   static const _pendingPhoneCallingCodeKey = 'maplov_pending_calling_code';
 
+  static const _africanCountryCodes = <String>{
+    'DZ',
+    'AO',
+    'BJ',
+    'BW',
+    'BF',
+    'BI',
+    'CV',
+    'CM',
+    'CF',
+    'TD',
+    'KM',
+    'CG',
+    'CD',
+    'CI',
+    'DJ',
+    'EG',
+    'GQ',
+    'ER',
+    'SZ',
+    'ET',
+    'GA',
+    'GM',
+    'GH',
+    'GN',
+    'GW',
+    'KE',
+    'LS',
+    'LR',
+    'LY',
+    'MG',
+    'MW',
+    'ML',
+    'MR',
+    'MU',
+    'MA',
+    'MZ',
+    'NA',
+    'NE',
+    'NG',
+    'RW',
+    'ST',
+    'SN',
+    'SC',
+    'SL',
+    'SO',
+    'ZA',
+    'SS',
+    'SD',
+    'TZ',
+    'TG',
+    'TN',
+    'UG',
+    'ZM',
+    'ZW',
+    'EH',
+  };
+
+  static bool isAfricanResidenceCountry(String? countryCode) =>
+      countryCode != null &&
+      _africanCountryCodes.contains(countryCode.trim().toUpperCase());
+
+  static bool phoneRequirementIsSatisfied({
+    required String? phone,
+    required bool phoneVerified,
+    required bool verificationExempt,
+  }) =>
+      phone?.trim().isNotEmpty == true && (phoneVerified || verificationExempt);
+
   String? _pendingPhoneCache;
   String? _pendingPhoneEmailCache;
+  String? _residenceCountryCodeCache;
+  String? _residenceCountryUserIdCache;
   MapLovAuthIntent? _pendingAuthIntent;
 
   SupabaseClient? get _client => SupabaseConfig.client;
@@ -64,9 +135,22 @@ class AuthService {
       !isConfigured || _client?.auth.currentUser?.emailConfirmedAt != null;
   bool get isPhoneVerified =>
       !isConfigured || _client?.auth.currentUser?.phoneConfirmedAt != null;
-  bool get isPhoneVerificationDeferred =>
-      _client?.auth.currentUser?.userMetadata?['phone_verification_deferred'] ==
-      true;
+  String? get residenceCountryCode {
+    final currentUserId = _client?.auth.currentUser?.id;
+    if (_residenceCountryUserIdCache == currentUserId &&
+        _residenceCountryCodeCache?.isNotEmpty == true) {
+      return _residenceCountryCodeCache;
+    }
+    final metadataCode =
+        _client?.auth.currentUser?.userMetadata?['country_code'];
+    if (metadataCode is String && metadataCode.trim().isNotEmpty) {
+      return metadataCode.trim().toUpperCase();
+    }
+    return _residenceCountryCodeCache;
+  }
+
+  bool get isPhoneVerificationExempt =>
+      isAfricanResidenceCountry(residenceCountryCode);
   String? get pendingPhoneNumber {
     final user = _client?.auth.currentUser;
     final authPhone = user?.phone ?? user?.userMetadata?['phone_number'];
@@ -79,11 +163,16 @@ class AuthService {
     return null;
   }
 
+  bool get isPhoneRequirementSatisfied => phoneRequirementIsSatisfied(
+    phone: pendingPhoneNumber,
+    phoneVerified: isPhoneVerified,
+    verificationExempt: isPhoneVerificationExempt,
+  );
+
   bool get requiresPhoneVerification =>
       isConfigured &&
-      pendingPhoneNumber?.isNotEmpty == true &&
-      !isPhoneVerified &&
-      !isPhoneVerificationDeferred;
+      _client?.auth.currentUser != null &&
+      !isPhoneRequirementSatisfied;
   bool get requiresPreferencesCompletion =>
       isConfigured &&
       _client?.auth.currentUser != null &&
@@ -203,9 +292,14 @@ class AuthService {
     if (client == null || user == null) return;
     final row = await client
         .from('profiles')
-        .select('status')
+        .select('status, country_code')
         .eq('id', user.id)
         .maybeSingle();
+    final countryCode = row?['country_code'];
+    if (countryCode is String && countryCode.trim().isNotEmpty) {
+      _residenceCountryCodeCache = countryCode.trim().toUpperCase();
+      _residenceCountryUserIdCache = user.id;
+    }
     final status = row?['status'] as String? ?? 'active';
     if (status != 'active') {
       await client.auth.signOut(scope: SignOutScope.local);
@@ -371,6 +465,24 @@ class AuthService {
     }
   }
 
+  Future<void> verifyPasswordRecoveryCode({
+    required String email,
+    required String code,
+  }) async {
+    final client = _client;
+    if (client == null) return;
+    final response = await client.auth.verifyOTP(
+      email: email.trim().toLowerCase(),
+      token: code.trim(),
+      type: OtpType.recovery,
+    );
+    if (response.session == null) {
+      throw const AuthException(
+        'Password recovery did not create an authenticated session.',
+      );
+    }
+  }
+
   Future<void> updatePassword(String password) async {
     final client = _client;
     if (client == null) return;
@@ -425,53 +537,94 @@ class AuthService {
     final client = _client;
     final phone = await phoneNumberForVerification();
     if (client == null) return;
+    if (isPhoneVerificationExempt) {
+      throw const AuthException(
+        'Phone verification is not required in your country.',
+      );
+    }
     if (phone == null || phone.isEmpty) {
       throw const AuthException('No phone number is attached to this account.');
     }
     if (isPhoneVerified) return;
-    await client.auth.updateUser(UserAttributes(phone: phone));
+    await client.functions.invoke('bright-processor', body: {'phone': phone});
   }
 
   Future<void> resendPhoneVerification() async {
     final client = _client;
     final phone = await phoneNumberForVerification();
     if (client == null) return;
+    if (isPhoneVerificationExempt) {
+      throw const AuthException(
+        'Phone verification is not required in your country.',
+      );
+    }
     if (phone == null || phone.isEmpty) {
       throw const AuthException('No phone number is attached to this account.');
     }
-    await client.auth.resend(phone: phone, type: OtpType.phoneChange);
+    await client.functions.invoke('bright-processor', body: {'phone': phone});
   }
 
   Future<void> verifyPhone(String code) async {
     final client = _client;
     final phone = await phoneNumberForVerification();
     if (client == null) return;
+    if (isPhoneVerificationExempt) {
+      throw const AuthException(
+        'Phone verification is not required in your country.',
+      );
+    }
     if (phone == null || phone.isEmpty) {
       throw const AuthException('No phone number is attached to this account.');
     }
-    await client.auth.verifyOTP(
-      phone: phone,
-      token: code.trim(),
-      type: OtpType.phoneChange,
+    await client.functions.invoke(
+      'quick-action',
+      body: {'phone': phone, 'code': code.trim()},
     );
     await client.auth.refreshSession();
   }
 
-  Future<void> deferPhoneVerification() async {
+  Future<void> setPhoneNumberForVerification(String phone) async {
     final client = _client;
     final user = client?.auth.currentUser;
-    if (isConfigured && (client == null || user == null)) {
+    final normalized = phone.replaceAll(RegExp(r'[\s().-]'), '');
+    if (!RegExp(r'^\+[1-9]\d{7,14}$').hasMatch(normalized)) {
       throw const AuthException(
-        'Sign in to the account before deferring phone verification.',
+        'Enter the phone number in international format, for example +14165551234.',
       );
     }
-    if (client != null && user != null) {
-      await client.auth.updateUser(
-        UserAttributes(
-          data: {...?user.userMetadata, 'phone_verification_deferred': true},
-        ),
+    if (client == null || user == null) return;
+    await client.auth.updateUser(
+      UserAttributes(data: {...?user.userMetadata, 'phone_number': normalized}),
+    );
+    _pendingPhoneCache = normalized;
+    _pendingPhoneEmailCache = user.email?.trim().toLowerCase();
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.setString(_pendingPhoneKey, normalized);
+    if (_pendingPhoneEmailCache != null) {
+      await preferences.setString(
+        _pendingPhoneEmailKey,
+        _pendingPhoneEmailCache!,
       );
     }
+  }
+
+  Future<bool> requiresPhoneVerificationForCurrentUser() async {
+    final client = _client;
+    final user = client?.auth.currentUser;
+    if (client == null || user == null || isPhoneVerified) return false;
+    if (_residenceCountryUserIdCache != user.id) {
+      final row = await client
+          .from('profiles')
+          .select('country_code')
+          .eq('id', user.id)
+          .maybeSingle();
+      final countryCode = row?['country_code'];
+      _residenceCountryCodeCache = countryCode is String
+          ? countryCode.trim().toUpperCase()
+          : null;
+      _residenceCountryUserIdCache = user.id;
+    }
+    return requiresPhoneVerification;
   }
 
   Future<bool> refreshAndCheckEmailVerification() async {
@@ -485,6 +638,8 @@ class AuthService {
 
   Future<void> signOut({bool allDevices = false}) async {
     await clearPendingAuthIntent();
+    _residenceCountryCodeCache = null;
+    _residenceCountryUserIdCache = null;
     final client = _client;
     if (client != null) {
       try {

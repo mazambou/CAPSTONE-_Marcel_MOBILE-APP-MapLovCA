@@ -409,6 +409,12 @@ deno_version = 2
 [functions.verify-profile-photo]
 verify_jwt = true
 
+[functions.bright-processor]
+verify_jwt = true
+
+[functions.quick-action]
+verify_jwt = true
+
 [functions.verify-store-purchase]
 verify_jwt = true
 

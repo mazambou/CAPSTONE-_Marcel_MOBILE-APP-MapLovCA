@@ -1495,9 +1495,17 @@ class MapLovRepository {
       return Map<String, dynamic>.from(response.data as Map? ?? const {});
     } on FunctionException catch (error) {
       final details = error.details;
-      final body = details is Map
-          ? Map<String, dynamic>.from(details)
-          : const <String, dynamic>{};
+      Map<String, dynamic> body = const {};
+      if (details is Map) {
+        body = Map<String, dynamic>.from(details);
+      } else if (details is String && details.trim().isNotEmpty) {
+        try {
+          final decoded = jsonDecode(details);
+          if (decoded is Map) body = Map<String, dynamic>.from(decoded);
+        } on FormatException {
+          // Keep the stable client error when an intermediary returns text.
+        }
+      }
       throw FaceVerificationException(
         body['code'] as String? ?? 'face_verification_failed',
         body['message'] as String? ??

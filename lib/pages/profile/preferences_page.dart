@@ -344,8 +344,8 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
       }
       await AuthService.instance.markPreferencesCompleted();
       if (!mounted) return;
-      if (AuthService.instance.isConfigured &&
-          AuthService.instance.isPhoneVerified) {
+      if (!AuthService.instance.isConfigured ||
+          AuthService.instance.isPhoneRequirementSatisfied) {
         if (completingRegistration) {
           Navigator.pushNamedAndRemoveUntil(
             context,

@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:maplove/app.dart';
 import 'package:maplove/config/supabase_config.dart';
 import 'package:maplove/routes/app_routes.dart';
+import 'package:maplove/services/auth_service.dart';
 import 'package:maplove/services/external_checkout_service.dart';
 import 'package:maplove/services/locale_service.dart';
 import 'package:maplove/services/location_service.dart';
@@ -88,6 +89,37 @@ void main() {
     expect(
       supportedReferenceSelfieExtension('iphone-capture.HEIC', 'image/heic'),
       isEmpty,
+    );
+  });
+
+  test('phone verification is exempt only for African residences', () {
+    expect(AuthService.isAfricanResidenceCountry('CM'), isTrue);
+    expect(AuthService.isAfricanResidenceCountry('za'), isTrue);
+    expect(AuthService.isAfricanResidenceCountry('CA'), isFalse);
+    expect(AuthService.isAfricanResidenceCountry(null), isFalse);
+    expect(
+      AuthService.phoneRequirementIsSatisfied(
+        phone: null,
+        phoneVerified: false,
+        verificationExempt: true,
+      ),
+      isFalse,
+    );
+    expect(
+      AuthService.phoneRequirementIsSatisfied(
+        phone: '+237612345678',
+        phoneVerified: false,
+        verificationExempt: true,
+      ),
+      isTrue,
+    );
+    expect(
+      AuthService.phoneRequirementIsSatisfied(
+        phone: '+14165551234',
+        phoneVerified: false,
+        verificationExempt: false,
+      ),
+      isFalse,
     );
   });
 
@@ -349,6 +381,35 @@ void main() {
     );
   });
 
+  testWidgets('password recovery accepts the emailed six-digit code', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        routes: {
+          AppRoutes.resetPassword: (_) =>
+              const Scaffold(body: material.Text('Choose a new password')),
+        },
+        home: const ForgotPasswordScreen(),
+      ),
+    );
+
+    await tester.enterText(find.byType(TextField).first, 'jamie@example.com');
+    await tester.tap(find.text('Send recovery code'));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('password_recovery_code')), findsOneWidget);
+    expect(find.textContaining('enter the 6-digit code'), findsOneWidget);
+    await tester.enterText(
+      find.byKey(const Key('password_recovery_code')),
+      '123456',
+    );
+    await tester.tap(find.text('Verify recovery code'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Choose a new password'), findsOneWidget);
+  });
+
   testWidgets('email verification requires a six-digit code', (tester) async {
     await tester.pumpWidget(
       MaterialApp(
@@ -501,10 +562,14 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('Phone number being verified'), findsOneWidget);
+    final codeField = tester.widget<TextField>(
+      find.byKey(const Key('phone_verification_code')),
+    );
+    expect(codeField.maxLength, 6);
     await tester.drag(find.byType(ListView), const Offset(0, -500));
     await tester.pumpAndSettle();
-    expect(find.byKey(const Key('defer_phone_verification')), findsOneWidget);
-    expect(find.text('Continue for now'), findsOneWidget);
+    expect(find.byKey(const Key('defer_phone_verification')), findsNothing);
+    expect(find.text('Continue for now'), findsNothing);
 
     await tester.drag(find.byType(ListView), const Offset(0, 500));
     await tester.pumpAndSettle();
@@ -512,20 +577,16 @@ void main() {
       find.byKey(const Key('phone_verification_code')),
       '123',
     );
-    await tester.tap(find.text('Verify phone number'));
+    final verifyButton = find.text('Verify phone number', skipOffstage: false);
+    await tester.ensureVisible(verifyButton);
+    await tester.pumpAndSettle();
+    await tester.tap(verifyButton);
     await tester.pump();
 
     expect(
       find.text('Enter the verification code sent by SMS.'),
       findsOneWidget,
     );
-
-    await tester.drag(find.byType(ListView), const Offset(0, -500));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('defer_phone_verification')));
-    await tester.pumpAndSettle();
-
-    expect(find.byType(HomeScreen), findsOneWidget);
   });
 
   testWidgets('profile setup reuses residence and asks for origin', (

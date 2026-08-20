@@ -23,4 +23,18 @@ void main() {
       expect(functionConfig, contains('verify_jwt = true'));
     },
   );
+
+  test('phone OTP functions enforce JWT and browser preflight', () {
+    final config = File('supabase/config.toml').readAsStringSync();
+    for (final slug in const ['bright-processor', 'quick-action']) {
+      final source = File(
+        'supabase/functions/$slug/index.ts',
+      ).readAsStringSync();
+      expect(source, contains('req.method === "OPTIONS"'));
+      expect(source, contains('"Access-Control-Allow-Origin": "*"'));
+      expect(source, contains('AFRICAN_COUNTRY_CODES.has(countryCode)'));
+      expect(source, contains('accountPhone !== phone'));
+      expect(config, contains('[functions.$slug]\nverify_jwt = true'));
+    }
+  });
 }

@@ -10,6 +10,114 @@ class HelpCenterScreen extends StatefulWidget {
 class _HelpCenterScreenState extends State<HelpCenterScreen> {
   String query = '';
 
+  Future<void> _contactSupport() async {
+    final subject = TextEditingController();
+    final description = TextEditingController();
+    var submitting = false;
+    final submitted = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Contact support'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'Describe the problem without including a password, OTP or sensitive document.',
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  key: const Key('support_subject'),
+                  controller: subject,
+                  maxLength: 160,
+                  decoration: const InputDecoration(labelText: 'Subject'),
+                ),
+                TextField(
+                  key: const Key('support_description'),
+                  controller: description,
+                  minLines: 4,
+                  maxLines: 8,
+                  maxLength: 5000,
+                  decoration: const InputDecoration(labelText: 'Description'),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: submitting
+                  ? null
+                  : () => Navigator.pop(dialogContext, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              key: const Key('submit_support_request'),
+              onPressed: submitting
+                  ? null
+                  : () async {
+                      if (subject.text.trim().length < 3 ||
+                          description.text.trim().length < 10) {
+                        ScaffoldMessenger.of(this.context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'Please provide a subject and details.',
+                            ),
+                          ),
+                        );
+                        return;
+                      }
+                      setDialogState(() => submitting = true);
+                      try {
+                        await MapLovRepository.instance.submitSupportRequest(
+                          subject: subject.text,
+                          description: description.text,
+                        );
+                        if (dialogContext.mounted) {
+                          Navigator.pop(dialogContext, true);
+                        }
+                      } catch (error) {
+                        setDialogState(() => submitting = false);
+                        if (dialogContext.mounted) {
+                          ScaffoldMessenger.of(dialogContext).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                'Unable to submit this support request: $error',
+                              ),
+                            ),
+                          );
+                        }
+                      }
+                    },
+              child: submitting
+                  ? const SizedBox.square(
+                      dimension: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Text('Send'),
+            ),
+          ],
+        ),
+      ),
+    );
+    subject.dispose();
+    description.dispose();
+    if (submitted == true && mounted) {
+      final vip = (await MapLovRepository.instance.subscriptionInfo()).isVip;
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            vip
+                ? 'Your VIP priority support request was submitted.'
+                : 'Your support request was submitted.',
+          ),
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final normalized = query.trim().toLowerCase();
@@ -58,26 +166,7 @@ class _HelpCenterScreenState extends State<HelpCenterScreen> {
           ),
         const SizedBox(height: 20),
         OutlinedButton.icon(
-          onPressed: () => showDialog<void>(
-            context: context,
-            builder: (context) => AlertDialog(
-              title: const Text('Contact support'),
-              content: SelectableText(
-                context.tr(
-                  'General support: support@maplov.ca\n'
-                  'Privacy: privacy@maplov.ca\n'
-                  'Child safety: child-safety@maplov.ca\n\n'
-                  'Include your account email, device model and a short description. Never send your password or SMS code.',
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('Close'),
-                ),
-              ],
-            ),
-          ),
+          onPressed: () => unawaited(_contactSupport()),
           icon: const Icon(Icons.support_agent),
           label: const Text('Contact MapLov Support'),
         ),

@@ -42,6 +42,9 @@ test/failures/
 !.env.example
 *.dart-define.json
 supabase/.temp/
+android/key.properties
+android/*.jks
+android/*.keystore
 
 # Symbolication related
 app.*.symbols

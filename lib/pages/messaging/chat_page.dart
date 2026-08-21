@@ -22,6 +22,7 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _sending = false;
   bool _pickingAttachment = false;
   bool _showEmojiPanel = false;
+  bool _canSeeReadReceipts = false;
   String? _lastVisibleMessageId;
   DateTime? _clearedAt;
   final Set<String> _locallyHiddenMessageIds = {};
@@ -41,10 +42,21 @@ class _ChatScreenState extends State<ChatScreen> {
     _messageStream = MapLovRepository.instance.watchMessages(conversationId);
     _text.addListener(_handleComposerChanged);
     unawaited(MapLovRepository.instance.markConversationRead(conversationId));
+    unawaited(_loadReadReceiptEntitlement());
     _player.onPlayerComplete.listen((_) {
       if (mounted) setState(() => _playingMessageId = null);
     });
   }
+
+  Future<void> _loadReadReceiptEntitlement() async {
+    final subscription = await MapLovRepository.instance.subscriptionInfo();
+    if (mounted) {
+      setState(() => _canSeeReadReceipts = subscription.isPremium);
+    }
+  }
+
+  bool _visibleReadReceipt(MapLovMessage message) =>
+      _canSeeReadReceipts && message.read;
 
   @override
   void dispose() {
@@ -246,7 +258,7 @@ class _ChatScreenState extends State<ChatScreen> {
               text: message.body ?? '📷 Photo message',
               mine: mine,
               time: message.createdAt,
-              read: message.read,
+              read: _visibleReadReceipt(message),
             )
           : Align(
               alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
@@ -300,7 +312,7 @@ class _ChatScreenState extends State<ChatScreen> {
                       child: _MessageMeta(
                         time: message.createdAt,
                         mine: mine,
-                        read: message.read,
+                        read: _visibleReadReceipt(message),
                       ),
                     ),
                   ],
@@ -345,7 +357,7 @@ class _ChatScreenState extends State<ChatScreen> {
               _MessageMeta(
                 time: message.createdAt,
                 mine: mine,
-                read: message.read,
+                read: _visibleReadReceipt(message),
               ),
             ],
           ),
@@ -396,7 +408,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     _MessageMeta(
                       time: message.createdAt,
                       mine: mine,
-                      read: message.read,
+                      read: _visibleReadReceipt(message),
                     ),
                   ],
                 ),
@@ -410,7 +422,7 @@ class _ChatScreenState extends State<ChatScreen> {
         text: message.body ?? '',
         mine: mine,
         time: message.createdAt,
-        read: message.read,
+        read: _visibleReadReceipt(message),
       );
     }
     return Semantics(

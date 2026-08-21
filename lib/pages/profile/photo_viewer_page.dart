@@ -338,10 +338,13 @@ class _DetailedPhotoViewerState extends State<_DetailedPhotoViewer> {
                             label:
                                 '${_profile.photoUrls.isEmpty ? 1 : _profile.photoUrls.length} photos',
                           ),
-                          const _PhotoBadge(
+                          _PhotoBadge(
+                            key: Key('photo_presence_${_profile.id}'),
                             icon: Icons.circle,
-                            label: 'Online',
-                            iconColor: Color(0xFF29D391),
+                            label: _profile.isOnline ? 'Online' : 'Offline',
+                            iconColor: _profile.isOnline
+                                ? const Color(0xFF29D391)
+                                : const Color(0xFF9E9E9E),
                           ),
                         ],
                       ),
@@ -627,9 +630,34 @@ class _SocialPhotoViewerState extends State<_SocialPhotoViewer> {
           _superLikedStates[index] = previousLiked;
           _superLikeCounts[index] = previousCount;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Unable to update this Super Like: $error')),
-        );
+        if (error.toString().contains('No Super Like credits available')) {
+          await showDialog<void>(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text('No Super Likes available'),
+              content: const Text(
+                'Buy a Super Like pack to send this special reaction.',
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancel'),
+                ),
+                FilledButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    Navigator.pushNamed(context, AppRoutes.premium);
+                  },
+                  child: const Text('View packs'),
+                ),
+              ],
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Unable to update this Super Like: $error')),
+          );
+        }
       }
     } finally {
       if (mounted) setState(() => _superLikeUpdating = false);
@@ -701,10 +729,13 @@ class _SocialPhotoViewerState extends State<_SocialPhotoViewer> {
                           label:
                               '${widget.profile.photoUrls.isEmpty ? 1 : widget.profile.photoUrls.length} photos',
                         ),
-                        const _PhotoBadge(
+                        _PhotoBadge(
+                          key: Key('photo_presence_${widget.profile.id}'),
                           icon: Icons.circle,
-                          label: 'Online',
-                          iconColor: Color(0xFF29D391),
+                          label: widget.profile.isOnline ? 'Online' : 'Offline',
+                          iconColor: widget.profile.isOnline
+                              ? const Color(0xFF29D391)
+                              : const Color(0xFF9E9E9E),
                         ),
                       ],
                     ),
@@ -1288,6 +1319,7 @@ class _PhotoViewerHeader extends StatelessWidget {
 
 class _PhotoBadge extends StatelessWidget {
   const _PhotoBadge({
+    super.key,
     required this.icon,
     required this.label,
     this.iconColor = Colors.white,

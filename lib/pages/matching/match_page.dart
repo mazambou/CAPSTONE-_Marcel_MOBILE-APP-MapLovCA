@@ -4,16 +4,40 @@ class NewMatchScreen extends StatelessWidget {
   const NewMatchScreen({super.key, this.profile});
 
   final UserProfile? profile;
-  UserProfile get _match => profile ?? demoProfileOrUnavailable;
+  static const _demoCurrentUser = UserProfile(
+    id: 'me',
+    name: 'Jamie',
+    age: 29,
+    city: 'Toronto, ON',
+    compatibilityScore: 100,
+    imagePath: 'assets/profile/profile_user_placeholder.png',
+    photoDisplayStyle: PhotoDisplayStyle.profileDetails,
+  );
 
-  Future<void> _openChat(BuildContext context) async {
+  Future<(UserProfile, UserProfile)?> _loadProfiles() async {
+    final repository = MapLovRepository.instance;
+    final currentId = repository.currentUserId;
+    if (currentId == null) return null;
+    final results = await Future.wait([
+      repository.getProfile(currentId),
+      repository.resolveMatchPartner(profile),
+    ]);
+    final current = results[0];
+    final partner = results[1];
+    if (current == null || partner == null || current.id == partner.id) {
+      return null;
+    }
+    return (current, partner);
+  }
+
+  Future<void> _openChat(BuildContext context, UserProfile match) async {
     try {
-      final id = await MapLovRepository.instance.startConversation(_match.id);
+      final id = await MapLovRepository.instance.startConversation(match.id);
       if (!context.mounted) return;
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (_) => ChatScreen(conversationId: id, profile: _match),
+          builder: (_) => ChatScreen(conversationId: id, profile: match),
         ),
       );
     } catch (error) {
@@ -30,125 +54,173 @@ class NewMatchScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: AppColors.white,
       bottomNavigationBar: const _MapLovNavigationBar(selectedIndex: 2),
-      body: SafeArea(
-        bottom: false,
-        child: LayoutBuilder(
-          builder: (context, constraints) => SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(20, 8, 20, 26),
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                minHeight: constraints.maxHeight - 34,
-              ),
-              child: Column(
-                children: [
-                  _NewMatchHeader(
-                    onBack: () {
-                      if (Navigator.canPop(context)) {
-                        Navigator.pop(context);
-                      } else {
-                        Navigator.pushReplacementNamed(context, AppRoutes.home);
-                      }
-                    },
-                  ),
-                  const SizedBox(height: 18),
-                  const _MatchCelebrationTitle(),
-                  const SizedBox(height: 10),
-                  Text(
-                    'You and ${_match.name} liked each other.\nStart a conversation!',
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      color: AppColors.darkText,
-                      fontSize: 17,
-                      height: 1.35,
-                      fontWeight: FontWeight.w500,
+      body: MapLovRepository.instance.isLive
+          ? FutureBuilder<(UserProfile, UserProfile)?>(
+              future: _loadProfiles(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState != ConnectionState.done) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                final profiles = snapshot.data;
+                if (snapshot.hasError || profiles == null) {
+                  return _UnavailableMatch(
+                    onBack: () => Navigator.pushReplacementNamed(
+                      context,
+                      AppRoutes.matches,
                     ),
-                  ),
-                  const SizedBox(height: 24),
-                  _MatchedProfiles(match: _match),
-                  const SizedBox(height: 24),
-                  SizedBox(
-                    width: double.infinity,
-                    child: FilledButton.icon(
-                      key: const Key('new_match_send_message'),
-                      onPressed: () => _openChat(context),
-                      style: FilledButton.styleFrom(
-                        backgroundColor: AppColors.deepPink,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: const StadiumBorder(),
-                      ),
-                      icon: const Icon(Icons.chat_bubble_outline),
-                      label: const Text(
-                        'Send Message',
-                        style: TextStyle(
-                          fontSize: 17,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton.icon(
-                      key: const Key('new_match_keep_swiping'),
-                      onPressed: () => Navigator.pushReplacementNamed(
-                        context,
-                        AppRoutes.home,
-                      ),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: AppColors.deepPink,
-                        side: const BorderSide(
-                          color: AppColors.deepPink,
-                          width: 1.5,
-                        ),
-                        padding: const EdgeInsets.symmetric(vertical: 15),
-                        shape: const StadiumBorder(),
-                      ),
-                      icon: const Icon(Icons.style_outlined),
-                      label: const Text(
-                        'Keep Swiping',
-                        style: TextStyle(
-                          fontSize: 17,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 18),
-                  Material(
-                    color: AppColors.palePink,
-                    borderRadius: BorderRadius.circular(18),
-                    child: ListTile(
-                      key: const Key('new_match_complete_profile'),
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 7,
-                      ),
-                      leading: const Icon(
-                        Icons.favorite,
-                        color: AppColors.deepPink,
-                        size: 34,
-                      ),
-                      title: const Text(
-                        'Increase your chances',
-                        style: TextStyle(fontWeight: FontWeight.w800),
-                      ),
-                      subtitle: const Text(
-                        'Complete your profile to get more matches!',
-                      ),
-                      trailing: const Icon(Icons.chevron_right),
-                      onTap: () =>
-                          Navigator.pushNamed(context, AppRoutes.editProfile),
-                    ),
-                  ),
-                ],
-              ),
+                  );
+                }
+                return _buildMatchBody(context, profiles.$1, profiles.$2);
+              },
+            )
+          : _buildMatchBody(
+              context,
+              _demoCurrentUser,
+              profile ?? demoProfileOrUnavailable,
             ),
+    );
+  }
+
+  Widget _buildMatchBody(
+    BuildContext context,
+    UserProfile current,
+    UserProfile match,
+  ) => SafeArea(
+    bottom: false,
+    child: LayoutBuilder(
+      builder: (context, constraints) => SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(20, 8, 20, 26),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minHeight: constraints.maxHeight - 34),
+          child: Column(
+            children: [
+              _NewMatchHeader(
+                onBack: () {
+                  if (Navigator.canPop(context)) {
+                    Navigator.pop(context);
+                  } else {
+                    Navigator.pushReplacementNamed(context, AppRoutes.home);
+                  }
+                },
+              ),
+              const SizedBox(height: 18),
+              const _MatchCelebrationTitle(),
+              const SizedBox(height: 10),
+              Text(
+                'You and ${match.name} liked each other.\nStart a conversation!',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: AppColors.darkText,
+                  fontSize: 17,
+                  height: 1.35,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(height: 24),
+              _MatchedProfiles(current: current, match: match),
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  key: const Key('new_match_send_message'),
+                  onPressed: () => _openChat(context, match),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.deepPink,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: const StadiumBorder(),
+                  ),
+                  icon: const Icon(Icons.chat_bubble_outline),
+                  label: const Text(
+                    'Send Message',
+                    style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  key: const Key('new_match_keep_swiping'),
+                  onPressed: () =>
+                      Navigator.pushReplacementNamed(context, AppRoutes.home),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.deepPink,
+                    side: const BorderSide(
+                      color: AppColors.deepPink,
+                      width: 1.5,
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 15),
+                    shape: const StadiumBorder(),
+                  ),
+                  icon: const Icon(Icons.style_outlined),
+                  label: const Text(
+                    'Keep Swiping',
+                    style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
+              Material(
+                color: AppColors.palePink,
+                borderRadius: BorderRadius.circular(18),
+                child: ListTile(
+                  key: const Key('new_match_complete_profile'),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 7,
+                  ),
+                  leading: const Icon(
+                    Icons.favorite,
+                    color: AppColors.deepPink,
+                    size: 34,
+                  ),
+                  title: const Text(
+                    'Increase your chances',
+                    style: TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                  subtitle: const Text(
+                    'Complete your profile to get more matches!',
+                  ),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () =>
+                      Navigator.pushNamed(context, AppRoutes.editProfile),
+                ),
+              ),
+            ],
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
+
+class _UnavailableMatch extends StatelessWidget {
+  const _UnavailableMatch({required this.onBack});
+
+  final VoidCallback onBack;
+
+  @override
+  Widget build(BuildContext context) => SafeArea(
+    child: Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.person_off_outlined, size: 54),
+            const SizedBox(height: 16),
+            const Text(
+              'This match is no longer available.',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 16),
+            FilledButton(onPressed: onBack, child: const Text('View matches')),
+          ],
+        ),
+      ),
+    ),
+  );
 }
 
 class _NewMatchHeader extends StatelessWidget {
@@ -223,8 +295,9 @@ class _MatchCelebrationTitle extends StatelessWidget {
 }
 
 class _MatchedProfiles extends StatelessWidget {
-  const _MatchedProfiles({required this.match});
+  const _MatchedProfiles({required this.current, required this.match});
 
+  final UserProfile current;
   final UserProfile match;
 
   @override
@@ -244,9 +317,7 @@ class _MatchedProfiles extends StatelessWidget {
                 alignment: Alignment.centerLeft,
                 child: _MatchPortrait(
                   diameter: diameter,
-                  image: const AssetImage(
-                    'assets/profile/profile_user_placeholder.png',
-                  ),
+                  image: profileImageProvider(current),
                 ),
               ),
               Align(
@@ -279,11 +350,11 @@ class _MatchedProfiles extends StatelessWidget {
         const SizedBox(height: 12),
         Row(
           children: [
-            const Expanded(
+            Expanded(
               child: _MatchIdentity(
-                name: 'Jamie',
-                age: 29,
-                city: 'Toronto, ON',
+                name: current.name,
+                age: current.age,
+                city: current.city,
               ),
             ),
             Expanded(

@@ -413,22 +413,39 @@ class PostCommentItem {
 class SubscriptionInfo {
   const SubscriptionInfo({
     this.tier = 'free',
+    this.baseTier = 'free',
     this.status = 'active',
     this.provider,
     this.renewsAt,
     this.autoRenewEnabled = false,
     this.history = const [],
+    this.isPromotionalVip = false,
+    this.promotionActive = false,
+    this.promotionMemberCount = 0,
+    this.promotionThreshold = 1000,
   });
   final String tier;
+  final String baseTier;
   final String status;
   final String? provider;
   final DateTime? renewsAt;
   final bool autoRenewEnabled;
   final List<Map<String, dynamic>> history;
+  final bool isPromotionalVip;
+  final bool promotionActive;
+  final int promotionMemberCount;
+  final int promotionThreshold;
 
   bool get isPremium => tier == 'plus' || tier == 'elite' || tier == 'vip';
   bool get isVip => tier == 'elite' || tier == 'vip';
   bool get isElite => isVip;
+  bool get hasPaidSubscription =>
+      baseTier == 'plus' || baseTier == 'elite' || baseTier == 'vip';
+  String get baseDisplayName => baseTier == 'elite' || baseTier == 'vip'
+      ? 'VIP'
+      : baseTier == 'plus'
+      ? 'Plus'
+      : 'Standard';
   String get displayName => isVip
       ? 'VIP'
       : tier == 'plus'
@@ -1306,6 +1323,18 @@ class MapLovRepository {
     return ProfileLikeResult(liked: true, matched: !wasMatched && isMatched);
   }
 
+  Future<String?> rewindLastProfileLike() async {
+    if (!isLive) {
+      if (_demoLikedIds.isEmpty) return null;
+      final profileId = _demoLikedIds.last;
+      _demoLikedIds.remove(profileId);
+      return profileId;
+    }
+    final result = await _client!.rpc('rewind_my_last_profile_like');
+    clearDiscoveryCache();
+    return result as String?;
+  }
+
   Future<bool> _hasMatchWith(String profileId) async {
     if (!isLive) {
       final profile = mockProfiles
@@ -1337,8 +1366,9 @@ class MapLovRepository {
     }
     final incoming = await _client!
         .from('profile_likes')
-        .select('liker_id, created_at')
+        .select('liker_id, created_at, priority_rank')
         .eq('liked_id', currentUserId!)
+        .order('priority_rank', ascending: false)
         .order('created_at', ascending: false);
     final outgoing = await _client!
         .from('profile_likes')
@@ -1410,6 +1440,33 @@ class MapLovRepository {
       }
     }
     return result;
+  }
+
+  Future<UserProfile?> resolveMatchPartner(UserProfile? suggested) async {
+    if (!isLive) return suggested ?? demoProfileOrUnavailable;
+    final me = currentUserId;
+    if (me == null) return null;
+
+    if (suggested != null && suggested.id.isNotEmpty && suggested.id != me) {
+      final refreshed = await getProfile(suggested.id);
+      if (refreshed != null) return refreshed;
+    }
+
+    final rows = await _client!
+        .from('matches')
+        .select('user_a, user_b, matched_at')
+        .or('user_a.eq.$me,user_b.eq.$me')
+        .order('matched_at', ascending: false)
+        .limit(10);
+    for (final row in rows) {
+      final userA = row['user_a'] as String;
+      final userB = row['user_b'] as String;
+      final otherId = userA == me ? userB : userA;
+      if (otherId == me) continue;
+      final profile = await getProfile(otherId);
+      if (profile != null) return profile;
+    }
+    return null;
   }
 
   Future<void> updateLocation({
@@ -1723,35 +1780,25 @@ class MapLovRepository {
       _demoSuperLikedPhotoIds.add(photoId);
       return true;
     }
-    final existing = await _client!
-        .from('photo_super_likes')
-        .select('photo_id')
-        .eq('photo_id', photoId)
-        .eq('user_id', currentUserId!)
-        .maybeSingle();
-    if (existing != null) {
-      await _client!
-          .from('photo_super_likes')
-          .delete()
-          .eq('photo_id', photoId)
-          .eq('user_id', currentUserId!);
-      return false;
-    }
-    try {
-      await _client!.from('photo_super_likes').insert({
-        'photo_id': photoId,
-        'user_id': currentUserId!,
-      });
-    } on PostgrestException catch (error) {
-      if (error.code != '23505') rethrow;
-      await _client!
-          .from('photo_super_likes')
-          .delete()
-          .eq('photo_id', photoId)
-          .eq('user_id', currentUserId!);
-      return false;
-    }
-    return true;
+    final result = await _client!.rpc(
+      'toggle_my_photo_super_like',
+      params: {'target_photo': photoId},
+    );
+    final rows = List<Map<String, dynamic>>.from(result as List);
+    if (rows.isEmpty) throw StateError('Unable to update this Super Like.');
+    return rows.first['super_liked'] as bool? ?? false;
+  }
+
+  Future<String> submitSupportRequest({
+    required String subject,
+    required String description,
+  }) async {
+    if (!isLive) return 'demo-support-request';
+    final result = await _client!.rpc(
+      'submit_my_support_request',
+      params: {'subject_value': subject, 'description_value': description},
+    );
+    return result as String;
   }
 
   Future<PhotoReactionState> photoReactionState(List<String> photoIds) async {
@@ -3701,8 +3748,30 @@ class MapLovRepository {
     final current = subscriptions
         .where((item) => item['is_current'] == true)
         .firstOrNull;
+    var baseTier = current?['tier'] as String? ?? 'free';
+    var effectiveTier = baseTier;
+    var isPromotionalVip = false;
+    var promotionActive = false;
+    var promotionMemberCount = 0;
+    var promotionThreshold = 1000;
+    try {
+      final value = await _client!.rpc('my_subscription_entitlement');
+      final entitlement = Map<String, dynamic>.from(value as Map);
+      baseTier = entitlement['base_tier'] as String? ?? baseTier;
+      effectiveTier = entitlement['effective_tier'] as String? ?? baseTier;
+      isPromotionalVip = entitlement['is_promotional_vip'] as bool? ?? false;
+      promotionActive = entitlement['promotion_active'] as bool? ?? false;
+      promotionMemberCount =
+          (entitlement['registered_count'] as num?)?.toInt() ?? 0;
+      promotionThreshold =
+          (entitlement['member_threshold'] as num?)?.toInt() ?? 1000;
+    } on PostgrestException {
+      // Backward-compatible fallback while the additive migration is being
+      // deployed. Paid subscription data remains authoritative.
+    }
     return SubscriptionInfo(
-      tier: current?['tier'] as String? ?? 'free',
+      tier: effectiveTier,
+      baseTier: baseTier,
       status: current?['status'] as String? ?? 'active',
       provider: current?['provider'] as String?,
       renewsAt: DateTime.tryParse(
@@ -3710,6 +3779,10 @@ class MapLovRepository {
       ),
       autoRenewEnabled: current?['auto_renew_enabled'] as bool? ?? false,
       history: history,
+      isPromotionalVip: isPromotionalVip,
+      promotionActive: promotionActive,
+      promotionMemberCount: promotionMemberCount,
+      promotionThreshold: promotionThreshold,
     );
   }
 

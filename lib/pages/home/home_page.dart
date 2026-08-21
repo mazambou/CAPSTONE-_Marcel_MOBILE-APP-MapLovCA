@@ -496,6 +496,43 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
   }
 
+  Future<void> _rewindLastLike() async {
+    final allowed = await _requireSubscriptionFeature(
+      context,
+      requirement: _SubscriptionRequirement.premiumPlus,
+      feature: 'Profile rewind',
+    );
+    if (!allowed || !mounted) return;
+    try {
+      final profileId = await MapLovRepository.instance.rewindLastProfileLike();
+      if (!mounted) return;
+      if (profileId == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No profile like to rewind.')),
+        );
+        return;
+      }
+      setState(() {
+        final profile = _profiles
+            .where((item) => item.id == profileId)
+            .firstOrNull;
+        if (profile != null) likedProfiles.remove(profile.name);
+      });
+      await _loadProfiles(forceRefresh: true);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Your last profile like was restored.')),
+        );
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Unable to rewind this profile: $error')),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final profiles = visibleProfiles;
@@ -507,6 +544,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           children: [
             _DiscoverHeader(
               onFilters: _openFilters,
+              onRewind: () => unawaited(_rewindLastLike()),
               onNotifications: () =>
                   Navigator.pushNamed(context, AppRoutes.notifications),
             ),
@@ -1013,10 +1051,12 @@ class _PopularPhotosStripState extends State<_PopularPhotosStrip> {
 class _DiscoverHeader extends StatelessWidget {
   const _DiscoverHeader({
     required this.onFilters,
+    required this.onRewind,
     required this.onNotifications,
   });
 
   final VoidCallback onFilters;
+  final VoidCallback onRewind;
   final VoidCallback onNotifications;
 
   @override
@@ -1060,6 +1100,12 @@ class _DiscoverHeader extends StatelessWidget {
                 ),
               ),
             ),
+          ),
+          IconButton(
+            key: const Key('home_rewind_button'),
+            tooltip: 'Rewind last profile like',
+            onPressed: onRewind,
+            icon: const Icon(Icons.undo_rounded, size: 27),
           ),
           IconButton(
             key: const Key('home_notifications_button'),

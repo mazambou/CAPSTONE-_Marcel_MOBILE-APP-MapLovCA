@@ -1919,6 +1919,35 @@ void main() {
     expect(find.text('About me'), findsOneWidget);
   });
 
+  testWidgets('photo viewers use the same offline presence as Discover', (
+    tester,
+  ) async {
+    for (final style in PhotoDisplayStyle.values) {
+      final profile = UserProfile(
+        id: 'offline-${style.name}',
+        name: 'Carine',
+        age: 37,
+        city: 'Toronto',
+        compatibilityScore: 91,
+        imagePath: 'assets/avatars/story_sophie.png',
+        photoDisplayStyle: style,
+        isOnline: false,
+      );
+      await tester.pumpWidget(
+        MaterialApp(home: PhotoViewerScreen(profile: profile)),
+      );
+      await tester.pumpAndSettle();
+
+      final badge = find.byKey(Key('photo_presence_${profile.id}'));
+      expect(badge, findsOneWidget);
+      expect(
+        find.descendant(of: badge, matching: find.text('Offline')),
+        findsOneWidget,
+      );
+      await tester.pumpWidget(const SizedBox.shrink());
+    }
+  });
+
   testWidgets('profile exposes the two photo display choices', (tester) async {
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1;
@@ -2441,9 +2470,26 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
 
-    await tester.pumpWidget(const MaterialApp(home: NewMatchScreen()));
+    const carine = UserProfile(
+      id: 'carine',
+      name: 'Carine',
+      age: 28,
+      city: 'Toronto',
+      compatibilityScore: 91,
+      imagePath: 'assets/avatars/story_sophie.png',
+      photoDisplayStyle: PhotoDisplayStyle.profileDetails,
+    );
+    await tester.pumpWidget(
+      const MaterialApp(home: NewMatchScreen(profile: carine)),
+    );
 
     expect(find.text("It's a Match!"), findsOneWidget);
+    expect(
+      find.textContaining('You and Carine liked each other.'),
+      findsOneWidget,
+    );
+    expect(find.textContaining('Jamie, 29'), findsOneWidget);
+    expect(find.textContaining('Carine, 28'), findsOneWidget);
     expect(find.byKey(const Key('new_match_send_message')), findsOneWidget);
     expect(find.byKey(const Key('new_match_keep_swiping')), findsOneWidget);
     expect(tester.takeException(), isNull);

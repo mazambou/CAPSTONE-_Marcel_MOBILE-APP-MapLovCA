@@ -266,12 +266,12 @@ content_path = "./supabase/templates/email_change.html"
 [auth.email.notification.password_changed]
 enabled = true
 subject = "Your MapLov password was changed"
-content_path = "./supabase/templates/password_changed_notification.html"
+content_path = "./templates/password_changed_notification.html"
 
 [auth.email.notification.email_changed]
 enabled = true
 subject = "Your MapLov email was changed"
-content_path = "./supabase/templates/email_changed_notification.html"
+content_path = "./templates/email_changed_notification.html"
 
 [auth.sms]
 # Allow/disallow new user signups via SMS to your project.
@@ -306,7 +306,7 @@ max_frequency = "5s"
 
 [auth.hook.send_email]
 enabled = true
-uri = "http://host.docker.internal:54321/functions/v1/bright-action"
+uri = "env(SEND_EMAIL_HOOK_URI)"
 secrets = "env(SEND_EMAIL_HOOK_SECRET)"
 
 # Configure one of the supported SMS providers: `twilio`, `twilio_verify`, `messagebird`, `textlocal`, `vonage`.

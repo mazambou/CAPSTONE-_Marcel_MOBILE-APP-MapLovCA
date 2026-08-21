@@ -168,26 +168,33 @@ class _SubscriptionManagementScreenState
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    'MapLov ${info.displayName}',
+                    info.isPromotionalVip
+                        ? 'MapLov VIP fondateur offert'
+                        : 'MapLov ${info.displayName}',
                     style: const TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.w800,
                     ),
                   ),
                   Text(
-                    info.renewsAt == null
+                    info.isPromotionalVip
+                        ? '${info.promotionMemberCount}/${info.promotionThreshold} membres. '
+                              'Votre forfait ${info.baseDisplayName} reprendra au 1 001ᵉ compte.'
+                        : info.renewsAt == null
                         ? 'Aucune date d’échéance'
                         : info.autoRenewEnabled
                         ? 'Renouvellement le ${DateFormat.yMMMd().format(info.renewsAt!)}'
                         : 'Expire le ${DateFormat.yMMMd().format(info.renewsAt!)}',
                   ),
-                  Text('Paiement : ${info.provider ?? 'Boutique mobile'}'),
-                  Text(
-                    'Renouvellement : ${info.autoRenewEnabled ? 'Activé' : 'Désactivé'}',
-                  ),
+                  if (!info.isPromotionalVip || info.hasPaidSubscription) ...[
+                    Text('Paiement : ${info.provider ?? 'Boutique mobile'}'),
+                    Text(
+                      'Renouvellement : ${info.autoRenewEnabled ? 'Activé' : 'Désactivé'}',
+                    ),
+                  ],
                   const SizedBox(height: 12),
                   FilledButton.icon(
-                    onPressed: info.isPremium
+                    onPressed: info.hasPaidSubscription
                         ? () => _manageCurrent(info)
                         : null,
                     icon: const Icon(Icons.settings_outlined),

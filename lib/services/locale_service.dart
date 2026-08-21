@@ -852,8 +852,8 @@ class MapLovLocalizations {
     'Choose a country before choosing a region.':
         'Choisissez d’abord un pays avant de choisir une région.',
     'Premium Plus required': 'Premium Plus requis',
-    'International search is available with Premium Plus and VIP.':
-        'La recherche internationale est accessible avec Premium Plus et VIP.',
+    'International search requires Premium VIP or an International Pass.':
+        'La recherche internationale nécessite Premium VIP ou un Pass International.',
     'View Premium Plus': 'Voir Premium Plus',
     'Other city': 'Autre ville',
     'Any profession': 'Toute profession',

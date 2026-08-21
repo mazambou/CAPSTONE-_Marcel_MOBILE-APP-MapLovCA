@@ -12,7 +12,7 @@ class PremiumScreen extends StatelessWidget {
       iconColor: AppColors.blush,
       features: [
         'Profile and public photos',
-        'Discover, likes and matches',
+        'Discover, send likes and create matches',
         'Text, photo, voice and document messages',
         'Quick and standard filters',
         'Friends and community posts',
@@ -39,7 +39,7 @@ class PremiumScreen extends StatelessWidget {
         '20 Secret Garden requests per day',
         'Early access to New Accounts after 7 days',
         'Unlimited profile rewinds',
-        'Priority likes in Discover',
+        'Priority placement in received Likes',
         'Read receipts for conversations',
       ],
       buttonLabel: 'Choose Plus',
@@ -672,7 +672,7 @@ class _StoreCatalogItem {
       '3 albums Secret Garden et 30 photos',
       '20 demandes Secret Garden par jour',
       'Retours illimités sur les profils',
-      'Likes prioritaires et confirmations de lecture',
+      'Likes prioritaires dans la liste reçue et confirmations de lecture',
     ],
     ExternalPaymentProduct.plusYearly => const [
       'Tous les avantages MapLov Plus',
@@ -1218,11 +1218,16 @@ class _StoreCatalogState extends State<_StoreCatalog> {
                     color: Color(0xFF168447),
                   ),
                   title: Text(
-                    'Votre abonnement actuel : MapLov ${subscription.displayName}',
+                    subscription.isPromotionalVip
+                        ? 'Votre accès actuel : VIP fondateur offert'
+                        : 'Votre abonnement actuel : MapLov ${subscription.displayName}',
                     style: const TextStyle(fontWeight: FontWeight.w900),
                   ),
                   subtitle: Text(
-                    subscription.renewsAt == null
+                    subscription.isPromotionalVip
+                        ? '${subscription.promotionMemberCount}/${subscription.promotionThreshold} membres • '
+                              'Au 1 001ᵉ compte, votre forfait ${subscription.baseDisplayName} reprendra automatiquement.'
+                        : subscription.renewsAt == null
                         ? 'Actif sur votre compte'
                         : 'Accès jusqu’au ${DateFormat.yMMMd().format(subscription.renewsAt!)}',
                   ),

@@ -12,6 +12,15 @@
 /flutter_service_worker.js
   Cache-Control: no-cache, no-store, must-revalidate
 
+/favicon.png
+  Cache-Control: no-cache, max-age=0, must-revalidate
+
+/manifest.json
+  Cache-Control: no-cache, max-age=0, must-revalidate
+
+/icons/*
+  Cache-Control: no-cache, max-age=0, must-revalidate
+
 /.well-known/*
   Cache-Control: public, max-age=3600
   X-Content-Type-Options: nosniff

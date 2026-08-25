@@ -10,7 +10,7 @@ class NewMatchScreen extends StatelessWidget {
     age: 29,
     city: 'Toronto, ON',
     compatibilityScore: 100,
-    imagePath: 'assets/profile/profile_user_placeholder.png',
+    imagePath: '',
     photoDisplayStyle: PhotoDisplayStyle.profileDetails,
   );
 

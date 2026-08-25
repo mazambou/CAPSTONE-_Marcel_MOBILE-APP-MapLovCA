@@ -95,7 +95,10 @@ class _NearMeScreenState extends State<NearMeScreen> {
                 .map(
                   (profile) => ListTile(
                     onTap: () async {
-                      if (!await _requireProfilePhotos(context, minimum: 3) ||
+                      if (!await _requireProfilePhotos(
+                            context,
+                            minimum: discoverProfileMinimumPhotoCount,
+                          ) ||
                           !context.mounted) {
                         return;
                       }

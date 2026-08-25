@@ -195,7 +195,7 @@ const _helpArticles = [
   ),
   _HelpArticle(
     'Profile photo requirements',
-    'A main profile photo is required before interacting. At least three profile photos are required before opening full member profiles. Use clear, recent photos that belong to you.',
+    'A main profile photo and at least three additional photos are required before opening full member profiles from Discover. Use clear, recent photos that belong to you.',
     Icons.photo_library_outlined,
   ),
   _HelpArticle(

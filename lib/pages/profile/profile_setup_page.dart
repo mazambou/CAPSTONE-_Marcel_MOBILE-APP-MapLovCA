@@ -70,6 +70,8 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   int _originGeographyRequest = 0;
   late Future<List<Map<String, dynamic>>> photos;
   Uint8List? pendingProfilePhoto;
+  bool profilePhotoReady = false;
+  bool profilePhotoRequirementShown = false;
   bool uploadingPhoto = false;
   bool faceReferenceReady = !MapLovRepository.instance.isLive;
   bool loadingFaceReference = MapLovRepository.instance.isLive;
@@ -78,9 +80,43 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   @override
   void initState() {
     super.initState();
-    photos = MapLovRepository.instance.myPhotos();
+    photos = _loadProfilePhotos();
     unawaited(_loadGeography());
     unawaited(_loadFaceReference());
+  }
+
+  Future<List<Map<String, dynamic>>> _loadProfilePhotos() async {
+    final loaded = await MapLovRepository.instance.myPhotos();
+    final hasVisiblePrimary = loaded.any(
+      (photo) =>
+          photo['is_primary'] == true &&
+          photo['moderation_status'] == 'visible',
+    );
+    if (mounted) {
+      setState(() {
+        // Mock profiles are browsing fixtures, not the registering user's
+        // uploaded photo. A local registration becomes ready only after the
+        // user actually picks an image in this screen.
+        profilePhotoReady = MapLovRepository.instance.isLive
+            ? hasVisiblePrimary
+            : pendingProfilePhoto != null;
+      });
+    }
+    return loaded;
+  }
+
+  void _showProfilePhotoRequired() {
+    if (!mounted) return;
+    setState(() => profilePhotoRequirementShown = true);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          context.tr(
+            'A real profile photo is required before you can continue.',
+          ),
+        ),
+      ),
+    );
   }
 
   Future<void> _loadFaceReference() async {
@@ -372,6 +408,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       setState(() {
         pendingProfilePhoto = bytes;
         uploadingPhoto = true;
+        profilePhotoRequirementShown = false;
       });
       final photoId = await MapLovRepository.instance.uploadProfilePhoto(
         bytes: bytes,
@@ -380,7 +417,10 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       if (photoId != null) {
         await MapLovRepository.instance.setPrimaryPhoto(photoId);
       }
-      final refreshed = MapLovRepository.instance.myPhotos();
+      if (!MapLovRepository.instance.isLive) {
+        setState(() => profilePhotoReady = true);
+      }
+      final refreshed = _loadProfilePhotos();
       if (MapLovRepository.instance.isLive) await refreshed;
       if (mounted) {
         setState(() {
@@ -475,6 +515,10 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       );
       return;
     }
+    if (!profilePhotoReady || uploadingPhoto) {
+      _showProfilePhotoRequired();
+      return;
+    }
     if (MapLovRepository.instance.isLive && !residenceDetected) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -543,270 +587,316 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   }
 
   @override
-  Widget build(BuildContext context) => _AppPage(
-    title: 'Create your profile',
-    children: [
-      const LinearProgressIndicator(value: 0.35),
-      const SizedBox(height: 22),
-      Card(
-        key: const Key('private_reference_selfie'),
-        color: faceReferenceReady ? Colors.green.shade50 : AppColors.palePink,
-        child: Padding(
-          padding: const EdgeInsets.all(18),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                children: [
-                  CircleAvatar(
-                    radius: 25,
-                    backgroundColor: faceReferenceReady
-                        ? Colors.green.shade100
-                        : AppColors.blush,
-                    child: Icon(
-                      faceReferenceReady
-                          ? Icons.verified_user_outlined
-                          : Icons.face_retouching_natural_outlined,
-                      color: faceReferenceReady
-                          ? Colors.green.shade700
-                          : AppColors.coral,
-                      size: 29,
-                    ),
-                  ),
-                  const SizedBox(width: 13),
-                  Expanded(
-                    child: Text(
-                      faceReferenceReady
-                          ? 'Identity selfie verified'
-                          : 'Verify your identity with a private selfie',
-                      style: const TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.w900,
+  Widget build(BuildContext context) => PopScope(
+    canPop: profilePhotoReady,
+    onPopInvokedWithResult: (didPop, _) {
+      if (!didPop) _showProfilePhotoRequired();
+    },
+    child: _AppPage(
+      title: 'Create your profile',
+      children: [
+        const LinearProgressIndicator(value: 0.35),
+        const SizedBox(height: 22),
+        Card(
+          key: const Key('private_reference_selfie'),
+          color: faceReferenceReady ? Colors.green.shade50 : AppColors.palePink,
+          child: Padding(
+            padding: const EdgeInsets.all(18),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 25,
+                      backgroundColor: faceReferenceReady
+                          ? Colors.green.shade100
+                          : AppColors.blush,
+                      child: Icon(
+                        faceReferenceReady
+                            ? Icons.verified_user_outlined
+                            : Icons.face_retouching_natural_outlined,
+                        color: faceReferenceReady
+                            ? Colors.green.shade700
+                            : AppColors.coral,
+                        size: 29,
                       ),
                     ),
-                  ),
-                  if (faceReferenceReady)
-                    const Icon(Icons.check_circle, color: Colors.green),
-                ],
-              ),
-              const SizedBox(height: 14),
-              Text(
-                faceReferenceReady
-                    ? 'Your reference selfie is verified, kept private and never displayed on your profile.'
-                    : 'Take one clear, front-facing selfie. MapLov keeps it private, compares it with existing private reference selfies to prevent duplicate accounts, and uses it to confirm your profile photos. It never appears on your profile.',
-                style: const TextStyle(color: AppColors.grayText, height: 1.35),
-              ),
-              if (!faceReferenceReady) ...[
-                const SizedBox(height: 12),
-                const Row(
-                  children: [
-                    Icon(Icons.lock_outline, size: 18, color: AppColors.coral),
-                    SizedBox(width: 7),
+                    const SizedBox(width: 13),
                     Expanded(
                       child: Text(
-                        'Private • Security verification only',
-                        style: TextStyle(
-                          color: AppColors.coral,
-                          fontWeight: FontWeight.w700,
+                        faceReferenceReady
+                            ? 'Identity selfie verified'
+                            : 'Verify your identity with a private selfie',
+                        style: const TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w900,
                         ),
                       ),
                     ),
+                    if (faceReferenceReady)
+                      const Icon(Icons.check_circle, color: Colors.green),
                   ],
                 ),
-              ],
-              const SizedBox(height: 16),
-              if (loadingFaceReference || enrollingFaceReference)
-                const Center(
-                  child: SizedBox.square(
-                    dimension: 28,
-                    child: CircularProgressIndicator(strokeWidth: 2.5),
-                  ),
-                )
-              else if (!faceReferenceReady)
-                FilledButton.icon(
-                  key: const Key('capture_reference_selfie'),
-                  onPressed: _captureReferenceSelfie,
-                  icon: const Icon(Icons.camera_alt_outlined),
-                  label: const Text('Take my private selfie'),
-                  style: FilledButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 14),
+                const SizedBox(height: 14),
+                Text(
+                  faceReferenceReady
+                      ? 'Your reference selfie is verified, kept private and never displayed on your profile.'
+                      : 'Take one clear, front-facing selfie. MapLov keeps it private, compares it with existing private reference selfies to prevent duplicate accounts, and uses it to confirm your profile photos. It never appears on your profile.',
+                  style: const TextStyle(
+                    color: AppColors.grayText,
+                    height: 1.35,
                   ),
                 ),
-            ],
+                if (!faceReferenceReady) ...[
+                  const SizedBox(height: 12),
+                  const Row(
+                    children: [
+                      Icon(
+                        Icons.lock_outline,
+                        size: 18,
+                        color: AppColors.coral,
+                      ),
+                      SizedBox(width: 7),
+                      Expanded(
+                        child: Text(
+                          'Private • Security verification only',
+                          style: TextStyle(
+                            color: AppColors.coral,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+                const SizedBox(height: 16),
+                if (loadingFaceReference || enrollingFaceReference)
+                  const Center(
+                    child: SizedBox.square(
+                      dimension: 28,
+                      child: CircularProgressIndicator(strokeWidth: 2.5),
+                    ),
+                  )
+                else if (!faceReferenceReady)
+                  FilledButton.icon(
+                    key: const Key('capture_reference_selfie'),
+                    onPressed: _captureReferenceSelfie,
+                    icon: const Icon(Icons.camera_alt_outlined),
+                    label: const Text('Take my private selfie'),
+                    style: FilledButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                  ),
+              ],
+            ),
           ),
         ),
-      ),
-      const SizedBox(height: 18),
-      const Text(
-        'Profile photo',
-        textAlign: TextAlign.center,
-        style: TextStyle(fontWeight: FontWeight.w800),
-      ),
-      const SizedBox(height: 10),
-      Center(
-        child: Stack(
+        const SizedBox(height: 18),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            FutureBuilder<List<Map<String, dynamic>>>(
-              future: photos,
-              builder: (context, snapshot) {
-                if (pendingProfilePhoto != null) {
-                  return ClipOval(
-                    child: Image.memory(
-                      pendingProfilePhoto!,
-                      width: 116,
-                      height: 116,
-                      fit: BoxFit.cover,
-                    ),
-                  );
-                }
-                final loadedPhotos = snapshot.data ?? const [];
-                final photo =
-                    loadedPhotos
-                            .where((item) => item['is_primary'] == true)
-                            .firstOrNull?['url']
-                        as String? ??
-                    loadedPhotos.firstOrNull?['url'] as String?;
-                return ClipOval(
-                  child: SizedBox(
-                    width: 116,
-                    height: 116,
-                    child: photo == null
-                        ? const ColoredBox(
-                            color: AppColors.palePink,
-                            child: Icon(
-                              Icons.person,
-                              size: 70,
-                              color: AppColors.softPink,
-                            ),
-                          )
-                        : photo.startsWith('http')
-                        ? Image.network(photo, fit: BoxFit.cover)
-                        : Image.asset(photo, fit: BoxFit.cover),
-                  ),
-                );
-              },
+            const Text(
+              'Profile photo',
+              style: TextStyle(fontWeight: FontWeight.w800),
             ),
-            Positioned(
-              right: 0,
-              bottom: 0,
-              child: IconButton.filled(
-                tooltip: 'Add profile photo',
-                onPressed: uploadingPhoto ? null : _pickProfilePhoto,
-                icon: uploadingPhoto
-                    ? const SizedBox.square(
-                        dimension: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.add_a_photo_outlined),
+            const SizedBox(width: 7),
+            Text(
+              context.tr('Required'),
+              style: const TextStyle(
+                color: AppColors.error,
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
               ),
             ),
           ],
         ),
-      ),
-      const _SectionTitle('About you'),
-      const Text(
-        'Your name and birth date are already saved. Confirm your current residence, then tell MapLov where you are originally from.',
-        style: TextStyle(color: AppColors.grayText),
-      ),
-      const SizedBox(height: 12),
-      const _SectionTitle('Current residence'),
-      _geographyFields(
-        country: residenceCountry,
-        region: residenceRegion,
-        city: residenceCity,
-        otherController: residenceCityOther,
-        countryLabel: 'Current country of residence',
-        cityLabel: 'Current city of residence',
-        onCountryChanged: (value) {},
-        onCityChanged: (value) => setState(() => residenceCity = value),
-        onRegionChanged: (value) => setState(() {
-          residenceRegion = value;
-          residenceCity = _firstCityForCountryRegion(
-            residenceCountry,
-            residenceRegion,
-          );
-          residenceCityOther.clear();
-        }),
-        regionOtherController: residenceRegionOther,
-        countryReadOnly: true,
-        countryUsesGps: true,
-        countryRefreshing: detectingResidence,
-        countryError: residenceDetectionError,
-        onRefreshCountry: () => unawaited(_detectResidence()),
-        loadingRegions: loadingResidenceRegions,
-        loadingCities: loadingResidenceCities,
-        regionError: residenceRegionError,
-        cityError: residenceCityError,
-      ),
-      const _SectionTitle('Your origin'),
-      _geographyFields(
-        country: originCountry,
-        region: originRegion,
-        city: originCity,
-        otherController: originCityOther,
-        countryLabel: 'Country of origin',
-        cityLabel: 'City of origin',
-        onCountryChanged: (value) => unawaited(_changeOriginCountry(value)),
-        onCityChanged: (value) => setState(() => originCity = value),
-        onRegionChanged: (value) => unawaited(_changeOriginRegion(value)),
-        regionOtherController: originRegionOther,
-        countryReadOnly: originCountryLocked,
-        regionReadOnly: originRegionLocked,
-        cityReadOnly: originCityLocked,
-        loadingRegions: loadingOriginRegions,
-        loadingCities: loadingOriginCities,
-        regionError: originRegionError,
-        cityError: originCityError,
-      ),
-      const SizedBox(height: 12),
-      DropdownButtonFormField<String>(
-        initialValue: gender.isEmpty ? null : gender,
-        isExpanded: true,
-        decoration: InputDecoration(
-          labelText: context.tr('Gender'),
-          helperText: context.tr(
-            'Your gender is saved during registration and cannot be changed later.',
+        const SizedBox(height: 10),
+        Center(
+          child: Stack(
+            children: [
+              FutureBuilder<List<Map<String, dynamic>>>(
+                future: photos,
+                builder: (context, snapshot) {
+                  if (pendingProfilePhoto != null) {
+                    return ClipOval(
+                      child: Image.memory(
+                        pendingProfilePhoto!,
+                        width: 116,
+                        height: 116,
+                        fit: BoxFit.cover,
+                      ),
+                    );
+                  }
+                  final loadedPhotos = snapshot.data ?? const [];
+                  final photo =
+                      loadedPhotos
+                              .where((item) => item['is_primary'] == true)
+                              .firstOrNull?['url']
+                          as String? ??
+                      loadedPhotos.firstOrNull?['url'] as String?;
+                  return ClipOval(
+                    child: SizedBox(
+                      width: 116,
+                      height: 116,
+                      child: photo == null
+                          ? const ColoredBox(
+                              color: AppColors.palePink,
+                              child: Icon(
+                                Icons.person,
+                                size: 70,
+                                color: AppColors.softPink,
+                              ),
+                            )
+                          : photo.startsWith('http')
+                          ? Image.network(photo, fit: BoxFit.cover)
+                          : Image.asset(photo, fit: BoxFit.cover),
+                    ),
+                  );
+                },
+              ),
+              Positioned(
+                right: 0,
+                bottom: 0,
+                child: IconButton.filled(
+                  tooltip: 'Add profile photo',
+                  onPressed: uploadingPhoto ? null : _pickProfilePhoto,
+                  icon: uploadingPhoto
+                      ? const SizedBox.square(
+                          dimension: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.add_a_photo_outlined),
+                ),
+              ),
+            ],
           ),
         ),
-        items: const ['Woman', 'Man', 'Non-binary']
-            .map((value) => DropdownMenuItem(value: value, child: Text(value)))
-            .toList(),
-        onChanged: genderLocked
-            ? null
-            : (value) => setState(() {
-                gender = value ?? gender;
-                if (!_bodyTypeAllowedForProfileGender(bodyType, gender)) {
-                  bodyType = null;
-                }
-              }),
-      ),
-      const SizedBox(height: 12),
-      _BodyTypeSelector(
-        selected: bodyType == null ? const {} : {bodyType!},
-        enabledGalleries: _profileBodyGalleries(gender),
-        onChanged: (value) => setState(() => bodyType = value.firstOrNull),
-      ),
-      const SizedBox(height: 12),
-      TextField(
-        controller: bio,
-        maxLines: 4,
-        decoration: InputDecoration(
-          labelText: context.tr('Tell people about yourself'),
+        const SizedBox(height: 8),
+        Text(
+          context.tr(
+            profilePhotoReady
+                ? 'Your profile photo is ready.'
+                : 'Add a real profile photo to continue. The private selfie is never used as your public photo.',
+          ),
+          key: const Key('profile_photo_requirement'),
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: profilePhotoReady
+                ? AppColors.success
+                : profilePhotoRequirementShown
+                ? AppColors.error
+                : AppColors.grayText,
+            fontWeight: profilePhotoReady ? FontWeight.w700 : FontWeight.w500,
+          ),
         ),
-      ),
-      const SizedBox(height: 20),
-      KeyedSubtree(
-        key: const Key('profile_setup_continue'),
-        child: _PrimaryButton(
-          loadingProfile
-              ? 'Loading…'
-              : saving
-              ? 'Saving…'
-              : 'Continue to preferences',
-          onPressed: saving || loadingProfile ? () {} : _continue,
+        const _SectionTitle('About you'),
+        const Text(
+          'Your name and birth date are already saved. Confirm your current residence, then tell MapLov where you are originally from.',
+          style: TextStyle(color: AppColors.grayText),
         ),
-      ),
-    ],
+        const SizedBox(height: 12),
+        const _SectionTitle('Current residence'),
+        _geographyFields(
+          country: residenceCountry,
+          region: residenceRegion,
+          city: residenceCity,
+          otherController: residenceCityOther,
+          countryLabel: 'Current country of residence',
+          cityLabel: 'Current city of residence',
+          onCountryChanged: (value) {},
+          onCityChanged: (value) => setState(() => residenceCity = value),
+          onRegionChanged: (value) => setState(() {
+            residenceRegion = value;
+            residenceCity = _firstCityForCountryRegion(
+              residenceCountry,
+              residenceRegion,
+            );
+            residenceCityOther.clear();
+          }),
+          regionOtherController: residenceRegionOther,
+          countryReadOnly: true,
+          countryUsesGps: true,
+          countryRefreshing: detectingResidence,
+          countryError: residenceDetectionError,
+          onRefreshCountry: () => unawaited(_detectResidence()),
+          loadingRegions: loadingResidenceRegions,
+          loadingCities: loadingResidenceCities,
+          regionError: residenceRegionError,
+          cityError: residenceCityError,
+        ),
+        const _SectionTitle('Your origin'),
+        _geographyFields(
+          country: originCountry,
+          region: originRegion,
+          city: originCity,
+          otherController: originCityOther,
+          countryLabel: 'Country of origin',
+          cityLabel: 'City of origin',
+          onCountryChanged: (value) => unawaited(_changeOriginCountry(value)),
+          onCityChanged: (value) => setState(() => originCity = value),
+          onRegionChanged: (value) => unawaited(_changeOriginRegion(value)),
+          regionOtherController: originRegionOther,
+          countryReadOnly: originCountryLocked,
+          regionReadOnly: originRegionLocked,
+          cityReadOnly: originCityLocked,
+          loadingRegions: loadingOriginRegions,
+          loadingCities: loadingOriginCities,
+          regionError: originRegionError,
+          cityError: originCityError,
+        ),
+        const SizedBox(height: 12),
+        DropdownButtonFormField<String>(
+          initialValue: gender.isEmpty ? null : gender,
+          isExpanded: true,
+          decoration: InputDecoration(
+            labelText: context.tr('Gender'),
+            helperText: context.tr(
+              'Your gender is saved during registration and cannot be changed later.',
+            ),
+          ),
+          items: const ['Woman', 'Man', 'Non-binary']
+              .map(
+                (value) => DropdownMenuItem(value: value, child: Text(value)),
+              )
+              .toList(),
+          onChanged: genderLocked
+              ? null
+              : (value) => setState(() {
+                  gender = value ?? gender;
+                  if (!_bodyTypeAllowedForProfileGender(bodyType, gender)) {
+                    bodyType = null;
+                  }
+                }),
+        ),
+        const SizedBox(height: 12),
+        _BodyTypeSelector(
+          selected: bodyType == null ? const {} : {bodyType!},
+          enabledGalleries: _profileBodyGalleries(gender),
+          onChanged: (value) => setState(() => bodyType = value.firstOrNull),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          controller: bio,
+          maxLines: 4,
+          decoration: InputDecoration(
+            labelText: context.tr('Tell people about yourself'),
+          ),
+        ),
+        const SizedBox(height: 20),
+        KeyedSubtree(
+          key: const Key('profile_setup_continue'),
+          child: _PrimaryButton(
+            loadingProfile
+                ? 'Loading…'
+                : saving
+                ? 'Saving…'
+                : 'Continue to preferences',
+            onPressed: saving || loadingProfile ? () {} : _continue,
+          ),
+        ),
+      ],
+    ),
   );
 
   Widget _geographyFields({

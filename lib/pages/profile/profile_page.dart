@@ -13,7 +13,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     age: 29,
     city: 'Toronto',
     compatibilityScore: 100,
-    imagePath: 'assets/profile/profile_user_placeholder.png',
+    imagePath: '',
     photoDisplayStyle: PhotoDisplayStyle.profileDetails,
     profession: 'Product designer',
     bio:

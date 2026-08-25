@@ -726,6 +726,18 @@ class MapLovLocalizations {
     'Uses an immersive photo layout where visitors can like, comment or send a Super Like.':
         'Utilise une présentation photo immersive où les visiteurs peuvent aimer, commenter ou envoyer un Super Like.',
     'Profile photos required': 'Photos de profil requises',
+    'Add a profile photo before using this action.':
+        'Ajoutez une photo de profil avant d’utiliser cette action.',
+    'Add at least 3 profile photos before viewing another member’s profile.':
+        'Ajoutez au moins 3 photos de profil avant de consulter le profil d’un autre membre.',
+    'Add at least 3 photos in addition to your main profile photo before viewing another member’s profile.':
+        'Ajoutez au moins 3 photos en plus de votre photo de profil principale avant de consulter le profil d’un autre membre.',
+    'Required': 'Obligatoire',
+    'A real profile photo is required before you can continue.':
+        'Une véritable photo de profil est obligatoire avant de continuer.',
+    'Your profile photo is ready.': 'Votre photo de profil est prête.',
+    'Add a real profile photo to continue. The private selfie is never used as your public photo.':
+        'Ajoutez une véritable photo de profil pour continuer. Le selfie privé n’est jamais utilisé comme photo publique.',
     'Your first photo is your main profile photo. Photos are stored privately and served with temporary secure links.':
         'Votre première photo est votre photo de profil principale. Les photos sont stockées de manière privée et diffusées avec des liens temporaires sécurisés.',
     'Your profile must keep at least one photo.':
@@ -1130,8 +1142,8 @@ class MapLovLocalizations {
         'Inscrivez-vous avec une adresse courriel et un numéro de téléphone, confirmez votre courriel, complétez votre profil et vérifiez le code SMS. MapLov autorise un seul compte personnel par personne.',
     'Complete the required profile fields, add a main photo, keep Discover visibility enabled and check the other account’s age, gender and location filters. Your own profile never appears in your Discover results.':
         'Complétez les champs obligatoires du profil, ajoutez une photo principale, gardez la visibilité dans Découvrir activée et vérifiez les filtres d’âge, de genre et de localisation de l’autre compte. Votre propre profil n’apparaît jamais dans vos résultats Découvrir.',
-    'A main profile photo is required before interacting. At least three profile photos are required before opening full member profiles. Use clear, recent photos that belong to you.':
-        'Une photo de profil principale est requise avant toute interaction. Au moins trois photos de profil sont nécessaires pour ouvrir le profil complet d’un membre. Utilisez des photos claires, récentes et qui vous appartiennent.',
+    'A main profile photo and at least three additional photos are required before opening full member profiles from Discover. Use clear, recent photos that belong to you.':
+        'Une photo de profil principale et au moins trois photos supplémentaires sont requises avant d’ouvrir le profil complet d’un membre depuis Découvrir. Utilisez des photos claires, récentes et qui vous appartiennent.',
     'A compatibility score above 80% may create a match according to your preferences. Below that threshold, a reciprocal profile like or reciprocal photo like creates the match.':
         'Un score de compatibilité supérieur à 80 % peut créer un match selon vos préférences. Sous ce seuil, un J’aime réciproque sur le profil ou une photo crée le match.',
     'Tap your own message to delete it for yourself or, when eligible, for everyone. Clear Chat follows your plan: Plus removes your unread messages remotely; VIP can clear the whole conversation on both accounts.':

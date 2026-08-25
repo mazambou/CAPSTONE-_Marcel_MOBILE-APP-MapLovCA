@@ -420,7 +420,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _openPhoto(UserProfile profile) async {
-    if (!await _requireProfilePhotos(context, minimum: 1) || !mounted) return;
+    if (!await _requireProfilePhotos(
+          context,
+          minimum: discoverProfileMinimumPhotoCount,
+        ) ||
+        !mounted) {
+      return;
+    }
     final details = await MapLovRepository.instance.discoverProfileDetails(
       profile,
     );
@@ -432,7 +438,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _openProfile(UserProfile profile) async {
-    if (!await _requireProfilePhotos(context, minimum: 3) || !mounted) return;
+    if (!await _requireProfilePhotos(
+          context,
+          minimum: discoverProfileMinimumPhotoCount,
+        ) ||
+        !mounted) {
+      return;
+    }
     final details = await MapLovRepository.instance.discoverProfileDetails(
       profile,
     );
@@ -447,7 +459,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     List<PopularPhotoEntry> photos,
     int initialIndex,
   ) async {
-    if (!await _requireProfilePhotos(context, minimum: 1) || !mounted) return;
+    if (!await _requireProfilePhotos(
+          context,
+          minimum: discoverProfileMinimumPhotoCount,
+        ) ||
+        !mounted) {
+      return;
+    }
     await Navigator.push(
       context,
       MaterialPageRoute(

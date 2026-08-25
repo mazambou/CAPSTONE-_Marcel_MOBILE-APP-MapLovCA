@@ -12,7 +12,7 @@ const unavailableProfile = UserProfile(
   age: 18,
   city: '',
   compatibilityScore: 0,
-  imagePath: 'assets/profile/profile_user_placeholder.png',
+  imagePath: '',
   photoDisplayStyle: PhotoDisplayStyle.profileDetails,
 );
 

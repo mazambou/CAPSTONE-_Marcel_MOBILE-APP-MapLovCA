@@ -441,6 +441,16 @@ class _UserSafetyCard extends StatelessWidget {
   );
 }
 
+const int discoverProfileMinimumPhotoCount = 4;
+
+int discoverProfileMissingPhotoCount(int currentPhotoCount) {
+  final missing = discoverProfileMinimumPhotoCount - currentPhotoCount;
+  if (missing <= 0) return 0;
+  return missing >= discoverProfileMinimumPhotoCount
+      ? discoverProfileMinimumPhotoCount
+      : missing;
+}
+
 Future<bool> _requireProfilePhotos(
   BuildContext context, {
   required int minimum,
@@ -449,9 +459,15 @@ Future<bool> _requireProfilePhotos(
   if (!context.mounted) return false;
   if (count >= minimum) return true;
 
-  final message = minimum == 1
-      ? 'Add a profile photo before using this action.'
-      : 'Add at least 3 profile photos before viewing another member’s profile.';
+  final message = minimum == discoverProfileMinimumPhotoCount
+      ? context.tr(
+          'Add at least 3 photos in addition to your main profile photo before viewing another member’s profile.',
+        )
+      : minimum == 1
+      ? context.tr('Add a profile photo before using this action.')
+      : context.tr(
+          'Add at least 3 profile photos before viewing another member’s profile.',
+        );
   await showDialog<void>(
     context: context,
     barrierDismissible: false,
@@ -461,12 +477,12 @@ Future<bool> _requireProfilePhotos(
         color: AppColors.coral,
         size: 42,
       ),
-      title: const Text('Profile photos required'),
+      title: Text(context.tr('Profile photos required')),
       content: Text(message, textAlign: TextAlign.center),
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(dialogContext),
-          child: const Text('Not now'),
+          child: Text(context.tr('Not now')),
         ),
         FilledButton.icon(
           key: Key('add_required_${minimum}_photos'),
@@ -475,7 +491,7 @@ Future<bool> _requireProfilePhotos(
             Navigator.pushNamed(context, AppRoutes.managePhotos);
           },
           icon: const Icon(Icons.add_a_photo_outlined),
-          label: const Text('Add photos'),
+          label: Text(context.tr('Add photos')),
         ),
       ],
     ),

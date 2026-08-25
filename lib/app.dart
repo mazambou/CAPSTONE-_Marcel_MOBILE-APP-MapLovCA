@@ -385,10 +385,27 @@ class _MapLoveAppState extends State<MapLoveApp> with WidgetsBindingObserver {
   }
 }
 
+bool _hasDisplayableProfileImage(UserProfile profile) =>
+    profile.imagePath.trim().isNotEmpty &&
+    profile.imagePath != 'assets/profile/profile_user_placeholder.png';
+
 ImageProvider<Object> profileImageProvider(UserProfile profile) =>
     profile.hasNetworkImage
     ? NetworkImage(profile.imagePath)
-    : AssetImage(profile.imagePath);
+    : _hasDisplayableProfileImage(profile)
+    ? AssetImage(profile.imagePath)
+    : const AssetImage('assets/logos/splash_logo.png');
+
+Widget _emptyProfilePhoto({double? width, double? height}) => ColoredBox(
+  color: AppColors.palePink,
+  child: SizedBox(
+    width: width,
+    height: height,
+    child: const Center(
+      child: Icon(Icons.person_outline, color: AppColors.softPink, size: 64),
+    ),
+  ),
+);
 
 Widget profileImage(
   UserProfile profile, {
@@ -401,14 +418,12 @@ Widget profileImage(
         fit: fit,
         width: width,
         height: height,
-        errorBuilder: (_, _, _) => Image.asset(
-          'assets/profile/profile_user_placeholder.png',
-          fit: fit,
-          width: width,
-          height: height,
-        ),
+        errorBuilder: (_, _, _) =>
+            _emptyProfilePhoto(width: width, height: height),
       )
-    : Image.asset(profile.imagePath, fit: fit, width: width, height: height);
+    : _hasDisplayableProfileImage(profile)
+    ? Image.asset(profile.imagePath, fit: fit, width: width, height: height)
+    : _emptyProfilePhoto(width: width, height: height);
 
 Widget mediaImage(
   String path, {

@@ -700,7 +700,7 @@ void main() {
     expect(find.text('City of origin'), findsOneWidget);
   });
 
-  testWidgets('profile setup can continue without uploading a photo', (
+  testWidgets('profile setup requires a real profile photo before continuing', (
     tester,
   ) async {
     await tester.pumpWidget(
@@ -729,8 +729,24 @@ void main() {
     await tester.tap(find.byKey(const Key('profile_setup_continue')));
     await tester.pumpAndSettle();
 
-    expect(find.byType(PreferencesScreen), findsOneWidget);
+    expect(find.byType(PreferencesScreen), findsNothing);
+    expect(
+      find.text('A real profile photo is required before you can continue.'),
+      findsOneWidget,
+    );
   });
+
+  test(
+    'Discover full profiles require one main and three additional photos',
+    () {
+      expect(discoverProfileMinimumPhotoCount, 4);
+      expect(discoverProfileMissingPhotoCount(0), 4);
+      expect(discoverProfileMissingPhotoCount(1), 3);
+      expect(discoverProfileMissingPhotoCount(3), 1);
+      expect(discoverProfileMissingPhotoCount(4), 0);
+      expect(discoverProfileMissingPhotoCount(8), 0);
+    },
+  );
 
   testWidgets('opens the full-screen gallery when a profile photo is tapped', (
     tester,

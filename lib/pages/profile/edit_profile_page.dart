@@ -352,10 +352,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             children: [
               ClipOval(
                 child: profilePhotoUrl == null
-                    ? Image.asset(
-                        'assets/profile/profile_user_placeholder.png',
-                        fit: BoxFit.cover,
-                      )
+                    ? _emptyProfilePhoto(width: 124, height: 124)
                     : mediaImage(profilePhotoUrl!, fit: BoxFit.cover),
               ),
               Align(

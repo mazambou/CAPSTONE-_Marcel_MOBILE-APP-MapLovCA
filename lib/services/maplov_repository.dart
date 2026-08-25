@@ -1169,6 +1169,7 @@ class MapLovRepository {
         .select('id')
         .eq('user_id', currentUserId!)
         .eq('moderation_status', 'visible')
+        .eq('is_primary', true)
         .limit(1);
     final hasReferenceSelfie = await hasFaceReference();
     final ready =
@@ -1660,7 +1661,9 @@ class MapLovRepository {
     );
   }
 
-  Future<int> myPhotoCount() async => (await myPhotos()).length;
+  Future<int> myPhotoCount() async => (await myPhotos())
+      .where((photo) => photo['moderation_status'] == 'visible')
+      .length;
 
   Future<bool> deleteProfilePhoto(Map<String, dynamic> photo) async {
     if (!isLive) return true;
@@ -4169,9 +4172,7 @@ class MapLovRepository {
       originRegionId: row['origin_region_id'] as String? ?? '',
       originCityId: row['origin_city_id'] as String? ?? '',
       compatibilityScore: 80,
-      imagePath: urls.isEmpty
-          ? 'assets/profile/profile_user_placeholder.png'
-          : urls.first,
+      imagePath: urls.isEmpty ? '' : urls.first,
       photoUrls: urls,
       photoIds: photoIds,
       photoLikeCounts: likeCounts,

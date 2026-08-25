@@ -88,10 +88,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
             contentPadding: EdgeInsets.zero,
             leading: CircleAvatar(
               backgroundImage: author == null
-                  ? const AssetImage(
-                          'assets/profile/profile_user_placeholder.png',
-                        )
-                        as ImageProvider
+                  ? const AssetImage('assets/logos/splash_logo.png')
                   : profileImageProvider(author),
             ),
             title: Text(

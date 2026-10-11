@@ -9,7 +9,7 @@
 - [x] MVP account-to-discovery smoke flow passed on local macOS host
 - [x] Local discovery performance budget
 - [x] Debug Android APK build
-- [x] Release-mode Android App Bundle build using temporary debug signing
+- [x] Release-mode Android App Bundle build as an unsigned validation artifact
 - [x] Debug iOS simulator build
 - [x] R8 code shrinking and resource shrinking
 - [x] Cleartext traffic disabled
@@ -20,15 +20,16 @@
 - [x] Data export and delayed permanent-erasure backend
 - [x] Report rate limits and target validation
 - [x] Permanent Android application ID set to `ca.maplov.app`
-- [x] Local and linked Supabase migrations synchronized through migration 049
+- [x] Local and linked Supabase migrations synchronized through migration 060
 - [x] Linked PostgreSQL lint has no error-level findings
 
 ## Device and release-build validation
 
-- [ ] Run the MVP smoke flow on an Android emulator
+- [x] Run the MVP smoke flow on an Android 16 emulator with 16 KB page size
 - [ ] Run the MVP smoke flow on a physical Android device
 - [ ] Run the MVP smoke flow on an iOS simulator
 - [ ] Run the MVP smoke flow on a physical iPhone
+- [ ] Re-run the release AAB build from a local, non-synchronized workspace
 - [ ] Build the signed production Android App Bundle
 - [ ] Build and archive the signed production iOS application
 - [ ] Verify foreground location, camera, microphone and file attachments
@@ -40,11 +41,13 @@
 - [ ] Replace debug Release signing with the upload signing configuration
 - [ ] Create/verify the Google Play developer account
 - [ ] Enrol in Play App Signing
-- [ ] Configure public privacy-policy and account-deletion URLs
+- [x] Prepare public privacy-policy, account-deletion and child-safety pages
+- [ ] Deploy and verify the latest public legal pages on `maplov.ca`
 - [ ] Verify support and child-safety email addresses
 - [ ] Complete Data Safety, Child Safety, content rating and app access forms
 - [ ] Configure Google Play subscription products and purchase verification
-- [ ] Configure SMS, Google OAuth and Firebase Cloud Messaging
+- [ ] Configure SMS and Google OAuth
+- [ ] Decide whether to implement Firebase Cloud Messaging before offering push notifications
 - [ ] Upload the AAB to Internal testing
 - [ ] Complete required closed testing when applicable
 - [ ] Review Android vitals and pre-launch report

@@ -1,0 +1,325 @@
+Privacy Policy
+
+MapLov
+
+Operator
+
+MEZATECH Solutions Inc.
+
+Effective date
+
+September 30, 2026
+
+Address
+
+18 Squires Ave, East York, Ontario, Canada
+
+Privacy contact
+
+admin@mezatech.ca
+
+Summary. MapLov is a dating service reserved for adults aged 18 and over. This policy explains what personal information we collect, why we use it, who we may share it with, how we protect it, how long we keep it and what rights you can exercise.
+
+Please remember: Some data used by MapLov may be sensitive, including precise location, dating preferences, and, if you choose a biometric verification feature, biometric data. Where required by law, we seek separate, express consent before processing this information.
+
+This policy should be read in conjunction with MapLov’s Terms of Use and Community Guidelines.
+
+Summary
+
+1. Who are we and who does this policy apply to?
+
+2. What information do we collect?
+
+3. How do we collect your information?
+
+4. Why do we use your information?
+
+5. Consent and Sensitive Information
+
+6. Location, profiling and recommendations
+
+7. Identity verification and biometrics
+
+8. Disclosures to Third Parties and Service Providers
+
+9. Transfers and processing outside your province or Canada
+
+10. Payments and subscriptions
+
+11. Retention, deletion and anonymization
+
+12. Security and Privacy Breaches
+
+13. Your rights and choices
+
+14. Account deletion
+
+15. Electronic communications and marketing
+
+16. Users under 18 years old
+
+17. Policy Changes
+
+18. Person Responsible for the Protection of Personal Information
+
+19. Consent upon registration
+
+1. Who are we and who does this policy apply to?
+
+MapLov is a dating application and service operated by MEZATECH Solutions Inc. (“MEZATECH”, “MapLov”, “we”, “us” or “our”). This policy applies to personal information processed in the context of the MapLov application, the maplov.ca site, support functions, security, payment and related services that we control.
+
+“Personal information” is information relating to an identifiable person, directly or indirectly. Certain categories may be considered sensitive depending on their nature or context, including biometric information, precise location, dating preferences and certain intimate information.
+
+We apply Canadian privacy laws that apply to our activities, including the Personal Information Protection and Electronic Documents Act (PIPEDA) where applicable, as well as applicable provincial laws, including the Quebec Act Respecting the Protection of Personal Information in the Private Sector.
+
+2. What information do we collect?
+
+2.1 Account and identity information
+
+name or display name, email address, telephone number and login credentials;
+
+date of birth to verify 18+ eligibility;
+
+information necessary for creating, securing and recovering the account;
+
+evidence or verification results when you use an identity verification feature.
+
+2.2 Profile Information and Dating Preferences
+
+photos, videos, biography, city or region, languages, interests and other information you choose to add to your profile;
+
+gender, dating preferences and discovery criteria you choose to communicate;
+
+settings for visibility, distance and other discovery preferences.
+
+We ask you not to publish any personal information in your profile that you do not wish to be shared with other users.
+
+2.3 Location
+
+With your permission, MapLov may process approximate or precise location in order to display relevant profiles, calculate distance, improve security, prevent fraud or provide proximity-based features. Location features should not be enabled by default where the law requires voluntary activation. You can withdraw the authorization in the settings of your device, subject to the functional consequences explained in the application.
+
+2.4 Activity and content in MapLov
+
+likes, super likes, matches, searches, filters, interactions, blocks and reports;
+
+messages and content that you send in MapLov's communication functions;
+
+content transmitted to the medium or as part of a security report;
+
+data relating to campaigns, promotions, passes, boosts or premium features that you use.
+
+2.5 Technical and safety data
+
+IP address, device type, operating system, application version, language, technical identifiers and connection logs;
+
+security events, login attempts, anti-fraud signals, diagnostics, crashes and performance;
+
+information related to the use of the service in order to detect abuse and protect users.
+
+2.6 Payments and transactions
+
+When you purchase a subscription or paid feature, we receive transactional information such as the product purchased, date, amount, currency and payment status. Full credit card numbers are typically processed directly by the payment provider or app store and are not intended to be stored by MapLov.
+
+2.7 Biometric information, if the function is offered
+
+If you choose a selfie or facial recognition verification feature, biometric characteristics or measurements may be generated or compared. This information is sensitive. Before any biometric collection or use requiring consent, MapLov presents a separate notice indicating the purpose, the information processed, the retention period and the choices available.
+
+3. How do we collect your information?
+
+We may collect information:
+
+directly from you when you create an account, complete your profile, communicate with us or use a feature;
+
+automatically when you use the application or the site, for example by means of technical logs and technologies necessary for operation and security;
+
+from the permissions you grant on your device, for example camera, photos or location;
+
+from providers who process a transaction on our behalf, such as a payment, authentication, hosting or fraud prevention provider;
+
+from other users when they interact with you or file a report.
+
+4. Why do we use your information?
+
+We limit collection, use and disclosure to those purposes that are reasonable and necessary in the circumstances. Depending on the context, we use the information to:
+
+create, authenticate, maintain and secure your account;
+
+verify that you are at least 18 years old;
+
+display your profile according to your settings and allow you to discover other users;
+
+provide the matching, search, messaging and recommendations features you enable;
+
+fulfill your purchases, subscriptions and premium features;
+
+prevent, detect and investigate fraud, fake accounts, harassment, Community Guidelines violations and security threats;
+
+respond to support requests and reports;
+
+improve reliability, performance, accessibility and user experience;
+
+comply with our legal, regulatory, accounting, tax and security obligations;
+
+establish, exercise or defend legal rights where permitted by law.
+
+We do not sell your personal information in exchange for money. If MapLov subsequently introduces a targeted advertising use or significant new purpose, we will provide the notice and choices required by law before implementing this new practice.
+
+5. Consent and Sensitive Information
+
+We seek to obtain consent that is valid, understandable and proportionate to the sensitivity of the information. Where required by law, consent is requested separately from any other information and for each relevant purpose.
+
+We generally request express consent for processing that concerns sensitive information or that falls outside of a user's reasonable expectations, including biometrics and certain uses of precise location.
+
+You may withdraw your consent where permitted by law. Opting out may prevent the use of certain features that rely on this information. We will explain to you the reasonably foreseeable consequences of withdrawal.
+
+6. Location, profiling and recommendations
+
+MapLov may use the information you provide and your interactions to personalize profile discovery, rank suggestions, detect abnormal behavior and improve security. These operations may constitute profiling within the meaning of certain laws.
+
+When required by applicable law, technological functions allowing you to be located or certain profiles are only activated following an action on your part. You can adjust or disable the permissions available in the app or on your device.
+
+MapLov does not, to our knowledge, use exclusively automated processing to make a decision producing legal effects towards you. If such a function is introduced, we will provide the information and review rights required by law.
+
+7. Identity verification and biometrics
+
+MapLov may provide mechanisms to reduce fake profiles, duplicate profiles and identity theft. When a biometric mechanism is used:
+
+we clearly explain the purpose before collection;
+
+we ask for express consent when required;
+
+we limit collection and retention to what is necessary for the stated purpose;
+
+we apply specific legal measures applicable to biometrics, particularly in Quebec;
+
+we indicate, in the separate biometric notice, the applicable retention period and deletion method.
+
+In Quebec, the use of a biometric technique to verify or confirm identity as well as the creation of a bank of biometric characteristics or measurements are subject to specific requirements. MapLov will only deploy these functions to the persons concerned after having taken the required steps.
+
+8. Disclosures to Third Parties and Service Providers
+
+We may disclose personal information to vendors acting on our behalf, only to the extent necessary to provide, secure or operate MapLov. These categories may include:
+
+hosting, database, authentication, storage and cloud infrastructure;
+
+identity verification, fraud prevention and, if activated, biometric processing;
+
+payment providers and app stores;
+
+security, logging, diagnostic and support tools;
+
+legal, accounting or professional service providers when necessary.
+
+Providers used may include, depending on configuration, Supabase for certain backend functions, Amazon Web Services for certain verification or infrastructure functions, Stripe for certain web payments, Apple and Google for in-app purchases and Cloudflare for certain web services. The actual list of suppliers may change; MapLov remains responsible for its obligations to protect personal information under its control.
+
+We may also disclose information when authorized or required by law, including in response to an order, to prevent serious fraud or security risk, or to establish or defend a legal right. We do not grant any third party greater access than necessary for the relevant purpose.
+
+9. Transfers and processing outside your province or Canada
+
+Some providers may process or store information in another province or outside of Canada, including the United States. In this case, the information may be subject to the laws of the territory in which it is processed and be accessible to the competent authorities in accordance with those laws.
+
+When Quebec law applies, we carry out the required privacy impact assessment before communicating or entrusting personal information outside of Quebec and we put in place appropriate contractual agreements to ensure adequate protection.
+
+10. Payments and subscriptions
+
+Payments may be processed by Apple, Google, Stripe or another provider specified at the time of purchase. These providers process your payment information according to their own privacy policies and legal obligations.
+
+MapLov usually receives the information necessary to manage the transaction, subscription, reimbursement, fraud prevention and support, without receiving your full card number when the payment provider processes your card directly.
+
+11. Retention, deletion and anonymization
+
+We retain information only for as long as reasonably necessary for the purposes described in this policy, and then delete, securely destroy or anonymize it where permitted by law.
+
+The duration depends in particular on the nature of the information, sensitivity, account status, legal obligations and security needs. In practice:
+
+account and profile information is generally retained while your account is active;
+
+after a deletion request, we initiate the deletion of the data associated with the account, subject to the data that we must or can retain for legal, accounting, security, fraud prevention or dispute resolution reasons;
+
+technical backups may persist for a limited period before being overwritten in the normal backup cycle;
+
+transaction records are retained for the period required by applicable tax, accounting or consumer protection laws;
+
+biometric information, if used, follows the duration announced in the separate biometric notice and is not retained longer than necessary for the authorized purpose.
+
+When anonymization is permitted and used, we apply applicable legal requirements so that the information cannot reasonably be used to identify an individual.
+
+12. Security and Privacy Breaches
+
+We use administrative, technical and organizational measures proportionate to the sensitivity of the information, which may include access control, encryption in transit, authentication mechanisms, logging, security monitoring and limitation of privileges.
+
+No security method is perfect. In the event of a privacy incident presenting a real risk of serious harm or other threshold required by law, we will take the required measures, including assessment, record keeping and notification to appropriate persons or authorities when necessary.
+
+13. Your rights and choices
+
+Depending on your place of residence and applicable law, you may request:
+
+access to the personal information we hold about you;
+
+rectification of inaccurate or incomplete information;
+
+the deletion or cessation of dissemination in the circumstances provided for by law;
+
+withdrawal of your consent, subject to applicable legal or contractual restrictions;
+
+information about how your information was collected, used or disclosed;
+
+in Quebec, when the legal conditions are met, the computerized communication of certain information in a structured and commonly used technological format;
+
+to file a complaint with MapLov and, if necessary, with the competent personal information protection authority.
+
+To protect your account, we may request reasonable information to verify your identity before responding to a request. We respond within the time limits provided by applicable law.
+
+14. Account deletion
+
+You can request the deletion of your account from the route provided in MapLov. When required by application store requirements, a web-accessible means is also provided to initiate a deletion request.
+
+Deletion of an account includes the account and associated personal information, including user-generated content, except when we need to retain certain information for a legal obligation, reasonable prevention of fraud or abuse, security, a pending transaction or the defense of a legal right. When we retain data for a legitimate exception, we limit its use to that purpose.
+
+Uninstalling the app does not automatically delete your account. Temporarily deactivating or pausing the profile does not equate to permanent deletion.
+
+15. Electronic communications and marketing
+
+We may send you communications necessary for the service, for example for security, authentication, important changes or transactions. When commercial communications require consent, we collect this consent in accordance with Canadian anti-spam legislation and other applicable laws.
+
+You can use the unsubscribe mechanism included in commercial messages or change your preferences where this option is available. Certain messages strictly necessary for service, security or a transaction may continue to be sent even after a marketing opt-out.
+
+16. Users under 18 years old
+
+MapLov is reserved for persons aged 18 or over. We do not knowingly seek to collect personal information from anyone under the age of 18. If we learn that an account belongs to a minor, we may suspend or delete the account and take reasonable steps to delete the information, subject to applicable security or legal obligations.
+
+17. Policy Changes
+
+We may modify this policy to reflect changes to MapLov, our suppliers or legal requirements. We will post the updated version and effective date. Where the change is material or new consent is required, we will provide appropriate notice and request the required consent before implementing the new processing.
+
+18. Person Responsible for the Protection of Personal Information
+
+MEZATECH Solutions Inc. is responsible for personal information under its control. Questions, requests for access or rectification, withdrawal of consent and complaints relating to privacy can be addressed to the Personal Information Protection Manager:
+
+Business
+
+MEZATECH Solutions Inc.
+
+Title
+
+Person Responsible for the Protection of Personal Information
+
+E-mail
+
+admin@mezatech.ca
+
+Address
+
+18 Squires Ave, East York, Ontario, Canada
+
+You can also contact the competent privacy authority for your province or territory, in particular the Office of the Privacy Commissioner of Canada or, for Quebec, the Commission d’accès à l’information du Québec, where these organizations have jurisdiction.
+
+19. Consent upon registration
+
+In the “MapLov Agreements and Rules” screen, acceptance of this policy must remain separate from acceptance of the Terms of Use. The recommended wording is:
+
+☐ I acknowledge having read the Privacy Policy.
+
+This recognition of reading does not replace the separate consents which may be required for particular processing, in particular biometrics, certain uses of precise location or any new sensitive purpose.
+
+Last updated: September 30, 2026. This English translation accompanies the French source version. Where a specific legal requirement applies, the governing version is determined in accordance with applicable law.

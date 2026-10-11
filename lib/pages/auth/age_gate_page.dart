@@ -13,12 +13,24 @@ class RegistrationGateData {
 }
 
 const _legalDocumentVersions = <String, String>{
-  'terms_of_use': _legalDraftVersion,
-  'privacy_policy': _legalDraftVersion,
-  'community_guidelines': '2026-07-16',
-  'adult_eligibility': '2026-07-16',
-  'content_and_safety_rules': '2026-07-16',
+  'terms_of_use': '1.1-2026-09-24',
+  'privacy_policy': '1.0-2026-09-30',
+  'community_guidelines': '1.0-2026-09-30',
 };
+
+abstract final class AgeEligibility {
+  static int ageOn(DateTime dateOfBirth, DateTime onDate) {
+    var age = onDate.year - dateOfBirth.year;
+    final birthdayHasOccurred =
+        onDate.month > dateOfBirth.month ||
+        (onDate.month == dateOfBirth.month && onDate.day >= dateOfBirth.day);
+    if (!birthdayHasOccurred) age--;
+    return age;
+  }
+
+  static bool canUseMapLov(DateTime dateOfBirth, {DateTime? onDate}) =>
+      ageOn(dateOfBirth, onDate ?? DateTime.now()) >= 18;
+}
 
 class AgeGateScreen extends StatefulWidget {
   const AgeGateScreen({super.key, this.completeExistingSocialAccount = false});
@@ -38,13 +50,14 @@ class _AgeGateScreenState extends State<AgeGateScreen> {
   bool get _allAccepted =>
       acceptedDocuments.length == _legalDocumentVersions.length;
 
+  bool get _isAdult =>
+      dateOfBirth != null && AgeEligibility.canUseMapLov(dateOfBirth!);
+
   void _openLegalDocument(String key) {
     final document = switch (key) {
       'terms_of_use' => _termsDocument,
       'privacy_policy' => _privacyDocument,
-      'community_guidelines' => _communityDocument,
-      'adult_eligibility' => _adultEligibilityDocument,
-      _ => _contentSafetyDocument,
+      _ => _communityDocument,
     };
     Navigator.push(
       context,
@@ -68,12 +81,18 @@ class _AgeGateScreenState extends State<AgeGateScreen> {
       activeColor: AppColors.coral,
       contentPadding: EdgeInsets.zero,
       controlAffinity: ListTileControlAffinity.leading,
-      title: Wrap(
-        crossAxisAlignment: WrapCrossAlignment.center,
+      title: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(prefix),
+          Text(prefix.trim()),
           TextButton(
             onPressed: () => _openLegalDocument(key),
+            style: TextButton.styleFrom(
+              padding: EdgeInsets.zero,
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              alignment: Alignment.centerLeft,
+            ),
             child: Text(linkLabel),
           ),
         ],
@@ -83,16 +102,22 @@ class _AgeGateScreenState extends State<AgeGateScreen> {
 
   Future<void> _selectDateOfBirth() async {
     final now = DateTime.now();
-    final latestAllowed = DateTime(now.year - 18, now.month, now.day);
     final selected = await showDialog<DateTime>(
       context: context,
       builder: (_) => _BirthDatePickerDialog(
         initialDate: dateOfBirth ?? DateTime(now.year - 25, now.month, now.day),
         firstDate: DateTime(1900),
-        lastDate: latestAllowed,
+        lastDate: DateTime(now.year, now.month, now.day),
       ),
     );
-    if (selected != null && mounted) setState(() => dateOfBirth = selected);
+    if (selected != null && mounted) {
+      setState(() {
+        dateOfBirth = selected;
+        errorText = AgeEligibility.canUseMapLov(selected)
+            ? null
+            : 'You must be at least 18 years old to use MapLov.';
+      });
+    }
   }
 
   String get _formattedDate {
@@ -115,7 +140,7 @@ class _AgeGateScreenState extends State<AgeGateScreen> {
   );
 
   Future<void> _continue() async {
-    if (!_allAccepted || dateOfBirth == null || saving) return;
+    if (!_allAccepted || !_isAdult || saving) return;
     final gateData = _gateData();
     if (!widget.completeExistingSocialAccount) {
       Navigator.pushReplacementNamed(
@@ -196,17 +221,7 @@ class _AgeGateScreenState extends State<AgeGateScreen> {
       _acceptanceTile(
         'community_guidelines',
         'I have read and accept the ',
-        'Community Guidelines',
-      ),
-      _acceptanceTile(
-        'adult_eligibility',
-        'I confirm that I am at least 18 and accept the ',
-        'adult eligibility rules',
-      ),
-      _acceptanceTile(
-        'content_and_safety_rules',
-        'I accept the ',
-        'content, photo, reporting and safety rules',
+        'Community and Safety Guidelines',
       ),
       const SizedBox(height: 16),
       if (errorText != null) ...[
@@ -220,9 +235,7 @@ class _AgeGateScreenState extends State<AgeGateScreen> {
       SizedBox(
         width: double.infinity,
         child: FilledButton(
-          onPressed: _allAccepted && dateOfBirth != null && !saving
-              ? _continue
-              : null,
+          onPressed: _allAccepted && _isAdult && !saving ? _continue : null,
           child: saving
               ? const SizedBox.square(
                   dimension: 20,

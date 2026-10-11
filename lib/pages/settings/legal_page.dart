@@ -27,6 +27,8 @@ class _LegalDocument {
     required this.effectiveDate,
     required this.sections,
     required this.contact,
+    this.englishAsset,
+    this.frenchAsset,
   });
 
   final String key;
@@ -35,6 +37,13 @@ class _LegalDocument {
   final _LegalCopy effectiveDate;
   final List<_LegalSection> sections;
   final _LegalCopy contact;
+  final String? englishAsset;
+  final String? frenchAsset;
+
+  String? assetFor(BuildContext context) =>
+      Localizations.localeOf(context).languageCode == 'fr'
+      ? frenchAsset
+      : englishAsset;
 }
 
 class LegalScreen extends StatefulWidget {
@@ -110,9 +119,9 @@ class _LegalScreenState extends State<LegalScreen> {
         color: AppColors.palePink,
         child: ListTile(
           leading: Icon(Icons.gavel_outlined, color: AppColors.coral),
-          title: Text('Legal drafts for MapLov'),
+          title: Text('MapLov legal documents'),
           subtitle: Text(
-            'Original Canadian drafts based on MapLov’s actual features. The legal operator name, postal address and final launch date must be confirmed by qualified Canadian counsel before publication.',
+            'Terms of Use, Privacy Policy, and Community and Safety Guidelines are available in French and English.',
           ),
         ),
       ),
@@ -208,44 +217,104 @@ class _LegalDocumentScreen extends StatelessWidget {
   final _LegalDocument document;
 
   @override
-  Widget build(BuildContext context) => _AppPage(
-    title: document.title.resolve(context),
-    children: [
-      Text(
-        '${document.effectiveDate.resolve(context)} • '
-        '${Localizations.localeOf(context).languageCode == 'fr' ? 'Version' : 'Version'} '
-        '${document.version}',
-        style: const TextStyle(color: AppColors.grayText),
-      ),
-      const SizedBox(height: 8),
-      ...document.sections.expand(
-        (section) => [
-          _SectionTitle(section.title.resolve(context)),
+  Widget build(BuildContext context) {
+    final asset = document.assetFor(context);
+    return _AppPage(
+      title: document.title.resolve(context),
+      children: [
+        if (asset != null)
+          _LegalAssetBody(asset: asset)
+        else ...[
+          Text(
+            '${document.effectiveDate.resolve(context)} • '
+            'Version ${document.version}',
+            style: const TextStyle(color: AppColors.grayText),
+          ),
+          const SizedBox(height: 8),
+          ...document.sections.expand(
+            (section) => [
+              _SectionTitle(section.title.resolve(context)),
+              SelectableText(
+                section.body.resolve(context),
+                style: const TextStyle(height: 1.48),
+              ),
+            ],
+          ),
+          const SizedBox(height: 22),
           SelectableText(
-            section.body.resolve(context),
-            style: const TextStyle(height: 1.48),
+            document.contact.resolve(context),
+            style: const TextStyle(
+              color: AppColors.grayText,
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ],
-      ),
-      const SizedBox(height: 22),
-      SelectableText(
-        document.contact.resolve(context),
-        style: const TextStyle(
-          color: AppColors.grayText,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
-    ],
+      ],
+    );
+  }
+}
+
+class _LegalAssetBody extends StatelessWidget {
+  const _LegalAssetBody({required this.asset});
+
+  final String asset;
+
+  bool _isHeading(String line) =>
+      line == 'Summary' ||
+      line == 'Sommaire' ||
+      RegExp(r'^\d+(?:\.\d+)*\.?(?:\s|$)').hasMatch(line) ||
+      (line.length < 80 && line == line.toUpperCase());
+
+  @override
+  Widget build(BuildContext context) => FutureBuilder<String>(
+    future: rootBundle.loadString(asset),
+    builder: (context, snapshot) {
+      if (snapshot.hasError) {
+        return const Text('Unable to load this legal document.');
+      }
+      if (!snapshot.hasData) {
+        return const Center(child: CircularProgressIndicator());
+      }
+      final lines = snapshot.data!
+          .replaceAll('\f', '\n')
+          .split('\n')
+          .map((line) => line.trim())
+          .where((line) => line.isNotEmpty);
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          for (final line in lines)
+            Padding(
+              padding: EdgeInsets.only(
+                top: _isHeading(line) ? 14 : 4,
+                bottom: 4,
+                left: line.startsWith('•') ? 12 : 0,
+              ),
+              child: SelectableText(
+                line,
+                style: TextStyle(
+                  height: 1.45,
+                  fontWeight: _isHeading(line)
+                      ? FontWeight.w700
+                      : FontWeight.w400,
+                ),
+              ),
+            ),
+        ],
+      );
+    },
   );
 }
 
 const _termsDocument = _LegalDocument(
   key: 'terms_of_use',
-  version: _legalDraftVersion,
+  version: '1.1-2026-09-24',
+  englishAsset: 'assets/legal/en/terms_of_use_v1.1.txt',
+  frenchAsset: 'assets/legal/fr/terms_of_use_v1.1.txt',
   title: _LegalCopy('Terms of Use', 'Conditions d’utilisation'),
   effectiveDate: _LegalCopy(
-    'Effective date: July 30, 2026 — legal-review draft',
-    'Date d’entrée en vigueur : 30 juillet 2026 — projet à réviser juridiquement',
+    'Effective date: September 24, 2026',
+    'Date d’entrée en vigueur : 24 septembre 2026',
   ),
   contact: _LegalCopy(
     'Questions about these Terms: support@maplov.ca',
@@ -431,11 +500,13 @@ const _termsDocument = _LegalDocument(
 
 const _privacyDocument = _LegalDocument(
   key: 'privacy_policy',
-  version: _legalDraftVersion,
+  version: '1.0-2026-09-30',
+  englishAsset: 'assets/legal/en/privacy_policy_v1.0.txt',
+  frenchAsset: 'assets/legal/fr/privacy_policy_v1.0.txt',
   title: _LegalCopy('Privacy Policy', 'Politique de confidentialité'),
   effectiveDate: _LegalCopy(
-    'Effective date: July 30, 2026 — legal-review draft',
-    'Date d’entrée en vigueur : 30 juillet 2026 — projet à réviser juridiquement',
+    'Effective date: September 30, 2026',
+    'Date d’entrée en vigueur : 30 septembre 2026',
   ),
   contact: _LegalCopy(
     'Privacy Officer: privacy@maplov.ca',
@@ -743,11 +814,16 @@ const _faceVerificationDocument = _LegalDocument(
 
 const _communityDocument = _LegalDocument(
   key: 'community_guidelines',
-  version: '2026-07-16',
-  title: _LegalCopy('Community Guidelines', 'Règles de la communauté'),
+  version: '1.0-2026-09-30',
+  englishAsset: 'assets/legal/en/community_safety_guidelines_v1.0.txt',
+  frenchAsset: 'assets/legal/fr/community_safety_guidelines_v1.0.txt',
+  title: _LegalCopy(
+    'Community and Safety Guidelines',
+    'Règles de la communauté et de sécurité',
+  ),
   effectiveDate: _LegalCopy(
-    'Effective date: July 16, 2026',
-    'Date d’entrée en vigueur : 16 juillet 2026',
+    'Effective date: September 30, 2026',
+    'Date d’entrée en vigueur : 30 septembre 2026',
   ),
   contact: _LegalCopy(
     'Safety reports: use the in-app controls or support@maplov.ca',

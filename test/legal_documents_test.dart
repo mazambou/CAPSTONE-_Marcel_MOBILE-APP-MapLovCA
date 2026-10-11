@@ -20,14 +20,10 @@ void main() {
     await tester.tap(find.text('Terms of Use'));
     await tester.pumpAndSettle();
 
-    expect(
-      find.textContaining('Effective date: July 30, 2026'),
-      findsOneWidget,
-    );
-    expect(
-      find.textContaining('These Terms govern access to the MapLov'),
-      findsOneWidget,
-    );
+    expect(find.text('Effective date'), findsOneWidget);
+    expect(find.text('September 24, 2026'), findsOneWidget);
+    expect(find.textContaining('Effective date:'), findsNothing);
+    expect(find.textContaining('MEZATECH Solutions Inc.'), findsWidgets);
   });
 
   test('legal drafts do not include Tinder branding', () {

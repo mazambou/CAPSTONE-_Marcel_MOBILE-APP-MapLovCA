@@ -207,6 +207,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
     if (widget.effectiveDateOfBirth == null) {
       return 'Confirm your age and accept every required agreement first.';
     }
+    if (!AgeEligibility.canUseMapLov(widget.effectiveDateOfBirth!)) {
+      return 'You must be at least 18 years old to use MapLov.';
+    }
     if (_fullNameController.text.trim().length < 2) {
       return 'Enter your full name.';
     }

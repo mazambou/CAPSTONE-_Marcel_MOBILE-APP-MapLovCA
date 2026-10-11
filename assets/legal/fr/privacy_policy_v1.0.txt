@@ -1,0 +1,164 @@
+Politique de confidentialité
+MapLov
+Exploitant
+MEZATECH Solutions Inc.
+Date d’entrée en vigueur
+30 septembre 2026
+Adresse
+18 Squires Ave, East York, Ontario, Canada
+Contact vie privée
+admin@mezatech.ca
+Résumé. MapLov est un service de rencontres réservé aux adultes de 18 ans et plus. La présente politique explique quels renseignements personnels nous recueillons, pourquoi nous les utilisons, avec qui nous pouvons les communiquer, comment nous les protégeons, combien de temps nous les conservons et quels droits vous pouvez exercer.
+À retenir : certaines données utilisées par MapLov peuvent être sensibles, notamment la localisation précise, les préférences de rencontre et, si vous choisissez une fonction de vérification biométrique, les données biométriques. Lorsque la loi l’exige, nous demandons un consentement exprès et distinct avant de traiter ces renseignements.
+Cette politique doit être lue avec les Conditions d’utilisation et les Règles de la communauté de MapLov.
+
+Sommaire
+1. Qui sommes-nous et à qui s’applique cette politique ?
+2. Quels renseignements recueillons-nous ?
+3. Comment recueillons-nous vos renseignements ?
+4. Pourquoi utilisons-nous vos renseignements ?
+5. Consentement et renseignements sensibles
+6. Localisation, profilage et recommandations
+7. Vérification d’identité et biométrie
+8. Communications à des tiers et fournisseurs de services
+9. Transferts et traitement hors de votre province ou du Canada
+10. Paiements et abonnements
+11. Conservation, suppression et anonymisation
+12. Sécurité et incidents de confidentialité
+13. Vos droits et vos choix
+14. Suppression du compte
+15. Communications électroniques et marketing
+16. Utilisateurs de moins de 18 ans
+17. Modifications de la politique
+18. Responsable de la protection des renseignements personnels
+19. Consentement lors de l’inscription
+1. Qui sommes-nous et à qui s’applique cette politique ?
+MapLov est une application et un service de rencontres exploité par MEZATECH Solutions Inc. (« MEZATECH », « MapLov », « nous », « notre » ou « nos »). La présente politique s’applique aux renseignements personnels traités dans le cadre de l’application MapLov, du site maplov.ca, des fonctions de support, de sécurité, de paiement et des services connexes que nous contrôlons.
+Un « renseignement personnel » est un renseignement concernant une personne identifiable, directement ou indirectement. Certaines catégories peuvent être considérées comme sensibles selon leur nature ou leur contexte, notamment les renseignements biométriques, la localisation précise, les préférences de rencontre et certains renseignements intimes.
+Nous appliquons les lois canadiennes sur la protection des renseignements personnels qui s’appliquent à nos activités, notamment la Loi sur la protection des renseignements personnels et les documents électroniques (LPRPDE/PIPEDA) lorsqu’elle s’applique, ainsi que les lois provinciales applicables, dont la Loi sur la protection des renseignements personnels dans le secteur privé du Québec.
+2. Quels renseignements recueillons-nous ?
+2.1 Renseignements de compte et d’identité
+nom ou nom d’affichage, adresse courriel, numéro de téléphone et identifiants de connexion;
+date de naissance afin de vérifier l’admissibilité 18+;
+informations nécessaires à la création, à la sécurisation et à la récupération du compte;
+preuves ou résultats de vérification lorsque vous utilisez une fonction de vérification d’identité.
+2.2 Renseignements de profil et préférences de rencontre
+photos, vidéos, biographie, ville ou région, langues, intérêts et autres renseignements que vous choisissez d’ajouter à votre profil;
+genre, préférences de rencontre et critères de découverte que vous choisissez de communiquer;
+paramètres de visibilité, de distance et autres préférences de découverte.
+Nous vous demandons de ne pas publier dans votre profil des renseignements personnels dont vous ne souhaitez pas la diffusion à d’autres utilisateurs.
+2.3 Localisation
+Avec votre autorisation, MapLov peut traiter une localisation approximative ou précise afin d’afficher des profils pertinents, calculer une distance, améliorer la sécurité, prévenir la fraude ou fournir des fonctions basées sur la proximité. Les fonctions de localisation ne doivent pas être activées par défaut lorsque la loi exige une activation volontaire. Vous pouvez retirer l’autorisation dans les réglages de votre appareil, sous réserve des conséquences fonctionnelles expliquées dans l’application.
+2.4 Activité et contenu dans MapLov
+likes, super likes, matchs, recherches, filtres, interactions, blocages et signalements;
+messages et contenu que vous envoyez dans les fonctions de communication de MapLov;
+contenu transmis au support ou dans le cadre d’un signalement de sécurité;
+données relatives aux campagnes, promotions, passes, boosts ou fonctions premium que vous utilisez.
+2.5 Données techniques et de sécurité
+adresse IP, type d’appareil, système d’exploitation, version de l’application, langue, identifiants techniques et journaux de connexion;
+événements de sécurité, tentatives de connexion, signaux anti-fraude, diagnostics, pannes et performances;
+informations liées à l’utilisation du service afin de détecter les abus et protéger les utilisateurs.
+2.6 Paiements et transactions
+Lorsque vous achetez un abonnement ou une fonction payante, nous recevons des renseignements transactionnels tels que le produit acheté, la date, le montant, la devise et l’état du paiement. Les numéros complets de carte bancaire sont généralement traités directement par le fournisseur de paiement ou la boutique d’applications et ne sont pas destinés à être stockés par MapLov.
+2.7 Renseignements biométriques, si la fonction est offerte
+Si vous choisissez une fonction de vérification par selfie ou reconnaissance faciale, des caractéristiques ou mesures biométriques peuvent être générées ou comparées. Ces renseignements sont sensibles. Avant toute collecte ou utilisation biométrique nécessitant un consentement, MapLov présente un avis distinct indiquant la finalité, les renseignements traités, la durée de conservation et les choix disponibles.
+3. Comment recueillons-nous vos renseignements ?
+Nous pouvons recueillir des renseignements :
+directement auprès de vous lorsque vous créez un compte, complétez votre profil, communiquez avec nous ou utilisez une fonction;
+automatiquement lorsque vous utilisez l’application ou le site, par exemple au moyen de journaux techniques et de technologies nécessaires au fonctionnement et à la sécurité;
+à partir des autorisations que vous accordez sur votre appareil, par exemple l’appareil photo, les photos ou la localisation;
+auprès de fournisseurs qui traitent une opération en notre nom, comme un fournisseur de paiement, d’authentification, d’hébergement ou de prévention de la fraude;
+auprès d’autres utilisateurs lorsqu’ils interagissent avec vous ou déposent un signalement.
+4. Pourquoi utilisons-nous vos renseignements ?
+Nous limitons la collecte, l’utilisation et la communication aux fins qui sont raisonnables et nécessaires dans les circonstances. Selon le contexte, nous utilisons les renseignements pour :
+créer, authentifier, maintenir et sécuriser votre compte;
+vérifier que vous avez au moins 18 ans;
+afficher votre profil conformément à vos paramètres et vous permettre de découvrir d’autres utilisateurs;
+fournir les fonctions de correspondance, de recherche, de messagerie et de recommandations que vous activez;
+exécuter vos achats, abonnements et fonctions premium;
+prévenir, détecter et enquêter sur la fraude, les faux comptes, le harcèlement, les violations des Règles de la communauté et les menaces à la sécurité;
+répondre aux demandes de support et aux signalements;
+améliorer la fiabilité, les performances, l’accessibilité et l’expérience utilisateur;
+respecter nos obligations légales, réglementaires, comptables, fiscales et de sécurité;
+établir, exercer ou défendre des droits en justice lorsque cela est permis par la loi.
+Nous ne vendons pas vos renseignements personnels en échange d’argent. Si MapLov introduit ultérieurement une utilisation à des fins de publicité ciblée ou une nouvelle finalité importante, nous fournirons l’avis et les choix exigés par la loi avant de mettre en œuvre cette nouvelle pratique.
+5. Consentement et renseignements sensibles
+Nous cherchons à obtenir un consentement valable, compréhensible et proportionné à la sensibilité des renseignements. Lorsque la loi l’exige, le consentement est demandé séparément de toute autre information et pour chaque finalité pertinente.
+Nous demandons généralement un consentement exprès pour les traitements qui concernent des renseignements sensibles ou qui sortent des attentes raisonnables d’un utilisateur, notamment la biométrie et certaines utilisations de la localisation précise.
+Vous pouvez retirer votre consentement lorsque la loi le permet. Le retrait peut empêcher l’utilisation de certaines fonctions qui dépendent de ces renseignements. Nous vous expliquerons les conséquences raisonnablement prévisibles du retrait.
+6. Localisation, profilage et recommandations
+MapLov peut utiliser les renseignements que vous fournissez et vos interactions pour personnaliser la découverte de profils, classer des suggestions, détecter des comportements anormaux et améliorer la sécurité. Ces opérations peuvent constituer du profilage au sens de certaines lois.
+Lorsque la loi applicable l’exige, les fonctions technologiques permettant de vous localiser ou d’effectuer certains profils ne sont activées qu’à la suite d’une action de votre part. Vous pouvez ajuster ou désactiver les autorisations disponibles dans l’application ou dans votre appareil.
+MapLov n’utilise pas, à notre connaissance, un traitement exclusivement automatisé pour prendre une décision produisant des effets juridiques à votre égard. Si une telle fonction est introduite, nous fournirons l’information et les droits de révision requis par la loi.
+7. Vérification d’identité et biométrie
+MapLov peut proposer des mécanismes destinés à réduire les faux profils, les doublons et l’usurpation d’identité. Lorsqu’un mécanisme biométrique est utilisé :
+nous expliquons clairement la finalité avant la collecte;
+nous demandons le consentement exprès lorsque requis;
+nous limitons la collecte et la conservation à ce qui est nécessaire pour la finalité annoncée;
+nous appliquons les mesures légales particulières applicables à la biométrie, notamment au Québec;
+nous indiquons, dans l’avis biométrique distinct, la durée de conservation et la méthode de suppression applicables.
+Au Québec, l’utilisation d’une technique biométrique pour vérifier ou confirmer l’identité ainsi que la création d’une banque de caractéristiques ou de mesures biométriques sont soumises à des exigences particulières. MapLov ne déploiera ces fonctions pour les personnes concernées qu’après avoir effectué les démarches requises.
+8. Communications à des tiers et fournisseurs de services
+Nous pouvons communiquer des renseignements personnels à des fournisseurs qui agissent pour notre compte, uniquement dans la mesure nécessaire pour fournir, sécuriser ou exploiter MapLov. Ces catégories peuvent comprendre :
+hébergement, base de données, authentification, stockage et infrastructure cloud;
+verification d’identité, prévention de la fraude et, si activé, traitement biométrique;
+prestataires de paiement et boutiques d’applications;
+outils de sécurité, de journalisation, de diagnostic et de support;
+prestataires juridiques, comptables ou professionnels lorsque nécessaire.
+Les fournisseurs utilisés peuvent inclure, selon la configuration en vigueur, Supabase pour certaines fonctions de backend, Amazon Web Services pour certaines fonctions de vérification ou d’infrastructure, Stripe pour certains paiements web, Apple et Google pour les achats intégrés et Cloudflare pour certains services web. La liste réelle des fournisseurs peut évoluer; MapLov demeure responsable de ses obligations de protection des renseignements personnels sous son contrôle.
+Nous pouvons également communiquer des renseignements lorsqu’une loi l’autorise ou l’exige, notamment en réponse à une ordonnance, pour prévenir une fraude grave ou un risque de sécurité, ou pour établir ou défendre un droit légal. Nous n’accordons pas à un tiers un accès plus large que nécessaire pour la finalité concernée.
+9. Transferts et traitement hors de votre province ou du Canada
+Certains fournisseurs peuvent traiter ou conserver des renseignements dans une autre province ou à l’extérieur du Canada, notamment aux États-Unis. Dans ce cas, les renseignements peuvent être soumis aux lois du territoire où ils sont traités et être accessibles aux autorités compétentes conformément à ces lois.
+Lorsque la loi québécoise s’applique, nous réalisons l’évaluation des facteurs relatifs à la vie privée requise avant de communiquer ou de confier des renseignements personnels à l’extérieur du Québec et nous mettons en place les ententes contractuelles appropriées afin d’assurer une protection adéquate.
+10. Paiements et abonnements
+Les paiements peuvent être traités par Apple, Google, Stripe ou un autre prestataire indiqué au moment de l’achat. Ces fournisseurs traitent vos renseignements de paiement selon leurs propres politiques de confidentialité et leurs obligations légales.
+MapLov reçoit habituellement les renseignements nécessaires pour gérer la transaction, l’abonnement, le remboursement, la prévention de la fraude et le support, sans recevoir le numéro complet de votre carte lorsque le prestataire de paiement traite directement celle-ci.
+11. Conservation, suppression et anonymisation
+Nous conservons les renseignements uniquement pendant la période raisonnablement nécessaire aux finalités décrites dans cette politique, puis nous les supprimons, les détruisons de façon sécuritaire ou les anonymisons lorsque la loi le permet.
+La durée dépend notamment de la nature du renseignement, de la sensibilité, de l’état du compte, des obligations légales et des besoins de sécurité. En pratique :
+les renseignements de compte et de profil sont généralement conservés pendant que votre compte est actif;
+apres une demande de suppression, nous lançons la suppression des données associées au compte, sous réserve des données que nous devons ou pouvons conserver pour des raisons légales, comptables, de sécurité, de prévention de la fraude ou de règlement de différends;
+les sauvegardes techniques peuvent persister pendant une période limitée avant d’être écrasées dans le cycle normal de sauvegarde;
+les dossiers de transaction sont conservés pendant la période requise par les lois fiscales, comptables ou de protection du consommateur applicables;
+les renseignements biométriques, s’ils sont utilisés, suivent la durée annoncée dans l’avis biométrique distinct et ne sont pas conservés plus longtemps que nécessaire pour la finalité autorisée.
+Lorsque l’anonymisation est permise et utilisée, nous appliquons les exigences légales applicables afin que les renseignements ne puissent raisonnablement permettre d’identifier une personne.
+12. Sécurité et incidents de confidentialité
+Nous utilisons des mesures administratives, techniques et organisationnelles proportionnées à la sensibilité des renseignements, qui peuvent comprendre le contrôle des accès, le chiffrement en transit, des mécanismes d’authentification, la journalisation, la surveillance de sécurité et la limitation des privilèges.
+Aucune méthode de sécurité n’est parfaite. En cas d’incident de confidentialité présentant un risque réel de préjudice grave ou un autre seuil prévu par la loi, nous prendrons les mesures requises, notamment l’évaluation, la tenue des registres et les avis aux personnes ou autorités compétentes lorsque nécessaire.
+13. Vos droits et vos choix
+Selon votre lieu de résidence et la loi applicable, vous pouvez notamment demander :
+l’accès aux renseignements personnels que nous détenons à votre sujet;
+la rectification de renseignements inexacts ou incomplets;
+la suppression ou la cessation de diffusion dans les circonstances prévues par la loi;
+le retrait de votre consentement, sous réserve des restrictions légales ou contractuelles applicables;
+des informations sur la manière dont vos renseignements ont été recueillis, utilisés ou communiqués;
+au Québec, lorsque les conditions légales sont réunies, la communication informatisée de certains renseignements dans un format technologique structuré et couramment utilisé;
+de déposer une plainte auprès de MapLov et, si nécessaire, auprès de l’autorité de protection des renseignements personnels compétente.
+Pour protéger votre compte, nous pouvons demander des informations raisonnables afin de vérifier votre identité avant de répondre à une demande. Nous répondons dans les délais prévus par la loi applicable.
+14. Suppression du compte
+Vous pouvez demander la suppression de votre compte à partir du parcours prévu dans MapLov. Lorsque les exigences d’une boutique d’applications l’imposent, un moyen accessible sur le Web est également offert pour initier une demande de suppression.
+La suppression d’un compte vise le compte et les renseignements personnels associés, y compris le contenu généré par l’utilisateur, sauf lorsque nous devons conserver certains renseignements pour une obligation légale, une prévention raisonnable de la fraude ou de l’abus, la sécurité, une transaction en cours ou la défense d’un droit. Lorsque nous conservons des données pour une exception légitime, nous limitons leur utilisation à cette finalité.
+La désinstallation de l’application ne supprime pas automatiquement votre compte. La désactivation temporaire ou la mise en pause du profil n’équivaut pas à une suppression définitive.
+15. Communications électroniques et marketing
+Nous pouvons vous envoyer des communications nécessaires au service, par exemple pour la sécurité, l’authentification, les modifications importantes ou les transactions. Lorsque des communications commerciales exigent un consentement, nous recueillons ce consentement conformément à la législation canadienne anti-pourriel et aux autres lois applicables.
+Vous pouvez utiliser le mécanisme de désabonnement inclus dans les messages commerciaux ou modifier vos préférences lorsque cette option est disponible. Certains messages strictement nécessaires au service, à la sécurité ou à une transaction peuvent continuer à être envoyés même après un désabonnement marketing.
+16. Utilisateurs de moins de 18 ans
+MapLov est réservé aux personnes âgées de 18 ans ou plus. Nous ne cherchons pas à recueillir sciemment des renseignements personnels auprès de personnes de moins de 18 ans. Si nous apprenons qu’un compte appartient à une personne mineure, nous pouvons suspendre ou supprimer le compte et prendre des mesures raisonnables pour supprimer les renseignements, sous réserve des obligations de sécurité ou légales applicables.
+17. Modifications de la politique
+Nous pouvons modifier cette politique pour refléter l’évolution de MapLov, de nos fournisseurs ou des exigences légales. Nous publierons la version mise à jour et la date d’entrée en vigueur. Lorsque la modification est importante ou qu’un nouveau consentement est requis, nous fournirons un avis approprié et demanderons le consentement requis avant d’appliquer le nouveau traitement.
+18. Responsable de la protection des renseignements personnels
+MEZATECH Solutions Inc. est responsable des renseignements personnels sous son contrôle. Les questions, demandes d’accès ou de rectification, retraits de consentement et plaintes relatives à la vie privée peuvent être adressés au Responsable de la protection des renseignements personnels :
+Entreprise
+MEZATECH Solutions Inc.
+Titre
+Responsable de la protection des renseignements personnels
+Courriel
+admin@mezatech.ca
+Adresse
+18 Squires Ave, East York, Ontario, Canada
+Vous pouvez également communiquer avec l’autorité de protection de la vie privée compétente pour votre province ou territoire, notamment le Commissariat à la protection de la vie privée du Canada ou, pour le Québec, la Commission d’accès à l’information, lorsque ces organismes ont compétence.
+19. Consentement lors de l’inscription
+Dans l’écran « Accords et règles de MapLov », l’acceptation de la présente politique doit rester distincte de l’acceptation des Conditions d’utilisation. La formulation recommandée est :
+☐ Je reconnais avoir lu la Politique de confidentialité.
+Cette reconnaissance de lecture ne remplace pas les consentements distincts qui peuvent être exigés pour des traitements particuliers, notamment la biométrie, certaines utilisations de la localisation précise ou toute nouvelle finalité sensible.
+Dernière mise à jour : 30 septembre 2026. Version française. Une version anglaise peut être mise à disposition; en cas d’exigence légale particulière, la version applicable est celle déterminée conformément au droit en vigueur.

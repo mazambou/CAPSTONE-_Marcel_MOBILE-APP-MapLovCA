@@ -138,6 +138,7 @@ class MapLovLocalizations {
     'Terms of Use': 'Conditions d’utilisation',
     'Privacy Policy': 'Politique de confidentialité',
     'Community Guidelines': 'Règles de la communauté',
+    'Community and Safety Guidelines': 'Règles de la communauté et de sécurité',
     'Child Safety Standards': 'Normes de sécurité des enfants',
     'Data and cookie preferences': 'Préférences de données et témoins',
     'Location consent': 'Consentement à la localisation',
@@ -771,12 +772,18 @@ class MapLovLocalizations {
         'Essayez une recherche plus courte ou contactez le soutien.',
     'MVP legal documents': 'Documents juridiques du MVP',
     'Legal drafts for MapLov': 'Projets juridiques pour MapLov',
+    'MapLov legal documents': 'Documents juridiques de MapLov',
+    'Terms of Use, Privacy Policy, and Community and Safety Guidelines are available in French and English.':
+        'Les Conditions d’utilisation, la Politique de confidentialité et les Règles de la communauté et de sécurité sont disponibles en français et en anglais.',
     'Original Canadian drafts based on MapLov’s actual features. The legal operator name, postal address and final launch date must be confirmed by qualified Canadian counsel before publication.':
         'Projets canadiens originaux fondés sur les fonctions réelles de MapLov. La dénomination de l’exploitant, son adresse postale et la date définitive de lancement doivent être confirmées par un juriste canadien qualifié avant publication.',
     'Privacy controls': 'Contrôles de confidentialité',
     'Questions about privacy or these documents can be sent to privacy@maplov.ca. General support is available at support@maplov.ca.':
         'Les questions sur la vie privée ou ces documents peuvent être envoyées à privacy@maplov.ca. Le soutien général est offert à support@maplov.ca.',
     'I acknowledge that I have read the ': 'Je reconnais avoir lu la ',
+    'I have read and accept the ': 'J’ai lu et j’accepte les ',
+    'You must be at least 18 years old to use MapLov.':
+        'Vous devez avoir au moins 18 ans pour utiliser MapLov.',
     'Questions: privacy@maplov.ca': 'Questions : privacy@maplov.ca',
     'This report is confidential.': 'Ce signalement est confidentiel.',
     'Report submitted for review.': 'Signalement soumis pour examen.',

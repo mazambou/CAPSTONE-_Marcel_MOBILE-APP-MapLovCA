@@ -478,12 +478,25 @@ void main() {
     expect(find.text('Terms of Use', skipOffstage: false), findsOneWidget);
     expect(find.text('Privacy Policy', skipOffstage: false), findsOneWidget);
     expect(
-      find.text('Community Guidelines', skipOffstage: false),
+      find.text('Community and Safety Guidelines', skipOffstage: false),
       findsOneWidget,
     );
     expect(
       find.byType(CheckboxListTile, skipOffstage: false),
-      findsNWidgets(5),
+      findsNWidgets(3),
+    );
+  });
+
+  test('age eligibility is calculated from the complete birth date', () {
+    final today = DateTime(2026, 10, 10);
+
+    expect(
+      AgeEligibility.canUseMapLov(DateTime(2008, 10, 10), onDate: today),
+      isTrue,
+    );
+    expect(
+      AgeEligibility.canUseMapLov(DateTime(2008, 10, 11), onDate: today),
+      isFalse,
     );
   });
 
@@ -2912,9 +2925,9 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
 
     await tester.pumpWidget(const MaterialApp(home: LegalScreen()));
-    await tester.tap(find.text('Community Guidelines'));
+    await tester.tap(find.text('Community and Safety Guidelines'));
     await tester.pumpAndSettle();
-    expect(find.text('Respect and consent'), findsOneWidget);
+    expect(find.text('1. Purpose and scope'), findsOneWidget);
 
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump();
@@ -3044,6 +3057,18 @@ void main() {
     'admin global notifications': const AdminGlobalNotificationsScreen(),
     'admin account recovery': const AdminAccountRecoveryScreen(),
   };
+
+  testWidgets('notification settings do not advertise unimplemented push', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      const MaterialApp(home: NotificationSettingsScreen()),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Push notifications'), findsNothing);
+    expect(find.text('In-app notifications'), findsOneWidget);
+  });
 
   for (final entry in screens.entries) {
     testWidgets('${entry.key} renders on a mobile viewport', (tester) async {

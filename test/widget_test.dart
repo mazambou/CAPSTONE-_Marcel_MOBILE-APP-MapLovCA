@@ -2781,6 +2781,21 @@ void main() {
     expect(find.text('Delete all my data permanently'), findsOneWidget);
   });
 
+  test(
+    'account deletion errors are not mislabeled as authentication failures',
+    () {
+      const error = AccountDeletionException(
+        'self_deletion_failed',
+        'Permanent deletion could not be completed. Try again.',
+      );
+
+      expect(
+        AuthService.instance.messageFor(error),
+        'Permanent deletion could not be completed. Try again.',
+      );
+    },
+  );
+
   test('face verification errors keep a safe user-facing message', () {
     const error = FaceVerificationException(
       'face_mismatch',

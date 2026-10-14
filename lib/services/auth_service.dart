@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -29,6 +31,16 @@ class SignUpResult {
   const SignUpResult({required this.requiresEmailConfirmation});
 
   final bool requiresEmailConfirmation;
+}
+
+class AccountDeletionException implements Exception {
+  const AccountDeletionException(this.code, this.message);
+
+  final String code;
+  final String message;
+
+  @override
+  String toString() => message;
 }
 
 class AuthService {
@@ -695,13 +707,30 @@ class AuthService {
       await client.auth.signOut(scope: SignOutScope.local);
     } on FunctionException catch (error) {
       final details = error.details;
-      final body = details is Map
-          ? Map<String, dynamic>.from(details)
-          : const <String, dynamic>{};
-      throw AuthException(
-        body['message'] as String? ??
-            'Permanent account deletion could not be completed.',
-      );
+      Map<String, dynamic> body = const {};
+      if (details is Map) {
+        body = Map<String, dynamic>.from(details);
+      } else if (details is String && details.trim().isNotEmpty) {
+        try {
+          final decoded = jsonDecode(details);
+          if (decoded is Map) body = Map<String, dynamic>.from(decoded);
+        } on FormatException {
+          // Keep the stable client message when an intermediary returns text.
+        }
+      }
+      final code = body['code'] as String? ?? 'account_deletion_failed';
+      final message = switch (code) {
+        'authentication_required' || 'invalid_session' =>
+          'Your session has expired. Sign in again before deleting your account.',
+        'privileged_account' =>
+          'This privileged account must be deleted by another administrator.',
+        _ =>
+          body['message'] as String? ??
+              (error.status == 0
+                  ? 'Unable to connect. Check your internet connection.'
+                  : 'Permanent account deletion could not be completed. Try again.'),
+      };
+      throw AccountDeletionException(code, message);
     }
   }
 
@@ -718,6 +747,7 @@ class AuthService {
   }
 
   String messageFor(Object error) {
+    if (error is AccountDeletionException) return error.message;
     final raw = error is AuthException ? error.message : error.toString();
     final message = raw.toLowerCase();
     if (message.contains('invalid login credentials')) {

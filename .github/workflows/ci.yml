@@ -51,8 +51,19 @@ jobs:
       - name: Analyze
         run: flutter analyze
 
-      - name: Run tests
-        run: flutter test
+      # The Play Store goldens are generated on macOS and differ from Linux
+      # because Flutter text and image rasterization is platform-dependent.
+      - name: Run portable tests
+        run: flutter test --exclude-tags golden
+
+      - name: Verify Play Store screenshot assets
+        shell: bash
+        run: |
+          test -s docs/play_store/screenshots/01_discover.png
+          test -s docs/play_store/screenshots/02_likes.png
+          test -s docs/play_store/screenshots/03_matches.png
+          test -s docs/play_store/screenshots/04_messages.png
+          test -s docs/play_store/screenshots/05_profile.png
 
       - name: Build release-mode Android App Bundle
         run: flutter build appbundle --release

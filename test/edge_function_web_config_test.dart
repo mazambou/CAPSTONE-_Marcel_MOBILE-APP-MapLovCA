@@ -41,4 +41,22 @@ void main() {
       expect(config, contains('[functions.$slug]\nverify_jwt = true'));
     }
   });
+
+  test('account deletion accepts authenticated browser preflight', () {
+    final source = File(
+      'supabase/functions/admin-delete-account/index.ts',
+    ).readAsStringSync();
+    final config = File('supabase/config.toml').readAsStringSync();
+
+    expect(source, contains("request.method === 'OPTIONS'"));
+    expect(source, contains("'Access-Control-Allow-Origin': '*'"));
+    expect(
+      source,
+      contains('authorization, apikey, content-type, x-client-info'),
+    );
+    final functionConfig = config
+        .split('[functions.admin-delete-account]')[1]
+        .split('[functions.bright-action]')[0];
+    expect(functionConfig, contains('verify_jwt = false'));
+  });
 }

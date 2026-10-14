@@ -7,6 +7,14 @@ import {
 type JsonRecord = Record<string, unknown>;
 type AdminClient = ReturnType<typeof createClient>;
 
+const corsHeaders: HeadersInit = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers':
+    'authorization, apikey, content-type, x-client-info',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Max-Age': '86400',
+};
+
 const uuidPattern =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const storagePageSize = 1000;
@@ -14,7 +22,7 @@ const storagePageSize = 1000;
 function response(status: number, body: JsonRecord): Response {
   return Response.json(body, {
     status,
-    headers: { 'Cache-Control': 'no-store' },
+    headers: { ...corsHeaders, 'Cache-Control': 'no-store' },
   });
 }
 
@@ -231,6 +239,9 @@ async function processDue(admin: AdminClient): Promise<Response> {
 }
 
 Deno.serve(async (request) => {
+  if (request.method === 'OPTIONS') {
+    return new Response(null, { status: 204, headers: corsHeaders });
+  }
   if (request.method !== 'POST') {
     return response(405, {
       code: 'method_not_allowed',

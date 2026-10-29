@@ -14,7 +14,9 @@ class _ManagePhotosScreenState extends State<ManagePhotosScreen> {
   int _uploadedCount = 0;
   int _uploadTotal = 0;
   bool _referenceReady = !MapLovRepository.instance.isLive;
+  bool _accountReady = !MapLovRepository.instance.isLive;
   bool _loadingReference = MapLovRepository.instance.isLive;
+  bool _verifyingPrimaryPhoto = false;
 
   @override
   void initState() {
@@ -24,13 +26,20 @@ class _ManagePhotosScreenState extends State<ManagePhotosScreen> {
   }
 
   Future<void> _loadReferenceStatus() async {
+    final repository = MapLovRepository.instance;
     try {
-      final ready = await MapLovRepository.instance.hasFaceReference();
+      final ready = await repository.hasFaceReference();
       if (mounted) setState(() => _referenceReady = ready);
     } catch (_) {
       if (mounted) setState(() => _referenceReady = false);
     } finally {
       if (mounted) setState(() => _loadingReference = false);
+    }
+    try {
+      final accountReady = await repository.hasAccountVerification();
+      if (mounted) setState(() => _accountReady = accountReady);
+    } catch (_) {
+      if (mounted) setState(() => _accountReady = false);
     }
   }
 
@@ -52,12 +61,32 @@ class _ManagePhotosScreenState extends State<ManagePhotosScreen> {
       _showError('Identity verification is still loading. Try again.');
       return;
     }
-    if (!_referenceReady) {
+    if (!_referenceReady && !_accountReady) {
+      try {
+        final existingPhotos = await _photos;
+        if (existingPhotos.any(
+          (photo) => photo['verification_method'] == 'account_checks',
+        )) {
+          await LocationService.instance.updateMyLocation();
+          final eligible = await MapLovRepository.instance
+              .verifyQuebecResidence();
+          if (eligible) {
+            _accountReady = await MapLovRepository.instance
+                .hasAccountVerification();
+          }
+        }
+      } catch (_) {
+        // The generic message below does not expose the Québec route.
+      }
+    }
+    if (!_referenceReady && !_accountReady) {
+      if (!mounted) return;
       _showError(
-        'Identity verification must be completed during registration. Contact support.',
+        'Confirm your email, phone and residence before adding photos.',
       );
       return;
     }
+    if (!mounted) return;
     List<XFile> photos;
     try {
       photos = await pickImagesForUpload(
@@ -81,6 +110,7 @@ class _ManagePhotosScreenState extends State<ManagePhotosScreen> {
         await MapLovRepository.instance.uploadProfilePhoto(
           bytes: bytes,
           extension: photo.name.split('.').last.toLowerCase(),
+          withoutBiometrics: !_referenceReady,
         );
         if (mounted) setState(() => _uploadedCount++);
       }
@@ -93,6 +123,43 @@ class _ManagePhotosScreenState extends State<ManagePhotosScreen> {
       if (mounted) _showError('Photo upload failed: $error');
     } finally {
       if (mounted) setState(() => _uploading = false);
+    }
+  }
+
+  Future<void> _verifyPrimaryPhoto() async {
+    if (_verifyingPrimaryPhoto) return;
+    try {
+      if (!await confirmFaceVerificationConsent(context)) return;
+      final selfie = await ImagePicker().pickImage(
+        source: ImageSource.camera,
+        preferredCameraDevice: CameraDevice.front,
+        imageQuality: kIsWeb ? null : 85,
+        maxWidth: kIsWeb ? null : 1600,
+        maxHeight: kIsWeb ? null : 1600,
+      );
+      if (selfie == null) return;
+      if (mounted) setState(() => _verifyingPrimaryPhoto = true);
+      final prepared = await prepareReferenceSelfie(selfie);
+      await LocationService.instance.updateMyLocation();
+      await MapLovRepository.instance.verifyExistingProfilePhoto(
+        bytes: prepared.bytes,
+        extension: prepared.extension,
+      );
+      if (!mounted) return;
+      setState(() {
+        _referenceReady = true;
+        _verifyingPrimaryPhoto = false;
+      });
+      _refreshPhotos();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(context.tr('Profile photo verified.'))),
+      );
+    } on FaceVerificationException catch (error) {
+      if (mounted) _showError(error.message);
+    } catch (error) {
+      if (mounted) _showError('Unable to verify the profile photo: $error');
+    } finally {
+      if (mounted) setState(() => _verifyingPrimaryPhoto = false);
     }
   }
 
@@ -202,122 +269,181 @@ class _ManagePhotosScreenState extends State<ManagePhotosScreen> {
               photos.isEmpty) {
             return const Center(child: CircularProgressIndicator());
           }
-          return GridView.count(
-            crossAxisCount: 2,
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            crossAxisSpacing: 12,
-            mainAxisSpacing: 12,
+          final unverifiedPrimary = photos.any(
+            (photo) =>
+                photo['is_primary'] == true &&
+                photo['moderation_status'] == 'visible' &&
+                photo['verification_method'] == 'account_checks' &&
+                photo['is_verified'] != true,
+          );
+          return Column(
             children: [
-              ...photos.map((photo) {
-                final id = photo['id'] as String;
-                final underReview =
-                    photo['moderation_status'] == 'under_review';
-                return GestureDetector(
-                  key: Key('managed_photo_$id'),
-                  onTap: underReview ? null : () => _openPhoto(photo, photos),
-                  onLongPress: () => _showDeleteControl(id),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(18),
-                    child: Stack(
-                      fit: StackFit.expand,
+              if (unverifiedPrimary) ...[
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        mediaImage(photo['url'] as String, fit: BoxFit.cover),
-                        if (underReview)
-                          ColoredBox(
-                            color: Colors.black.withValues(alpha: .58),
-                            child: const Center(
-                              child: Padding(
-                                padding: EdgeInsets.all(12),
-                                child: Text(
-                                  'Photo under moderation',
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w800,
+                        Text(
+                          context.tr('Photo not verified'),
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          context.tr(
+                            'Your profile photo has not been face verified. You can verify it whenever you choose.',
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        FilledButton.icon(
+                          key: const Key('verify_existing_profile_photo'),
+                          onPressed: _verifyingPrimaryPhoto
+                              ? null
+                              : _verifyPrimaryPhoto,
+                          icon: _verifyingPrimaryPhoto
+                              ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
                                   ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        if (photo['is_primary'] == true)
-                          const Positioned(
-                            left: 8,
-                            bottom: 8,
-                            child: Chip(
-                              avatar: Icon(Icons.person, size: 16),
-                              label: Text('Profile photo'),
-                            ),
-                          )
-                        else if (!underReview)
-                          Positioned(
-                            left: 7,
-                            bottom: 7,
-                            child: IconButton.filled(
-                              key: Key('set_primary_photo_$id'),
-                              tooltip: 'Use as profile photo',
-                              onPressed: () => _setPrimaryPhoto(photo),
-                              constraints: const BoxConstraints.tightFor(
-                                width: 40,
-                                height: 40,
-                              ),
-                              padding: EdgeInsets.zero,
-                              icon: const Icon(Icons.person_outline, size: 21),
-                            ),
-                          ),
-                        if (_deleteControls.contains(id))
-                          Positioned(
-                            top: 7,
-                            right: 7,
-                            child: IconButton.filled(
-                              key: Key('delete_managed_photo_$id'),
-                              tooltip: 'Delete photo',
-                              onPressed: () => _deletePhoto(photo),
-                              constraints: const BoxConstraints.tightFor(
-                                width: 38,
-                                height: 38,
-                              ),
-                              padding: EdgeInsets.zero,
-                              style: IconButton.styleFrom(
-                                backgroundColor: AppColors.coral,
-                                foregroundColor: Colors.white,
-                              ),
-                              icon: const Icon(Icons.close, size: 20),
-                            ),
-                          ),
+                                )
+                              : const Icon(Icons.verified_user_outlined),
+                          label: Text(context.tr('Verify my photo')),
+                        ),
                       ],
                     ),
                   ),
-                );
-              }),
-              InkWell(
-                onTap: _uploading ? null : _addPhoto,
-                borderRadius: BorderRadius.circular(18),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: AppColors.palePink,
-                    borderRadius: BorderRadius.circular(18),
-                    border: Border.all(color: AppColors.softPink),
-                  ),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      if (_uploading)
-                        const CircularProgressIndicator()
-                      else
-                        const Icon(
-                          Icons.add_a_photo_outlined,
-                          color: AppColors.coral,
-                        ),
-                      const SizedBox(height: 8),
-                      Text(
-                        _uploading
-                            ? 'Uploading $_uploadedCount/$_uploadTotal…'
-                            : 'Add photos',
-                      ),
-                    ],
-                  ),
                 ),
+                const SizedBox(height: 18),
+              ],
+              GridView.count(
+                crossAxisCount: 2,
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                crossAxisSpacing: 12,
+                mainAxisSpacing: 12,
+                children: [
+                  ...photos.map((photo) {
+                    final id = photo['id'] as String;
+                    final underReview =
+                        photo['moderation_status'] == 'under_review';
+                    return GestureDetector(
+                      key: Key('managed_photo_$id'),
+                      onTap: underReview
+                          ? null
+                          : () => _openPhoto(photo, photos),
+                      onLongPress: () => _showDeleteControl(id),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(18),
+                        child: Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            mediaImage(
+                              photo['url'] as String,
+                              fit: BoxFit.cover,
+                            ),
+                            if (underReview)
+                              ColoredBox(
+                                color: Colors.black.withValues(alpha: .58),
+                                child: const Center(
+                                  child: Padding(
+                                    padding: EdgeInsets.all(12),
+                                    child: Text(
+                                      'Photo under moderation',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            if (photo['is_primary'] == true)
+                              const Positioned(
+                                left: 8,
+                                bottom: 8,
+                                child: Chip(
+                                  avatar: Icon(Icons.person, size: 16),
+                                  label: Text('Profile photo'),
+                                ),
+                              )
+                            else if (!underReview)
+                              Positioned(
+                                left: 7,
+                                bottom: 7,
+                                child: IconButton.filled(
+                                  key: Key('set_primary_photo_$id'),
+                                  tooltip: 'Use as profile photo',
+                                  onPressed: () => _setPrimaryPhoto(photo),
+                                  constraints: const BoxConstraints.tightFor(
+                                    width: 40,
+                                    height: 40,
+                                  ),
+                                  padding: EdgeInsets.zero,
+                                  icon: const Icon(
+                                    Icons.person_outline,
+                                    size: 21,
+                                  ),
+                                ),
+                              ),
+                            if (_deleteControls.contains(id))
+                              Positioned(
+                                top: 7,
+                                right: 7,
+                                child: IconButton.filled(
+                                  key: Key('delete_managed_photo_$id'),
+                                  tooltip: 'Delete photo',
+                                  onPressed: () => _deletePhoto(photo),
+                                  constraints: const BoxConstraints.tightFor(
+                                    width: 38,
+                                    height: 38,
+                                  ),
+                                  padding: EdgeInsets.zero,
+                                  style: IconButton.styleFrom(
+                                    backgroundColor: AppColors.coral,
+                                    foregroundColor: Colors.white,
+                                  ),
+                                  icon: const Icon(Icons.close, size: 20),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }),
+                  InkWell(
+                    onTap: _uploading ? null : _addPhoto,
+                    borderRadius: BorderRadius.circular(18),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: AppColors.palePink,
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(color: AppColors.softPink),
+                      ),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          if (_uploading)
+                            const CircularProgressIndicator()
+                          else
+                            const Icon(
+                              Icons.add_a_photo_outlined,
+                              color: AppColors.coral,
+                            ),
+                          const SizedBox(height: 8),
+                          Text(
+                            _uploading
+                                ? 'Uploading $_uploadedCount/$_uploadTotal…'
+                                : 'Add photos',
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ],
           );

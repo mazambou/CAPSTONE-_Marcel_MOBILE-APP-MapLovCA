@@ -59,9 +59,10 @@ Flutter binary, or version control.
 
 ## Domain association deployment
 
-Run `tool/generate_auth_associations.sh` with the production Apple Team ID and
-Google Play App Signing SHA-256 certificate, then deploy the generated files
-under `web/.well-known`.
+Run `tool/generate_auth_associations.sh` with the Google Play App Signing
+SHA-256 certificate. Add the production Apple Team ID as the optional second
+argument when preparing the iOS association too, then deploy the generated
+files under `web/.well-known`.
 
 Both files must be served by `maplov.ca` over HTTPS with status 200, without a
 redirect. The web host must also rewrite `/auth/callback` to the Flutter web

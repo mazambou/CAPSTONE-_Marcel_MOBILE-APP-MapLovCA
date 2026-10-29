@@ -21,6 +21,15 @@
 /icons/*
   Cache-Control: no-cache, max-age=0, must-revalidate
 
+/privacy/*
+  Cache-Control: public, max-age=3600
+
+/account-deletion/*
+  Cache-Control: public, max-age=3600
+
+/child-safety/*
+  Cache-Control: public, max-age=3600
+
 /.well-known/*
   Cache-Control: public, max-age=3600
   X-Content-Type-Options: nosniff

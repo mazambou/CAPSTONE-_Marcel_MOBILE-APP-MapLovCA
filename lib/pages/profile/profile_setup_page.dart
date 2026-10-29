@@ -55,6 +55,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   bool loadingProfile = true;
   bool detectingResidence = MapLovRepository.instance.isLive;
   bool residenceDetected = !MapLovRepository.instance.isLive;
+  bool residenceIsQuebec = false;
   String? residenceDetectionError;
   bool originCountryLocked = false;
   bool originRegionLocked = false;
@@ -74,6 +75,8 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   bool profilePhotoRequirementShown = false;
   bool uploadingPhoto = false;
   bool faceReferenceReady = !MapLovRepository.instance.isLive;
+  bool accountVerificationReady = !MapLovRepository.instance.isLive;
+  bool useAccountVerification = false;
   bool loadingFaceReference = MapLovRepository.instance.isLive;
   bool enrollingFaceReference = false;
 
@@ -100,6 +103,11 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
         profilePhotoReady = MapLovRepository.instance.isLive
             ? hasVisiblePrimary
             : pendingProfilePhoto != null;
+        if (loaded.any(
+          (photo) => photo['verification_method'] == 'account_checks',
+        )) {
+          useAccountVerification = true;
+        }
       });
     }
     return loaded;
@@ -120,11 +128,18 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   }
 
   Future<void> _loadFaceReference() async {
+    final repository = MapLovRepository.instance;
     try {
-      final ready = await MapLovRepository.instance.hasFaceReference();
+      final ready = await repository.hasFaceReference();
       if (mounted) setState(() => faceReferenceReady = ready);
     } catch (_) {
       if (mounted) setState(() => faceReferenceReady = false);
+    }
+    try {
+      final accountReady = await repository.hasAccountVerification();
+      if (mounted) setState(() => accountVerificationReady = accountReady);
+    } catch (_) {
+      if (mounted) setState(() => accountVerificationReady = false);
     } finally {
       if (mounted) setState(() => loadingFaceReference = false);
     }
@@ -250,6 +265,8 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     if (mounted) {
       setState(() {
         detectingResidence = true;
+        residenceIsQuebec = false;
+        accountVerificationReady = false;
         residenceDetectionError = null;
       });
     }
@@ -289,9 +306,28 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
         region: detected.region,
         city: detected.city,
       );
+      final detectedQuebec =
+          detected.countryCode.toUpperCase() == 'CA' &&
+          LocationService.isQuebecRegion(detected.region);
+      var accountReady = false;
+      if (detectedQuebec) {
+        final confirmedRegion = await MapLovRepository.instance
+            .verifyQuebecResidence();
+        if (confirmedRegion) {
+          try {
+            accountReady = await MapLovRepository.instance
+                .hasAccountVerification();
+          } catch (_) {
+            // The account-check route must not block GPS residence detection.
+          }
+        }
+      }
       if (!mounted) return;
       setState(() {
+        accountVerificationReady = accountReady;
+        residenceIsQuebec = detectedQuebec && accountReady;
         residenceCountry = country;
+        if (!residenceIsQuebec) useAccountVerification = false;
         residenceRegion = selectedRegion;
         residenceRegionOther.text = selectedRegion == 'Other region'
             ? detected.region
@@ -306,6 +342,8 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       if (!mounted) return;
       setState(() {
         residenceDetected = false;
+        residenceIsQuebec = false;
+        accountVerificationReady = false;
         detectingResidence = false;
         residenceDetectionError =
             'GPS location is required to verify your country of residence.';
@@ -392,10 +430,20 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
 
   Future<void> _pickProfilePhoto() async {
     if (uploadingPhoto) return;
-    if (!faceReferenceReady) {
+    if (!faceReferenceReady && !useAccountVerification) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Create your private reference selfie first.'),
+        ),
+      );
+      return;
+    }
+    if (useAccountVerification && !accountVerificationReady) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            context.tr('Confirm your email, phone and residence first.'),
+          ),
         ),
       );
       return;
@@ -413,6 +461,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       final photoId = await MapLovRepository.instance.uploadProfilePhoto(
         bytes: bytes,
         extension: photo.name.split('.').last.toLowerCase(),
+        withoutBiometrics: useAccountVerification,
       );
       if (photoId != null) {
         await MapLovRepository.instance.setPrimaryPhoto(photoId);
@@ -507,10 +556,24 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       );
       return;
     }
-    if (!faceReferenceReady && MapLovRepository.instance.isLive) {
+    if (!faceReferenceReady &&
+        !useAccountVerification &&
+        MapLovRepository.instance.isLive) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('A private reference selfie is required.'),
+        ),
+      );
+      return;
+    }
+    if (useAccountVerification &&
+        !accountVerificationReady &&
+        MapLovRepository.instance.isLive) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            context.tr('Confirm your email, phone and residence first.'),
+          ),
         ),
       );
       return;
@@ -599,7 +662,9 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
         const SizedBox(height: 22),
         Card(
           key: const Key('private_reference_selfie'),
-          color: faceReferenceReady ? Colors.green.shade50 : AppColors.palePink,
+          color: faceReferenceReady || useAccountVerification
+              ? Colors.green.shade50
+              : AppColors.palePink,
           child: Padding(
             padding: const EdgeInsets.all(18),
             child: Column(
@@ -609,14 +674,17 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                   children: [
                     CircleAvatar(
                       radius: 25,
-                      backgroundColor: faceReferenceReady
+                      backgroundColor:
+                          faceReferenceReady || useAccountVerification
                           ? Colors.green.shade100
                           : AppColors.blush,
                       child: Icon(
                         faceReferenceReady
                             ? Icons.verified_user_outlined
+                            : useAccountVerification
+                            ? Icons.mark_email_read_outlined
                             : Icons.face_retouching_natural_outlined,
-                        color: faceReferenceReady
+                        color: faceReferenceReady || useAccountVerification
                             ? Colors.green.shade700
                             : AppColors.coral,
                         size: 29,
@@ -625,30 +693,39 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                     const SizedBox(width: 13),
                     Expanded(
                       child: Text(
-                        faceReferenceReady
-                            ? 'Identity selfie verified'
-                            : 'Verify your identity with a private selfie',
+                        context.tr(
+                          faceReferenceReady
+                              ? 'Identity selfie verified'
+                              : useAccountVerification
+                              ? 'Account checks without facial recognition'
+                              : 'Verify your identity with a private selfie',
+                        ),
                         style: const TextStyle(
                           fontSize: 17,
                           fontWeight: FontWeight.w900,
                         ),
                       ),
                     ),
-                    if (faceReferenceReady)
+                    if (faceReferenceReady ||
+                        (useAccountVerification && accountVerificationReady))
                       const Icon(Icons.check_circle, color: Colors.green),
                   ],
                 ),
                 const SizedBox(height: 14),
                 Text(
-                  faceReferenceReady
-                      ? 'Your reference selfie is verified, kept private and never displayed on your profile.'
-                      : 'Take one clear, front-facing selfie. MapLov keeps it private, compares it with existing private reference selfies to prevent duplicate accounts, and uses it to confirm your profile photos. It never appears on your profile.',
+                  context.tr(
+                    faceReferenceReady
+                        ? 'Your reference selfie is verified, kept private and never displayed on your profile.'
+                        : useAccountVerification
+                        ? 'MapLov checks your confirmed email, phone and residence. Your public profile photo is not face matched or labeled face verified.'
+                        : 'Take one clear, front-facing selfie. MapLov keeps it private, compares it with existing private reference selfies to prevent duplicate accounts, and uses it to confirm your profile photos. It never appears on your profile.',
+                  ),
                   style: const TextStyle(
                     color: AppColors.grayText,
                     height: 1.35,
                   ),
                 ),
-                if (!faceReferenceReady) ...[
+                if (!faceReferenceReady && !useAccountVerification) ...[
                   const SizedBox(height: 12),
                   const Row(
                     children: [
@@ -678,7 +755,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                       child: CircularProgressIndicator(strokeWidth: 2.5),
                     ),
                   )
-                else if (!faceReferenceReady)
+                else if (!faceReferenceReady && !useAccountVerification)
                   FilledButton.icon(
                     key: const Key('capture_reference_selfie'),
                     onPressed: _captureReferenceSelfie,
@@ -688,6 +765,46 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                       padding: const EdgeInsets.symmetric(vertical: 14),
                     ),
                   ),
+                if (!faceReferenceReady &&
+                    !profilePhotoReady &&
+                    residenceIsQuebec &&
+                    residenceDetected) ...[
+                  const SizedBox(height: 12),
+                  OutlinedButton(
+                    key: const Key('select_account_verification'),
+                    onPressed: () async {
+                      final selected = !useAccountVerification;
+                      var ready = accountVerificationReady;
+                      if (selected) {
+                        try {
+                          ready = await MapLovRepository.instance
+                              .hasAccountVerification();
+                        } catch (_) {
+                          ready = false;
+                        }
+                      }
+                      if (mounted) {
+                        setState(() {
+                          useAccountVerification = selected;
+                          accountVerificationReady = ready;
+                        });
+                      }
+                    },
+                    child: Text(
+                      context.tr(
+                        useAccountVerification
+                            ? 'Use the private selfie instead'
+                            : 'Continue without facial recognition',
+                      ),
+                    ),
+                  ),
+                  if (useAccountVerification && !accountVerificationReady)
+                    Text(
+                      context.tr(
+                        'Confirm your email and phone, and verify your residence before adding a photo.',
+                      ),
+                    ),
+                ],
               ],
             ),
           ),
@@ -777,6 +894,8 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
           context.tr(
             profilePhotoReady
                 ? 'Your profile photo is ready.'
+                : useAccountVerification
+                ? 'Add a real public profile photo to continue. It will not be face matched.'
                 : 'Add a real profile photo to continue. The private selfie is never used as your public photo.',
           ),
           key: const Key('profile_photo_requirement'),

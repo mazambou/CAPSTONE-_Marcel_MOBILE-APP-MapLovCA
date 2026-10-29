@@ -82,6 +82,13 @@ class MapLovLocalizations {
       _values[locale.languageCode]?[key] ?? _values['en']![key] ?? key;
 
   static const _french = <String, String>{
+    'Photo not verified': 'Photo non vérifiée',
+    'Your profile photo has not been face verified. You can verify it whenever you choose.':
+        'Votre photo de profil n’a pas été vérifiée par comparaison faciale. Vous pouvez la vérifier quand vous le souhaitez.',
+    'Verify my photo': 'Vérifier ma photo',
+    'Profile photo verified.': 'Photo de profil vérifiée.',
+    'Unable to verify the profile photo:':
+        'Impossible de vérifier la photo de profil :',
     'Discover': 'Découvrir',
     'Most liked photos': 'Photos les plus aimées',
     'Location access needed': 'Accès à la localisation requis',
@@ -680,13 +687,28 @@ class MapLovLocalizations {
     'Private • Security verification only':
         'Privé • Vérification de sécurité uniquement',
     'Take my private selfie': 'Prendre mon selfie privé',
+    'Account checks without facial recognition':
+        'Vérifications du compte sans reconnaissance faciale',
+    'MapLov checks your confirmed email, phone and residence. Your public profile photo is not face matched or labeled face verified.':
+        'MapLov vérifie votre courriel, votre téléphone et votre résidence confirmés. Votre photo de profil publique n’est pas comparée à un visage et ne porte pas la mention de vérification faciale.',
+    'Continue without facial recognition':
+        'Continuer sans reconnaissance faciale',
+    'Use the private selfie instead': 'Utiliser plutôt le selfie privé',
+    'Confirm your email and phone, and verify your residence before adding a photo.':
+        'Confirmez votre courriel et votre téléphone, puis vérifiez votre résidence avant d’ajouter une photo.',
+    'Confirm your email, phone and residence first.':
+        'Confirmez d’abord votre courriel, votre téléphone et votre résidence.',
+    'Confirm your email, phone and residence before adding photos.':
+        'Confirmez votre courriel, votre téléphone et votre résidence avant d’ajouter des photos.',
+    'Add a real public profile photo to continue. It will not be face matched.':
+        'Ajoutez une véritable photo de profil publique pour continuer. Elle ne sera pas comparée à un visage.',
     'Private selfie verification': 'Vérification par selfie privé',
     'I agree': 'J’accepte',
     'I understand and agree': 'Je comprends et j’accepte',
     'Read the detailed notice': 'Lire l’avis détaillé',
-    'MapLov will store one private registration selfie as the biometric reference for this account. Image bytes are sent to AWS Rekognition to detect one face, compare the selfie with existing private references to limit duplicate accounts, and verify later profile photos.\n\n'
+    'MapLov will store one private selfie as the biometric reference for this account. Image bytes are sent to AWS Rekognition to detect one face, compare the selfie with existing private references to limit duplicate accounts, and verify this and later profile photos.\n\n'
             'The selfie is never displayed to members or used for advertising. It remains private while the account is active and follows the 30-day account-deletion schedule. Face comparison is probabilistic and can produce a false match or rejection. You can ask privacy@maplov.ca to review a decision, withdraw consent or delete the reference; withdrawal may prevent continued use of features that require it.':
-        'MapLov conservera un selfie privé d’inscription comme référence biométrique de ce compte. Les octets de l’image sont transmis à AWS Rekognition afin de détecter un visage, de comparer le selfie aux références privées existantes pour limiter les comptes en double et de vérifier les futures photos de profil.\n\n'
+        'MapLov conservera un selfie privé comme référence biométrique de ce compte. Les octets de l’image sont transmis à AWS Rekognition afin de détecter un visage, de comparer le selfie aux références privées existantes pour limiter les comptes en double et de vérifier cette photo de profil ainsi que les futures photos.\n\n'
         'Le selfie n’est jamais affiché aux membres ni utilisé à des fins publicitaires. Il demeure privé tant que le compte est actif et suit le calendrier de suppression du compte de 30 jours. La comparaison faciale est probabiliste et peut produire un faux rapprochement ou un refus. Vous pouvez demander à privacy@maplov.ca de réviser une décision, de retirer votre consentement ou de supprimer la référence; ce retrait peut empêcher l’utilisation continue des fonctions qui en ont besoin.',
     'Create your private reference selfie first.':
         'Créez d’abord votre selfie privé de référence.',
@@ -699,6 +721,10 @@ class MapLovLocalizations {
         'Utilisez un selfie clair, de face et bien éclairé.',
     'The face does not match the private reference selfie.':
         'Le visage ne correspond pas au selfie privé de référence.',
+    'The selfie does not match your profile photo.':
+        'Le selfie ne correspond pas à votre photo de profil.',
+    'Photo verification cannot be completed. Contact support.':
+        'La vérification de la photo ne peut pas être terminée. Contactez le soutien.',
     'Use a clear profile photo where your face is visible.':
         'Utilisez une photo de profil claire où votre visage est visible.',
     'Verified and kept private. It is never shown on your profile.':

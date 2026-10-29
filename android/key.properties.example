@@ -1,6 +1,7 @@
 # Copy to android/key.properties and replace every value locally.
 # Never commit the real keystore or passwords.
+# Passwords may be read from environment variables using the env: prefix.
 storeFile=/absolute/path/to/maplov-upload.jks
-storePassword=REPLACE_ME
+storePassword=env:MAPLOV_UPLOAD_PASSWORD
 keyAlias=maplov-upload
-keyPassword=REPLACE_ME
+keyPassword=env:MAPLOV_UPLOAD_PASSWORD

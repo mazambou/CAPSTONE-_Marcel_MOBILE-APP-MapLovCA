@@ -8,18 +8,33 @@ plugins {
 
 val releaseKeystoreProperties = Properties()
 val releaseKeystorePropertiesFile = rootProject.file("key.properties")
-val hasReleaseSigning = releaseKeystorePropertiesFile.exists().also { exists ->
+val releaseSigningFileExists = releaseKeystorePropertiesFile.exists().also { exists ->
     if (exists) {
         releaseKeystorePropertiesFile.inputStream().use(releaseKeystoreProperties::load)
     }
 }
+
+fun releaseSigningValue(name: String): String? {
+    val value = releaseKeystoreProperties.getProperty(name)?.trim() ?: return null
+    return if (value.startsWith("env:")) {
+        System.getenv(value.removePrefix("env:"))?.takeIf { it.isNotBlank() }
+    } else {
+        value.takeIf { it.isNotBlank() }
+    }
+}
+
+val hasReleaseSigning =
+    releaseSigningFileExists &&
+        listOf("storeFile", "storePassword", "keyAlias", "keyPassword")
+            .all { releaseSigningValue(it) != null }
 val requireReleaseSigning =
     System.getenv("MAPLOV_REQUIRE_RELEASE_SIGNING")?.equals("true", ignoreCase = true) == true
 
 if (requireReleaseSigning && !hasReleaseSigning) {
     throw GradleException(
         "Production signing is required. Copy android/key.properties.example to " +
-            "android/key.properties and configure the MapLov upload keystore.",
+            "android/key.properties and configure the MapLov upload keystore " +
+            "and its referenced environment variables.",
     )
 }
 
@@ -46,10 +61,10 @@ android {
     signingConfigs {
         if (hasReleaseSigning) {
             create("release") {
-                keyAlias = releaseKeystoreProperties.getProperty("keyAlias")
-                keyPassword = releaseKeystoreProperties.getProperty("keyPassword")
-                storeFile = file(releaseKeystoreProperties.getProperty("storeFile"))
-                storePassword = releaseKeystoreProperties.getProperty("storePassword")
+                keyAlias = releaseSigningValue("keyAlias")
+                keyPassword = releaseSigningValue("keyPassword")
+                storeFile = file(releaseSigningValue("storeFile")!!)
+                storePassword = releaseSigningValue("storePassword")
             }
         }
     }

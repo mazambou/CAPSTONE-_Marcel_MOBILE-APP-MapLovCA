@@ -1166,12 +1166,15 @@ class MapLovRepository {
     final profile = await myProfileDetails();
     final photos = await _client!
         .from('profile_photos')
-        .select('id')
+        .select('id, is_verified, verification_method')
         .eq('user_id', currentUserId!)
         .eq('moderation_status', 'visible')
         .eq('is_primary', true)
         .limit(1);
     final hasReferenceSelfie = await hasFaceReference();
+    final hasAccountChecks = photos.any(
+      (photo) => photo['verification_method'] == 'account_checks',
+    );
     final ready =
         profile?['first_name'] != null &&
         profile?['date_of_birth'] != null &&
@@ -1183,8 +1186,12 @@ class MapLovRepository {
         profile?['origin_region'] != null &&
         profile?['origin_city'] != null &&
         (profile?['spoken_languages'] as List?)?.isNotEmpty == true &&
-        photos.isNotEmpty &&
-        hasReferenceSelfie;
+        photos.any(
+          (photo) =>
+              (hasReferenceSelfie && photo['is_verified'] == true) ||
+              (hasAccountChecks &&
+                  photo['verification_method'] == 'account_checks'),
+        );
     if (ready && profile?['profile_completed_at'] == null) {
       await _client!
           .from('profiles')
@@ -1507,6 +1514,7 @@ class MapLovRepository {
   Future<String?> uploadProfilePhoto({
     required Uint8List bytes,
     required String extension,
+    bool withoutBiometrics = false,
   }) async {
     _validateMedia(
       bytes,
@@ -1528,10 +1536,9 @@ class MapLovRepository {
           ),
         );
     try {
-      final result = await _invokeFaceVerification(
-        action: 'verify',
-        storagePath: path,
-      );
+      final result = withoutBiometrics
+          ? await _invokeAccountPhotoVerification(storagePath: path)
+          : await _invokeFaceVerification(action: 'verify', storagePath: path);
       final photoId = result['photoId'] as String?;
       await completeProfileIfReady();
       return photoId;
@@ -1548,9 +1555,77 @@ class MapLovRepository {
     return result == true;
   }
 
+  Future<bool> hasAccountVerification() async {
+    if (!isLive) return true;
+    final result = await _client!.rpc('has_my_account_verification');
+    return result == true;
+  }
+
+  Future<bool> verifyQuebecResidence() async {
+    if (!isLive) return true;
+    try {
+      final response = await _client!.functions.invoke(
+        'verify-quebec-residence',
+        body: const <String, Object>{},
+      );
+      final data = response.data;
+      return data is Map && data['eligible'] == true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<Map<String, dynamic>> _invokeAccountPhotoVerification({
+    required String storagePath,
+  }) async {
+    try {
+      final response = await _client!.functions.invoke(
+        'verify-account-photo',
+        body: {'storagePath': storagePath},
+      );
+      return Map<String, dynamic>.from(response.data as Map? ?? const {});
+    } on FunctionException catch (error) {
+      final details = error.details;
+      Map<String, dynamic> body = const {};
+      if (details is Map) {
+        body = Map<String, dynamic>.from(details);
+      } else if (details is String && details.trim().isNotEmpty) {
+        try {
+          final decoded = jsonDecode(details);
+          if (decoded is Map) body = Map<String, dynamic>.from(decoded);
+        } on FormatException {
+          // Keep the stable message when a proxy responds with plain text.
+        }
+      }
+      throw StateError(
+        body['message'] as String? ??
+            'Account photo verification is unavailable. Try again.',
+      );
+    }
+  }
+
   Future<void> enrollFaceReference({
     required Uint8List bytes,
     required String extension,
+  }) => _submitFaceReference(
+    bytes: bytes,
+    extension: extension,
+    action: 'enroll',
+  );
+
+  Future<void> verifyExistingProfilePhoto({
+    required Uint8List bytes,
+    required String extension,
+  }) => _submitFaceReference(
+    bytes: bytes,
+    extension: extension,
+    action: 'upgrade',
+  );
+
+  Future<void> _submitFaceReference({
+    required Uint8List bytes,
+    required String extension,
+    required String action,
   }) async {
     _validateMedia(
       bytes,
@@ -1573,7 +1648,7 @@ class MapLovRepository {
         );
     try {
       await _invokeFaceVerification(
-        action: 'enroll',
+        action: action,
         storagePath: path,
         consentVersion: 'face-verification-v3-global-dedup',
       );

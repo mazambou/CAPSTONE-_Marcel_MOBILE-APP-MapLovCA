@@ -409,6 +409,12 @@ deno_version = 2
 [functions.verify-profile-photo]
 verify_jwt = true
 
+[functions.verify-account-photo]
+verify_jwt = true
+
+[functions.verify-quebec-residence]
+verify_jwt = true
+
 [functions.bright-processor]
 verify_jwt = true
 

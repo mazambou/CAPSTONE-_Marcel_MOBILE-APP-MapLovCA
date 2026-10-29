@@ -66,6 +66,26 @@ When no Supabase variables are supplied, MapLov intentionally starts in its
 current UI/mock-data mode. This allows backend integration to happen feature by
 feature without removing validated interfaces.
 
+## Profile verification routes
+
+Apply all migrations before shipping a mobile build that offers the Québec
+account-check route. Migrations `202610250061` through `202610250065` record the
+photo verification method, protect it from client edits, and require an
+accepted primary photo before profile completion. Deploy the two functions:
+
+```sh
+supabase functions deploy verify-profile-photo
+supabase functions deploy verify-account-photo
+supabase functions deploy verify-quebec-residence
+```
+
+The face route remains available. The Québec alternative requires a
+confirmed email, confirmed phone and a recent server-confirmed Québec device
+location. It does not perform facial recognition or award a face-verification
+badge. Members can voluntarily verify their primary photo later. Run
+`supabase/tests/nonbiometric_profile_photo_test.sql` against a disposable local
+database before release.
+
 ## Configure Supabase Auth redirects
 
 In Supabase Dashboard, open **Authentication > URL Configuration** and add this
@@ -119,13 +139,18 @@ supabase functions deploy verify-store-purchase
 supabase functions deploy store-subscription-events --no-verify-jwt
 ```
 
-Create these subscription product IDs in both stores:
+Create these subscription product IDs in both stores for the current mobile
+client:
 
 ```text
 maplov_plus_monthly
 maplov_elite_monthly
-maplov_vip_monthly
 ```
+
+`maplov_elite_monthly` is the store identifier for the public VIP tier. The
+backend also accepts the older `maplov_vip_monthly` identifier when restoring
+an existing purchase, but the current client does not offer it as a new
+product.
 
 In Google Cloud Pub/Sub, configure the Play real-time developer notification
 topic to push to the `store-subscription-events` URL with authenticated push and

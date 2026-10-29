@@ -536,7 +536,7 @@ Future<bool> confirmFaceVerificationConsent(BuildContext context) async =>
         title: const Text('Private selfie verification'),
         content: const SingleChildScrollView(
           child: Text(
-            'MapLov will store one private registration selfie as the biometric reference for this account. Image bytes are sent to AWS Rekognition to detect one face, compare the selfie with existing private references to limit duplicate accounts, and verify later profile photos.\n\n'
+            'MapLov will store one private selfie as the biometric reference for this account. Image bytes are sent to AWS Rekognition to detect one face, compare the selfie with existing private references to limit duplicate accounts, and verify this and later profile photos.\n\n'
             'The selfie is never displayed to members or used for advertising. It remains private while the account is active and follows the 30-day account-deletion schedule. Face comparison is probabilistic and can produce a false match or rejection. You can ask privacy@maplov.ca to review a decision, withdraw consent or delete the reference; withdrawal may prevent continued use of features that require it.',
           ),
         ),

@@ -55,6 +55,14 @@ class LocationService {
   const LocationService._();
   static const instance = LocationService._();
 
+  static bool isQuebecRegion(String region) {
+    final normalized = region.trim().toLowerCase().replaceAll(
+      RegExp('[éèêë]'),
+      'e',
+    );
+    return const {'quebec', 'province of quebec', 'qc'}.contains(normalized);
+  }
+
   Future<Position> _currentPosition() async {
     if (!await Geolocator.isLocationServiceEnabled()) {
       throw const MapLovLocationFailure(

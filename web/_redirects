@@ -1,2 +1,14 @@
-/auth/callback  /index.html  200
-/*                /index.html  200
+# Public compliance pages must resolve to their static documents before the
+# Flutter single-page-app fallback. Keep both slash variants because Google
+# Play validates the exact URLs entered in Play Console.
+/privacy             /privacy/index.html             200
+/privacy/            /privacy/index.html             200
+/account-deletion    /account-deletion/index.html    200
+/account-deletion/   /account-deletion/index.html    200
+/child-safety        /child-safety/index.html        200
+/child-safety/       /child-safety/index.html        200
+
+/auth/callback       /index.html                     200
+# Cloudflare Pages serves index.html for other client-side routes when no
+# matching static file or 404.html exists. A catch-all rewrite would also
+# intercept the Android and Apple association files under /.well-known/.

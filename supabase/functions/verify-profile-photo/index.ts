@@ -45,28 +45,6 @@ function mimeType(path: string): string {
   return path.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg';
 }
 
-async function queueFaceCleanup(
-  admin: ReturnType<typeof createClient>,
-  collectionId: string,
-  faceId: string,
-  userId: string,
-  reason: string,
-): Promise<void> {
-  const { error } = await admin.from('face_index_cleanup_queue').upsert({
-    collection_id: collectionId,
-    face_id: faceId,
-    user_id: userId,
-    reason,
-  });
-  if (error) {
-    console.error('Unable to persist orphan face cleanup', {
-      userId,
-      collectionId,
-      error: error.message,
-    });
-  }
-}
-
 Deno.serve(async (request) => {
   if (request.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers: corsHeaders });
@@ -103,7 +81,7 @@ Deno.serve(async (request) => {
     return response(200, { enrolled: data === true });
   }
 
-  if (action !== 'enroll' && action !== 'verify') {
+  if (action !== 'enroll' && action !== 'verify' && action !== 'upgrade') {
     return response(400, { code: 'invalid_action' });
   }
 
@@ -122,7 +100,7 @@ Deno.serve(async (request) => {
     return response(503, { code: 'face_verification_unavailable' });
   }
   if ((recentChecks ?? 0) >= 20) {
-    const bucket = action === 'enroll'
+    const bucket = action === 'enroll' || action === 'upgrade'
       ? 'identity-selfies'
       : 'profile-media-pending';
     await admin.storage.from(bucket).remove([storagePath]);
@@ -132,7 +110,8 @@ Deno.serve(async (request) => {
     });
   }
 
-  if (action === 'enroll') {
+  if (action === 'enroll' || action === 'upgrade') {
+    const upgrading = action === 'upgrade';
     if (payload.consentVersion !== 'face-verification-v3-global-dedup') {
       await admin.storage.from('identity-selfies').remove([storagePath]);
       return response(400, { code: 'face_consent_required' });
@@ -213,13 +192,82 @@ Deno.serve(async (request) => {
         )
         .eq('id', user.id)
         .maybeSingle();
-      if (profile?.profile_completed_at) {
+      if (upgrading ? !profile?.profile_completed_at : !!profile?.profile_completed_at) {
         await admin.storage.from('identity-selfies').remove([storagePath]);
         return response(409, {
           code: 'reference_enrollment_closed',
-          message:
-            'The private reference selfie can only be created during registration.',
+          message: upgrading
+            ? 'Complete your profile before verifying its photo.'
+            : 'The private reference selfie can only be created during registration.',
         });
+      }
+      let primaryPhoto: { id: string; storage_path: string } | null = null;
+      let photoSimilarity = 0;
+      let photoThreshold = 95;
+      let photoCompareRequestId: string | undefined;
+      if (upgrading) {
+        const { data: photo, error: photoError } = await admin
+          .from('profile_photos')
+          .select('id, storage_path')
+          .eq('user_id', user.id)
+          .eq('is_primary', true)
+          .eq('moderation_status', 'visible')
+          .eq('verification_method', 'account_checks')
+          .eq('is_verified', false)
+          .maybeSingle();
+        if (photoError || !photo) {
+          await admin.storage.from('identity-selfies').remove([storagePath]);
+          return response(409, {
+            code: 'unverified_primary_photo_required',
+            message: 'Choose an unverified profile photo before verification.',
+          });
+        }
+        primaryPhoto = photo;
+        const { data: primaryFile, error: primaryError } = await admin.storage
+          .from('profile-media').download(photo.storage_path);
+        if (primaryError || !primaryFile) {
+          await admin.storage.from('identity-selfies').remove([storagePath]);
+          return response(409, { code: 'primary_photo_unavailable' });
+        }
+        const primaryBytes = new Uint8Array(await primaryFile.arrayBuffer());
+        if (primaryBytes.length === 0 || primaryBytes.length > maxImageBytes) {
+          await admin.storage.from('identity-selfies').remove([storagePath]);
+          return response(422, { code: 'invalid_image_size' });
+        }
+        const configuredThreshold = Number(
+          Deno.env.get('REKOGNITION_SIMILARITY_THRESHOLD') ?? '95',
+        );
+        photoThreshold = Number.isFinite(configuredThreshold)
+          ? Math.min(100, Math.max(80, configuredThreshold))
+          : 95;
+        const comparison = await client.send(new CompareFacesCommand({
+          SourceImage: { Bytes: bytes },
+          TargetImage: { Bytes: primaryBytes },
+          SimilarityThreshold: photoThreshold,
+          QualityFilter: 'HIGH',
+        }));
+        photoCompareRequestId = comparison.$metadata.requestId;
+        photoSimilarity = (comparison.FaceMatches ?? []).reduce(
+          (highest, match) => Math.max(highest, Number(match.Similarity ?? 0)),
+          0,
+        );
+        if (photoSimilarity < photoThreshold) {
+          await admin.from('profile_photo_face_checks').insert({
+            user_id: user.id,
+            photo_id: photo.id,
+            check_type: 'profile_photo',
+            status: 'rejected',
+            similarity: photoSimilarity,
+            threshold: photoThreshold,
+            provider_request_id: photoCompareRequestId,
+            failure_reason: 'face_mismatch',
+          });
+          await admin.storage.from('identity-selfies').remove([storagePath]);
+          return response(422, {
+            code: 'face_mismatch',
+            message: 'The selfie does not match your profile photo.',
+          });
+        }
       }
       const residenceCountry = profile?.country_name?.trim() ?? '';
       const residenceVerifiedAt = Date.parse(
@@ -421,12 +469,15 @@ Deno.serve(async (request) => {
           });
           await admin.storage.from('identity-selfies').remove([storagePath]);
 
-          const { error: deleteUserError } = await admin.auth.admin.deleteUser(
-            user.id,
-          );
+          if (upgrading) {
+            return response(409, {
+              code: 'duplicate_identity_detected',
+              message: 'Photo verification cannot be completed. Contact support.',
+            });
+          }
+          const { error: deleteUserError } = await admin.auth.admin.deleteUser(user.id);
           if (deleteUserError) {
-            await admin
-              .from('profiles')
+            await admin.from('profiles')
               .update({ status: 'suspended', is_discoverable: false })
               .eq('id', user.id);
           }
@@ -438,9 +489,7 @@ Deno.serve(async (request) => {
           });
         }
 
-        const { error: registrationError } = await admin.rpc(
-          'register_indexed_face_reference',
-          {
+        const registrationParams = {
             owner_user: user.id,
             country_id_value: countryId,
             storage_path_value: storagePath,
@@ -453,7 +502,19 @@ Deno.serve(async (request) => {
             index_request_id_value: indexRequestId ?? null,
             face_model_version_value: faceModelVersion ?? null,
             lock_owner_token_value: lockOwner,
-          },
+        };
+        const { error: registrationError } = await admin.rpc(
+          upgrading
+            ? 'register_indexed_face_reference_upgrade'
+            : 'register_indexed_face_reference',
+          upgrading ? {
+            ...registrationParams,
+            photo_id_value: primaryPhoto!.id,
+            photo_path_value: primaryPhoto!.storage_path,
+            similarity_value: photoSimilarity,
+            threshold_value: photoThreshold,
+            compare_request_id_value: photoCompareRequestId ?? null,
+          } : registrationParams,
         );
         if (registrationError) {
           if (indexedByThisRequest && indexedFaceId) {
@@ -465,20 +526,27 @@ Deno.serve(async (request) => {
             'reference_enrollment_failed',
           );
         }
-        return response(200, { enrolled: true });
+        return response(200, { enrolled: true, photoVerified: upgrading });
       } catch (error) {
         if (indexedByThisRequest && indexedFaceId) {
           try {
             await deleteIndexedFace(client, collectionId, indexedFaceId);
             indexedByThisRequest = false;
           } catch (cleanupError) {
-            await queueFaceCleanup(
-              admin,
-              collectionId,
-              indexedFaceId,
-              user.id,
-              'enrollment_db_write_failed',
-            );
+            const { error: queueError } = await admin
+              .from('face_index_cleanup_queue').upsert({
+                collection_id: collectionId,
+                face_id: indexedFaceId,
+                user_id: user.id,
+                reason: 'enrollment_db_write_failed',
+              });
+            if (queueError) {
+              console.error('Unable to persist orphan face cleanup', {
+                userId: user.id,
+                collectionId,
+                error: queueError.message,
+              });
+            }
             console.error('Orphan face compensation failed', {
               userId: user.id,
               collectionId,
@@ -510,7 +578,7 @@ Deno.serve(async (request) => {
           detectFaces: 1,
           searchFacesByImage: searchCallCount,
           indexFaces: indexCallCount,
-          compareFacesDuplicateScan: 0,
+          compareFacesDuplicateScan: upgrading ? 1 : 0,
         });
       }
     } catch (error) {

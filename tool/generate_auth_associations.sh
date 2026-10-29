@@ -4,15 +4,15 @@ set -euo pipefail
 # Generates the public proof files that bind maplov.ca to the signed MapLov
 # binaries. Production signing values are required because debug certificates
 # and guessed Apple team identifiers would silently break verified links.
-if [[ $# -ne 2 ]]; then
-  echo "Usage: $0 APPLE_TEAM_ID ANDROID_PLAY_SHA256_FINGERPRINT" >&2
+if [[ $# -lt 1 || $# -gt 2 ]]; then
+  echo "Usage: $0 ANDROID_PLAY_SHA256_FINGERPRINT [APPLE_TEAM_ID]" >&2
   exit 64
 fi
 
-apple_team_id="$1"
-android_fingerprint="$(printf '%s' "$2" | tr '[:lower:]' '[:upper:]')"
+android_fingerprint="$(printf '%s' "$1" | tr '[:lower:]' '[:upper:]')"
+apple_team_id="${2:-}"
 
-if [[ ! "$apple_team_id" =~ ^[A-Z0-9]{10}$ ]]; then
+if [[ -n "$apple_team_id" && ! "$apple_team_id" =~ ^[A-Z0-9]{10}$ ]]; then
   echo "APPLE_TEAM_ID must contain exactly 10 uppercase letters or digits." >&2
   exit 65
 fi
@@ -50,7 +50,8 @@ cat > "$association_directory/assetlinks.json" <<JSON
 ]
 JSON
 
-cat > "$association_directory/apple-app-site-association" <<JSON
+if [[ -n "$apple_team_id" ]]; then
+  cat > "$association_directory/apple-app-site-association" <<JSON
 {
   "applinks": {
     "details": [
@@ -67,7 +68,10 @@ cat > "$association_directory/apple-app-site-association" <<JSON
   }
 }
 JSON
+fi
 
 echo "Generated:"
 echo "  $association_directory/assetlinks.json"
-echo "  $association_directory/apple-app-site-association"
+if [[ -n "$apple_team_id" ]]; then
+  echo "  $association_directory/apple-app-site-association"
+fi

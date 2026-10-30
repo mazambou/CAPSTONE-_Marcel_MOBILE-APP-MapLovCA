@@ -45,6 +45,15 @@ function mimeType(path: string): string {
   return path.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg';
 }
 
+function duplicateAccountBlockActive(): boolean {
+  const pauseUntil = Deno.env.get('DUPLICATE_ACCOUNT_BYPASS_UNTIL');
+  if (!pauseUntil || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(pauseUntil)) {
+    return true;
+  }
+  const deadline = Date.parse(pauseUntil);
+  return !Number.isFinite(deadline) || Date.now() >= deadline;
+}
+
 Deno.serve(async (request) => {
   if (request.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers: corsHeaders });
@@ -396,7 +405,7 @@ Deno.serve(async (request) => {
             ? mappedUser !== user.id
             : match.Face?.ExternalImageId !== externalImageId;
         });
-        if (otherMatch) {
+        if (otherMatch && (upgrading || duplicateAccountBlockActive())) {
           const faceId = otherMatch.Face?.FaceId;
           duplicate = {
             userId: faceId ? usersByFaceId.get(faceId) : undefined,

@@ -29,6 +29,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       imagePath: 'assets/onboarding/onboarding02/onboarding_02_background.png',
       imageFit: BoxFit.contain,
       imageAlignment: Alignment.topCenter,
+      maskImageCorners: true,
     ),
     _OnboardingItem(
       title: 'Chat & Connect',
@@ -158,6 +159,7 @@ class _OnboardingItem {
     required this.imagePath,
     required this.imageFit,
     required this.imageAlignment,
+    this.maskImageCorners = false,
   });
 
   final String title;
@@ -165,6 +167,7 @@ class _OnboardingItem {
   final String imagePath;
   final BoxFit imageFit;
   final Alignment imageAlignment;
+  final bool maskImageCorners;
 }
 
 class _OnboardingHeader extends StatelessWidget {
@@ -276,6 +279,40 @@ class _OnboardingIllustration extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (item.maskImageCorners) {
+      return DecoratedBox(
+        decoration: BoxDecoration(
+          color: AppColors.palePink,
+          borderRadius: BorderRadius.circular(26),
+        ),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            const aspectRatio = 800 / 1038;
+            final imageWidth =
+                constraints.maxWidth < constraints.maxHeight * aspectRatio
+                ? constraints.maxWidth
+                : constraints.maxHeight * aspectRatio;
+            return Align(
+              alignment: item.imageAlignment,
+              child: SizedBox(
+                width: imageWidth,
+                height: imageWidth / aspectRatio,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(imageWidth * 0.10),
+                  child: Image.asset(
+                    item.imagePath,
+                    key: ValueKey(item.imagePath),
+                    fit: BoxFit.fill,
+                    excludeFromSemantics: true,
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
+      );
+    }
+
     return DecoratedBox(
       decoration: BoxDecoration(
         color: AppColors.palePink,

@@ -45,8 +45,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
   Future<void> _verifyCode() async {
     final code = _codeController.text.trim();
-    if (!RegExp(r'^\d{6}$').hasMatch(code)) {
-      setState(() => _errorText = 'Enter the 6-digit code from your email.');
+    if (!RegExp(r'^\d{8}$').hasMatch(code)) {
+      setState(() => _errorText = 'Enter the 8-digit code from your email.');
       return;
     }
     setState(() {
@@ -86,7 +86,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       const SizedBox(height: 8),
       Text(
         _emailSent
-            ? 'If an account exists for this email, enter the 6-digit code we sent you.'
+            ? 'If an account exists for this email, enter the 8-digit code we sent you.'
             : 'Enter the email connected to your MapLov account. We will send you a secure recovery code.',
         textAlign: TextAlign.center,
         style: const TextStyle(color: AppColors.grayText),
@@ -109,7 +109,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           controller: _codeController,
           keyboardType: TextInputType.number,
           textInputAction: TextInputAction.done,
-          maxLength: 6,
+          maxLength: 8,
           autofillHints: const [AutofillHints.oneTimeCode],
           enabled: !_isLoading,
           onSubmitted: (_) => _verifyCode(),

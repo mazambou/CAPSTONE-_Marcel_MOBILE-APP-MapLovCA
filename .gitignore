@@ -29,6 +29,10 @@ migrate_working_dir/
 .dart_tool/
 .dart_tool
 .flutter-plugins-dependencies*
+# Synced-file copies of generated plugin registrants are never source files.
+**/GeneratedPluginRegistrant [0-9]*.*
+**/generated_plugin_registrant [0-9]*.*
+**/generated_plugins [0-9]*.cmake
 .pub-cache/
 .pub/
 /build/

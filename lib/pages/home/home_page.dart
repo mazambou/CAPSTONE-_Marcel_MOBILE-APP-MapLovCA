@@ -46,18 +46,19 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   void _syncOnlineRefreshTimer() {
     _onlineRefreshTimer?.cancel();
     _onlineRefreshTimer = null;
-    if (!_isForeground || selectedTab != 'Online') return;
+    if (!_isForeground) return;
     _onlineRefreshTimer = Timer.periodic(
-      _onlineRefreshInterval,
-      (_) => unawaited(_refreshOnlineProfiles()),
+      selectedTab == 'Online'
+          ? _onlineRefreshInterval
+          : const Duration(minutes: 1),
+      (_) => unawaited(_refreshVisibleProfiles()),
     );
   }
 
-  Future<void> _refreshOnlineProfiles() async {
+  Future<void> _refreshVisibleProfiles() async {
     if (!mounted ||
         !_isForeground ||
         !TickerMode.valuesOf(context).enabled ||
-        selectedTab != 'Online' ||
         _refreshingOnline ||
         _loading) {
       return;
@@ -152,10 +153,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       _isForeground = true;
       _syncOnlineRefreshTimer();
       if (MapLovRepository.instance.isLive) {
-        unawaited(_refreshResidenceLocation());
-      }
-      if (selectedTab == 'Online') {
-        unawaited(_refreshOnlineProfiles());
+        unawaited(_refreshAfterResume());
       } else if (_locationFailure != null && !_loading) {
         unawaited(
           selectedTab == 'Nearby' ? _loadProfiles() : _initializeDiscovery(),
@@ -170,13 +168,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
   }
 
-  Future<void> _refreshResidenceLocation() async {
+  Future<void> _refreshAfterResume() async {
     try {
       await LocationService.instance.updateMyLocation();
     } catch (_) {
       // Automatic residence refresh is retried on the next resume and must not
       // interrupt an already authenticated session.
     }
+    if (mounted) await _refreshVisibleProfiles();
   }
 
   Future<void> _loadProfiles({
@@ -431,10 +430,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       profile,
     );
     if (!mounted) return;
-    Navigator.push(
+    await Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => PhotoViewerScreen(profile: details)),
     );
+    if (mounted) await _loadProfiles(forceRefresh: true);
   }
 
   Future<void> _openProfile(UserProfile profile) async {
@@ -449,10 +449,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       profile,
     );
     if (!mounted) return;
-    Navigator.push(
+    await Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => PublicProfileScreen(profile: details)),
     );
+    if (mounted) await _loadProfiles(forceRefresh: true);
   }
 
   Future<void> _openPopularPhoto(
@@ -599,12 +600,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               ),
             const Divider(height: 1),
             if (_loading) const LinearProgressIndicator(minHeight: 2),
-            if (selectedTab == 'Discover' && popularPhotos.isNotEmpty)
-              _PopularPhotosStrip(
-                key: const Key('popular_photos_strip'),
-                photos: popularPhotos,
-                onOpen: _openPopularPhoto,
-              ),
             Expanded(
               child: _locationFailure != null
                   ? _NearbyLocationAccessState(
@@ -614,54 +609,65 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   : RefreshIndicator(
                       key: Key('discover_refresh_$selectedTab'),
                       onRefresh: () => _loadProfiles(forceRefresh: true),
-                      child: profiles.isEmpty
-                          ? LayoutBuilder(
-                              builder: (context, constraints) => ListView(
-                                physics: const AlwaysScrollableScrollPhysics(),
-                                children: [
-                                  SizedBox(
-                                    height: constraints.maxHeight,
-                                    child: _EmptyDiscoverState(
-                                      hasActiveFilters:
-                                          _filters.hasOptionalCriteria,
-                                      onResetFilters: () =>
-                                          unawaited(_resetDiscoveryFilters()),
-                                    ),
-                                  ),
-                                ],
+                      child: CustomScrollView(
+                        key: Key('discover_grid_$selectedTab'),
+                        controller: _gridController,
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        slivers: [
+                          if (selectedTab == 'Discover' &&
+                              popularPhotos.isNotEmpty)
+                            SliverToBoxAdapter(
+                              child: _PopularPhotosStrip(
+                                key: const Key('popular_photos_strip'),
+                                photos: popularPhotos,
+                                onOpen: _openPopularPhoto,
+                              ),
+                            ),
+                          if (profiles.isEmpty)
+                            SliverFillRemaining(
+                              hasScrollBody: false,
+                              child: _EmptyDiscoverState(
+                                hasActiveFilters: _filters.hasOptionalCriteria,
+                                onResetFilters: () =>
+                                    unawaited(_resetDiscoveryFilters()),
                               ),
                             )
-                          : GridView.builder(
-                              key: Key('discover_grid_$selectedTab'),
-                              controller: _gridController,
-                              physics: const AlwaysScrollableScrollPhysics(),
+                          else
+                            SliverPadding(
                               padding: const EdgeInsets.fromLTRB(
                                 12,
                                 12,
                                 12,
                                 20,
                               ),
-                              gridDelegate:
-                                  const SliverGridDelegateWithFixedCrossAxisCount(
-                                    crossAxisCount: 2,
-                                    crossAxisSpacing: 10,
-                                    mainAxisSpacing: 10,
-                                    childAspectRatio: 0.66,
-                                  ),
-                              itemCount: profiles.length,
-                              itemBuilder: (context, index) {
-                                final profile = profiles[index];
-                                return _DiscoverGridCard(
-                                  profile: profile,
-                                  liked: likedProfiles.contains(profile.name),
-                                  onPhotoTap: () =>
-                                      unawaited(_openPhoto(profile)),
-                                  onNameTap: () =>
-                                      unawaited(_openProfile(profile)),
-                                  onLike: () => unawaited(_toggleLike(profile)),
-                                );
-                              },
+                              sliver: SliverGrid(
+                                gridDelegate:
+                                    const SliverGridDelegateWithFixedCrossAxisCount(
+                                      crossAxisCount: 2,
+                                      crossAxisSpacing: 10,
+                                      mainAxisSpacing: 10,
+                                      childAspectRatio: 0.66,
+                                    ),
+                                delegate: SliverChildBuilderDelegate((
+                                  context,
+                                  index,
+                                ) {
+                                  final profile = profiles[index];
+                                  return _DiscoverGridCard(
+                                    profile: profile,
+                                    liked: likedProfiles.contains(profile.name),
+                                    onPhotoTap: () =>
+                                        unawaited(_openPhoto(profile)),
+                                    onNameTap: () =>
+                                        unawaited(_openProfile(profile)),
+                                    onLike: () =>
+                                        unawaited(_toggleLike(profile)),
+                                  );
+                                }, childCount: profiles.length),
+                              ),
                             ),
+                        ],
+                      ),
                     ),
             ),
           ],

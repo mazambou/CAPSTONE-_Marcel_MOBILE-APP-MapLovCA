@@ -82,7 +82,7 @@ class _ManagePhotosScreenState extends State<ManagePhotosScreen> {
     if (!_referenceReady && !_accountReady) {
       if (!mounted) return;
       _showError(
-        'Confirm your email, phone and residence before adding photos.',
+        'Verify your email or SMS registration, phone and residence before adding photos.',
       );
       return;
     }

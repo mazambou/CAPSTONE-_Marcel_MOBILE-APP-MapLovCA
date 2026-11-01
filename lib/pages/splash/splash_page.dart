@@ -37,6 +37,13 @@ class _SplashScreenState extends State<SplashScreen> {
       Navigator.of(context).pushReplacementNamed(AppRoutes.resetPassword);
       return;
     }
+    if (!AuthService.instance.hasActiveSession &&
+        AuthService.instance.pendingAuthIntent ==
+            MapLovAuthIntent.emailConfirmation &&
+        AuthService.instance.emailForVerification != null) {
+      Navigator.of(context).pushReplacementNamed(AppRoutes.verifyEmail);
+      return;
+    }
     var profileComplete = true;
     if (AuthService.instance.hasActiveSession) {
       try {

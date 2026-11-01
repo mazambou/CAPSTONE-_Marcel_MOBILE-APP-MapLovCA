@@ -146,6 +146,128 @@ class _ModerationReportsScreenState extends State<ModerationReportsScreen> {
     await _moderate(id, 'resolved', notes: notes);
   }
 
+  Future<void> _reviewReport(Map<String, dynamic> report) async {
+    final id = report['id'] as String;
+    if (report['status'] == 'open') await _moderate(id, 'under_review');
+    if (!mounted) return;
+    Map<String, dynamic>? evidence;
+    try {
+      evidence = await MapLovRepository.instance.moderationReportEvidence(id);
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Unable to load report evidence: ' + error.toString(),
+            ),
+          ),
+        );
+      }
+      return;
+    }
+    if (!mounted) return;
+    final messages = List<Map<String, dynamic>>.from(
+      (evidence?['messages'] as List? ?? const []).map(
+        (item) => Map<String, dynamic>.from(item as Map),
+      ),
+    );
+    final attachments = List<Map<String, dynamic>>.from(
+      evidence?['attachments'] as List? ?? const [],
+    );
+    await showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Conversation evidence'),
+        content: SizedBox(
+          width: 620,
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('Reason: ' + report['reason'].toString()),
+                if (report['comment'] != null)
+                  Text('Details: ' + report['comment'].toString()),
+                const SizedBox(height: 12),
+                Text('Captured: ' + _adminDateTime(evidence?['captured_at'])),
+                if (evidence?['media_finalized_at'] == null)
+                  const Text(
+                    'Attachment copying is incomplete. Review available text and retry evidence finalization.',
+                  ),
+                const Divider(),
+                if (messages.isEmpty)
+                  const Text(
+                    'No conversation messages were available when this report was filed.',
+                  ),
+                for (final message in messages) ...[
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(
+                      message['body']?.toString().isNotEmpty == true
+                          ? message['body'].toString()
+                          : message['deleted_at'] != null
+                          ? 'Message content was already erased before evidence retention.'
+                          : '[' + message['kind'].toString() + ']',
+                    ),
+                    subtitle: Text(
+                      'Author: ' +
+                          message['sender_id'].toString() +
+                          ' • ' +
+                          _adminDateTime(message['created_at']) +
+                          (message['reply_to_id'] == null
+                              ? ''
+                              : ' • Reply to: ' +
+                                    message['reply_to_id'].toString()),
+                    ),
+                  ),
+                  for (final attachment in attachments.where(
+                    (item) => item['message_id'] == message['id'],
+                  ))
+                    TextButton.icon(
+                      onPressed: () {
+                        final url = attachment['url'] as String?;
+                        if (url != null) unawaited(launchUrl(Uri.parse(url)));
+                      },
+                      icon: const Icon(Icons.attach_file),
+                      label: const Text('Open preserved attachment'),
+                    ),
+                  const Divider(),
+                ],
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _warnReportedUser(String reportId) async {
+    final notes = await _decisionNotes('Warn this member?');
+    if (notes == null) return;
+    await MapLovRepository.instance.warnReportedUser(reportId, notes);
+    _refresh();
+  }
+
+  Future<void> _banReportedUser(Map<String, dynamic> report) async {
+    final notes = await _decisionNotes('Ban this member?');
+    if (notes == null) return;
+    await MapLovRepository.instance.setAccountStatus(
+      report['target_id'] as String,
+      'banned',
+    );
+    await _moderate(
+      report['id'] as String,
+      'resolved',
+      notes: notes.isEmpty ? 'Account banned after report review.' : notes,
+    );
+  }
+
   @override
   Widget build(BuildContext context) => _AppPage(
     title: widget.pendingOnly ? 'Pending reports' : 'User reports',
@@ -435,6 +557,25 @@ class _ModerationReportsScreenState extends State<ModerationReportsScreen> {
                                 label: const Text('Suspend reported account'),
                               ),
                             ),
+                          if (report['target_type'] == 'user')
+                            Wrap(
+                              spacing: 12,
+                              children: [
+                                TextButton.icon(
+                                  onPressed: () =>
+                                      _warnReportedUser(report['id'] as String),
+                                  icon: const Icon(
+                                    Icons.warning_amber_outlined,
+                                  ),
+                                  label: const Text('Warn reported account'),
+                                ),
+                                TextButton.icon(
+                                  onPressed: () => _banReportedUser(report),
+                                  icon: const Icon(Icons.block_outlined),
+                                  label: const Text('Ban reported account'),
+                                ),
+                              ],
+                            ),
                           Text(
                             'Target: ${report['target_type']} • ${report['target_id']}',
                           ),
@@ -459,10 +600,7 @@ class _ModerationReportsScreenState extends State<ModerationReportsScreen> {
                               const SizedBox(width: 10),
                               Expanded(
                                 child: FilledButton(
-                                  onPressed: () => _moderate(
-                                    report['id'] as String,
-                                    'under_review',
-                                  ),
+                                  onPressed: () => _reviewReport(report),
                                   child: const Text('Review'),
                                 ),
                               ),

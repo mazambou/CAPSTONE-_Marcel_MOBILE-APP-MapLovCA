@@ -8,6 +8,7 @@ import 'package:uuid/uuid.dart';
 import '../config/supabase_config.dart';
 import '../data/mock_data.dart';
 import '../models/user_profile.dart';
+import 'auth_service.dart';
 
 class FaceVerificationException implements Exception {
   const FaceVerificationException(this.code, this.message);
@@ -35,7 +36,7 @@ class DiscoveryFilters {
   const DiscoveryFilters({
     this.minimumAge = 18,
     this.maximumAge = 80,
-    this.distanceKm = 50,
+    this.distanceKm = 100,
     this.locationMode = 'near_me',
     this.countries = const [],
     this.regions = const [],
@@ -129,7 +130,7 @@ class DiscoveryFilters {
   bool get hasOptionalCriteria =>
       minimumAge != 18 ||
       maximumAge != 80 ||
-      distanceKm != 50 ||
+      distanceKm != 100 ||
       locationMode != 'near_me' ||
       countries.isNotEmpty ||
       regions.isNotEmpty ||
@@ -226,7 +227,7 @@ class DiscoveryFilters {
     return DiscoveryFilters(
       minimumAge: minimumAge,
       maximumAge: maximumAge,
-      distanceKm: row['distance_km'] as int? ?? 50,
+      distanceKm: row['distance_km'] as int? ?? 100,
       locationMode: row['location_mode'] as String? ?? 'near_me',
       countries: List<String>.from(row['country_codes'] ?? const []),
       regions: List<String>.from(row['regions'] ?? const []),
@@ -492,6 +493,9 @@ class MapLovMessage {
     this.mediaBytes,
     this.deleted = false,
     this.read = false,
+    this.replyToId,
+    this.replyPreview,
+    this.reactions = const [],
   });
   final String id;
   final String senderId;
@@ -502,6 +506,9 @@ class MapLovMessage {
   final DateTime createdAt;
   final bool deleted;
   final bool read;
+  final String? replyToId;
+  final String? replyPreview;
+  final List<Map<String, String>> reactions;
 }
 
 class MapLovPost {
@@ -905,9 +912,10 @@ class MapLovRepository {
     }
     if (filters.requiredRelationshipGoal &&
         filters.relationshipGoals.isNotEmpty &&
-        !_matchesFilterValue(
-          profile.relationshipGoal,
-          filters.relationshipGoals,
+        !filters.relationshipGoals.any(
+          (goal) =>
+              _normalizedRelationshipGoal(profile.relationshipGoal) ==
+              _normalizedRelationshipGoal(goal),
         )) {
       return false;
     }
@@ -1019,6 +1027,12 @@ class MapLovRepository {
     };
   }
 
+  String _normalizedRelationshipGoal(String value) =>
+      switch (_normalizedFilterValue(value)) {
+        'long-term relationship' => 'long-term',
+        final normalized => normalized,
+      };
+
   String _normalizedFilterValue(String value) => value.trim().toLowerCase();
 
   String _normalizedBodyTypeValue(String value) {
@@ -1107,8 +1121,32 @@ class MapLovRepository {
     return row == null ? null : _profileFromRow(row);
   }
 
+  Future<UserProfile?> _conversationPartner(String id) async {
+    final visible = await getProfile(id);
+    if (visible != null || !isLive) return visible;
+    final summary = await _client!.rpc(
+      'conversation_partner_summary',
+      params: {'target_user': id},
+    );
+    if (summary is! Map) return null;
+    return UserProfile(
+      id: id,
+      name: summary['first_name'] as String? ?? 'MapLov member',
+      age: 18,
+      city: summary['city'] as String? ?? '',
+      country: summary['country_name'] as String? ?? '',
+      compatibilityScore: 0,
+      imagePath: '',
+      photoDisplayStyle: PhotoDisplayStyle.profileDetails,
+      isOnline: false,
+    );
+  }
+
   Future<UserProfile> discoverProfileDetails(UserProfile summary) async {
     if (!isLive) return summary;
+    if (AuthService.instance.needsEmailVerificationReminder) {
+      return summary;
+    }
     final full = await getProfile(summary.id);
     if (full == null) return summary;
     return _copyProfile(
@@ -1509,6 +1547,22 @@ class MapLovRepository {
         'detected_city': city,
       },
     );
+  }
+
+  Future<void> updateResidenceGeographyIds({
+    required String? countryId,
+    required String? regionId,
+    required String? cityId,
+  }) async {
+    if (!isLive) return;
+    await _client!
+        .from('profiles')
+        .update({
+          'residence_country_id': countryId,
+          'residence_region_id': regionId,
+          'residence_city_id': cityId,
+        })
+        .eq('id', currentUserId!);
   }
 
   Future<String?> uploadProfilePhoto({
@@ -2159,7 +2213,9 @@ class MapLovRepository {
           .isFilter('left_at', null)
           .limit(1);
       if (others.isEmpty) continue;
-      final profile = await getProfile(others.first['user_id'] as String);
+      final profile = await _conversationPartner(
+        others.first['user_id'] as String,
+      );
       if (profile == null) continue;
       final clearRow = await _client!
           .from('conversation_clears')
@@ -2308,12 +2364,14 @@ class MapLovRepository {
         controller.onCancel = subscription.cancel;
       });
     }
-    return _client!
-        .from('messages')
-        .stream(primaryKey: ['id'])
-        .eq('conversation_id', conversationId)
-        .order('created_at')
-        .asyncMap((rows) async {
+    return Stream<List<MapLovMessage>>.multi((controller) {
+      var latestRows = <Map<String, dynamic>>[];
+      var revision = 0;
+      var active = true;
+      Future<void> emit() async {
+        final rows = latestRows;
+        final thisRevision = ++revision;
+        try {
           final clearRow = await _client!
               .from('conversation_clears')
               .select('cleared_at')
@@ -2340,7 +2398,23 @@ class MapLovRepository {
           final hiddenIds = hiddenRows
               .map((row) => row['message_id'] as String)
               .toSet();
-          return Future.wait(
+          final rowsById = {for (final row in rows) row['id'] as String: row};
+          final reactionRows = rows.isEmpty
+              ? <Map<String, dynamic>>[]
+              : await _client!
+                    .from('message_reactions')
+                    .select('message_id,user_id,emoji')
+                    .inFilter('message_id', rowsById.keys.toList());
+          final reactionsById = <String, List<Map<String, String>>>{};
+          for (final reaction in reactionRows) {
+            reactionsById
+                .putIfAbsent(reaction['message_id'] as String, () => [])
+                .add({
+                  'user_id': reaction['user_id'] as String,
+                  'emoji': reaction['emoji'] as String,
+                });
+          }
+          final visible = await Future.wait(
             rows
                 .where(
                   (row) =>
@@ -2350,9 +2424,41 @@ class MapLovRepository {
                             row['created_at'] as String,
                           ).isAfter(clearedAt)),
                 )
-                .map((row) => _messageFromRow(row, otherReadAt: readAt)),
+                .map(
+                  (row) => _messageFromRow(
+                    row,
+                    otherReadAt: readAt,
+                    replyRow: rowsById[row['reply_to_id']],
+                    reactions: reactionsById[row['id']] ?? const [],
+                  ),
+                ),
           );
-        });
+          if (active && thisRevision == revision) controller.add(visible);
+        } catch (error, stackTrace) {
+          if (active) controller.addError(error, stackTrace);
+        }
+      }
+
+      final messageSubscription = _client!
+          .from('messages')
+          .stream(primaryKey: ['id'])
+          .eq('conversation_id', conversationId)
+          .order('created_at')
+          .listen((rows) {
+            latestRows = rows;
+            unawaited(emit());
+          }, onError: controller.addError);
+      final reactionSubscription = _client!
+          .from('message_reactions')
+          .stream(primaryKey: ['message_id', 'user_id'])
+          .eq('conversation_id', conversationId)
+          .listen((_) => unawaited(emit()), onError: controller.addError);
+      controller.onCancel = () {
+        active = false;
+        unawaited(messageSubscription.cancel());
+        unawaited(reactionSubscription.cancel());
+      };
+    });
   }
 
   String _latestTimestamp(String? first, String? second) {
@@ -2369,6 +2475,7 @@ class MapLovRepository {
     String conversationId,
     String body, {
     String? clientMessageId,
+    String? replyToId,
   }) async {
     final text = body.trim();
     if (text.isEmpty) return;
@@ -2381,6 +2488,7 @@ class MapLovRepository {
           senderId: 'me',
           kind: 'text',
           body: text,
+          replyToId: replyToId,
           createdAt: DateTime.now(),
         ),
       );
@@ -2394,6 +2502,7 @@ class MapLovRepository {
         'kind': 'text',
         'body': text,
         'client_message_id': requestId,
+        if (replyToId != null) 'reply_to_id': replyToId,
       });
     } on PostgrestException catch (error) {
       if (error.code != '23505') rethrow;
@@ -2467,6 +2576,24 @@ class MapLovRepository {
     } on PostgrestException catch (error) {
       if (error.code != '23505') rethrow;
     }
+  }
+
+  Future<void> setMessageReaction(String messageId, String? emoji) async {
+    if (!isLive) return;
+    if (emoji == null) {
+      await _client!
+          .from('message_reactions')
+          .delete()
+          .eq('message_id', messageId)
+          .eq('user_id', currentUserId!);
+      return;
+    }
+    await _client!.from('message_reactions').upsert({
+      'message_id': messageId,
+      'user_id': currentUserId!,
+      'emoji': emoji,
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
+    }, onConflict: 'message_id,user_id');
   }
 
   Future<void> markConversationRead(String conversationId) async {
@@ -3125,6 +3252,15 @@ class MapLovRepository {
     clearDiscoveryCache();
   }
 
+  Future<String> chatBlockState(String userId) async {
+    if (!isLive) return _demoBlockedIds.contains(userId) ? 'outgoing' : 'none';
+    final value = await _client!.rpc(
+      'chat_block_state',
+      params: {'other_user': userId},
+    );
+    return value is String ? value : 'none';
+  }
+
   Future<void> unblockUser(String userId) async {
     if (!isLive) {
       _demoBlockedIds.remove(userId);
@@ -3148,7 +3284,7 @@ class MapLovRepository {
         .eq('blocker_id', currentUserId!);
     final result = <UserProfile>[];
     for (final row in rows) {
-      final profile = await getProfile(row['blocked_id'] as String);
+      final profile = await _conversationPartner(row['blocked_id'] as String);
       if (profile != null) result.add(profile);
     }
     return result;
@@ -3159,15 +3295,57 @@ class MapLovRepository {
     required String targetId,
     required String reason,
     String? comment,
+    String? conversationId,
   }) async {
     if (!isLive) return;
-    await _client!.from('reports').insert({
-      'reporter_id': currentUserId!,
-      'target_type': targetType,
-      'target_id': targetId,
-      'reason': reason,
-      'comment': comment,
-    });
+    if (targetType == 'user' || targetType == 'message') {
+      final response = await _client!.functions.invoke(
+        'report-conversation-evidence',
+        body: {
+          'targetType': targetType,
+          'targetId': targetId,
+          'reason': reason,
+          'comment': comment,
+          'conversationId': conversationId,
+        },
+      );
+      if (response.status != 200 ||
+          response.data is! Map ||
+          response.data['saved'] != true) {
+        throw StateError(
+          'The conversation evidence could not be saved yet. Please retry.',
+        );
+      }
+      return;
+    }
+    try {
+      await _client!
+          .from('reports')
+          .insert({
+            'reporter_id': currentUserId!,
+            'target_type': targetType,
+            'target_id': targetId,
+            'reason': reason,
+            'comment': comment,
+            if (conversationId != null)
+              'reported_conversation_id': conversationId,
+          })
+          .select('id')
+          .single();
+    } on PostgrestException catch (error) {
+      if (!error.message.contains('already under review')) rethrow;
+      final existing = await _client!
+          .from('reports')
+          .select('id')
+          .eq('reporter_id', currentUserId!)
+          .eq('target_type', targetType)
+          .eq('target_id', targetId)
+          .inFilter('status', ['open', 'under_review'])
+          .order('created_at', ascending: false)
+          .limit(1)
+          .maybeSingle();
+      if (existing == null) rethrow;
+    }
   }
 
   /// Returns false when this account has already reported the same photo.
@@ -3360,6 +3538,32 @@ class MapLovRepository {
     );
   }
 
+  Future<Map<String, dynamic>?> moderationReportEvidence(
+    String reportId,
+  ) async {
+    if (!isLive) return null;
+    final row = await _client!
+        .from('report_conversation_evidence')
+        .select()
+        .eq('report_id', reportId)
+        .maybeSingle();
+    if (row == null) return null;
+    final evidence = Map<String, dynamic>.from(row);
+    final attachments = List<Map<String, dynamic>>.from(
+      (row['attachments'] as List? ?? const []).map(
+        (item) => Map<String, dynamic>.from(item as Map),
+      ),
+    );
+    for (final attachment in attachments) {
+      attachment['url'] = await _signedUrl(
+        'moderation-evidence',
+        attachment['path'] as String,
+      );
+    }
+    evidence['attachments'] = attachments;
+    return evidence;
+  }
+
   Future<void> moderateReport(String id, String status, {String? notes}) async {
     if (!isLive) return;
     final resolved = status == 'resolved' || status == 'dismissed';
@@ -3379,6 +3583,14 @@ class MapLovRepository {
       'target_type': 'report',
       'target_id': id,
     });
+  }
+
+  Future<void> warnReportedUser(String reportId, String notes) async {
+    if (!isLive) return;
+    await _client!.rpc(
+      'admin_warn_reported_user',
+      params: {'report_id_value': reportId, 'notes_value': notes},
+    );
   }
 
   Future<List<Map<String, dynamic>>> adminUsers() async {
@@ -4384,6 +4596,8 @@ class MapLovRepository {
   Future<MapLovMessage> _messageFromRow(
     Map<String, dynamic> row, {
     DateTime? otherReadAt,
+    Map<String, dynamic>? replyRow,
+    List<Map<String, String>> reactions = const [],
   }) async {
     String? mediaUrl;
     final path = row['media_path'] as String?;
@@ -4397,6 +4611,14 @@ class MapLovRepository {
       mediaUrl: mediaUrl,
       createdAt: createdAt,
       deleted: row['deleted_at'] != null,
+      replyToId: row['reply_to_id'] as String?,
+      replyPreview: replyRow == null
+          ? null
+          : (replyRow['body'] as String?) ??
+                (replyRow['deleted_at'] != null
+                    ? 'Message supprimé'
+                    : '[' + replyRow['kind'].toString() + ']'),
+      reactions: reactions,
       read:
           row['sender_id'] == currentUserId &&
           otherReadAt != null &&

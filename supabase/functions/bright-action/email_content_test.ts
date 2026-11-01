@@ -18,6 +18,26 @@ Deno.test("signup sends the OTP to the current email", () => {
   assertMatch(messages[0].text, /123456/);
 });
 
+Deno.test("test account recovery reaches its verified contact email", () => {
+  const messages = buildAuthEmails({
+    user: {
+      email: "test-123@accounts.maplov.ca",
+      app_metadata: {
+        maplov_test_duplicate: true,
+        maplov_contact_email: "member@example.com",
+      },
+    },
+    email_data: {
+      email_action_type: "recovery",
+      token: "654321",
+      token_hash: "recovery-hash",
+      redirect_to: "https://maplov.ca/auth/callback",
+    },
+  }, supabaseUrl);
+
+  assertEquals(messages[0].to, "member@example.com");
+});
+
 Deno.test("recovery contains a valid Supabase verification link", () => {
   const messages = buildAuthEmails({
     user: { email: "member@example.com" },

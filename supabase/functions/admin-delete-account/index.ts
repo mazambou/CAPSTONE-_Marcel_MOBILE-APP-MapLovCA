@@ -195,6 +195,42 @@ async function eraseAccount(
 }
 
 async function processDue(admin: AdminClient): Promise<Response> {
+  const now = new Date().toISOString();
+  const { data: expiredEvidence, error: evidenceError } = await admin
+    .from('report_conversation_evidence')
+    .select('attachments')
+    .lte('retain_until', now)
+    .limit(100);
+  if (evidenceError) {
+    return response(503, { code: 'evidence_cleanup_unavailable' });
+  }
+  const evidencePaths = (expiredEvidence ?? []).flatMap((item) =>
+    (Array.isArray(item.attachments) ? item.attachments : [])
+      .map((attachment) => attachment?.path)
+      .filter((path): path is string => typeof path === 'string')
+  );
+  for (const batch of chunks(evidencePaths, storagePageSize)) {
+    const { error } = await admin.storage.from('moderation-evidence').remove(batch);
+    if (error) return response(503, { code: 'evidence_file_cleanup_failed' });
+  }
+  const { data: expiredMessages, error: retentionError } = await admin
+    .from('deleted_message_retention')
+    .select('media_path')
+    .lte('retain_until', now)
+    .limit(100);
+  if (retentionError) {
+    return response(503, { code: 'message_retention_cleanup_unavailable' });
+  }
+  const messagePaths = (expiredMessages ?? [])
+    .map((item) => item.media_path)
+    .filter((path): path is string => typeof path === 'string');
+  for (const batch of chunks(messagePaths, storagePageSize)) {
+    const { error } = await admin.storage.from('chat-media').remove(batch);
+    if (error) return response(503, { code: 'message_file_cleanup_failed' });
+  }
+  const { error: pruneError } = await admin.rpc('prune_expired_moderation_records');
+  if (pruneError) return response(503, { code: 'retention_cleanup_failed' });
+
   const { data: incompleteQueued, error: incompleteQueueError } = await admin
     .rpc('enqueue_stale_incomplete_registrations');
   if (incompleteQueueError) {

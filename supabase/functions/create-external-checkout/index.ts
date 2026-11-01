@@ -378,18 +378,22 @@ Deno.serve(async (request) => {
     if (insertError) throw new Error(insertError.message);
     checkoutId = checkout.id as string;
 
+    const billingEmail = user.app_metadata?.maplov_test_duplicate === true &&
+        typeof user.app_metadata?.maplov_contact_email === "string"
+      ? user.app_metadata.maplov_contact_email
+      : user.email;
     const displayName = String(
       user.user_metadata?.full_name ??
         user.user_metadata?.name ??
-        user.email.split("@")[0],
+        billingEmail.split("@")[0],
     ).substring(0, 100);
     const result = provider === "stripe"
-      ? await createStripeCheckout(reference, user.id, user.email, product)
+      ? await createStripeCheckout(reference, user.id, billingEmail, product)
       : provider === "paypal"
       ? await createPayPalCheckout(reference, product)
       : await createFlutterwaveCheckout(
         reference,
-        user.email,
+        billingEmail,
         displayName,
         product,
       );

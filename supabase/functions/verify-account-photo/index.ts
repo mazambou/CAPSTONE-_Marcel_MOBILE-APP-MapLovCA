@@ -72,7 +72,7 @@ Deno.serve(async (request) => {
   if (accountReady !== true) {
     await admin.storage.from('profile-media-pending').remove([path]);
     return reply(428, 'account_verification_required', {
-      message: 'Confirm your email, phone and residence before adding a photo.',
+      message: 'Verify your email or complete the SMS registration fallback, then verify your phone and residence before adding a photo.',
     });
   }
 
@@ -104,7 +104,7 @@ Deno.serve(async (request) => {
     await admin.storage.from('profile-media').remove([path]);
     await admin.storage.from('profile-media-pending').remove([path]);
     return reply(422, 'account_photo_registration_failed', {
-      message: 'Confirm your email, phone and residence, then try again.',
+      message: 'Verify your email or complete the SMS registration fallback, then verify your phone and residence.',
     });
   }
 

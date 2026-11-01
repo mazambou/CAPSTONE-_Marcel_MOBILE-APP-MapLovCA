@@ -185,7 +185,7 @@ class _HelpArticle {
 const _helpArticles = [
   _HelpArticle(
     'Creating and verifying an account',
-    'Register with one email address and one phone number, confirm your email, complete your profile and verify the SMS code. MapLov permits one personal account per person.',
+    'Register with one email address and one phone number. Confirm your email, or verify your phone by SMS if the email is delayed. An email left pending can be confirmed later in Security. MapLov permits one personal account per person.',
     Icons.person_add_alt_1_outlined,
   ),
   _HelpArticle(

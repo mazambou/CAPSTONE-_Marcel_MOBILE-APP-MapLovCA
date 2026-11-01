@@ -625,6 +625,16 @@ const _privacyDocument = _LegalDocument(
     ),
     _LegalSection(
       title: _LegalCopy(
+        '11a. Conversation reports and deleted messages',
+        '11a. Signalements de conversation et messages supprimés',
+      ),
+      body: _LegalCopy(
+        'A report of a conversation creates a separate copy of the available messages, authors, timestamps and attachments for authorized moderation personnel. This copy can remain after a message, conversation or account is deleted. Deleted message content is temporarily retained for 30 days to allow a later report. Report evidence remains while the case is open and for 365 days after closure, unless a longer legal retention duty applies.',
+        'Le signalement d’une conversation crée une copie distincte des messages disponibles, de leurs auteurs, dates, heures et pièces jointes pour le personnel de modération autorisé. Cette copie peut subsister après la suppression d’un message, d’une conversation ou d’un compte. Le contenu des messages supprimés est conservé temporairement pendant 30 jours pour permettre un signalement ultérieur. Les preuves liées à un dossier restent pendant son examen et pendant 365 jours après sa clôture, sauf obligation légale de conservation plus longue.',
+      ),
+    ),
+    _LegalSection(
+      title: _LegalCopy(
         '12. Your privacy rights and choices',
         '12. Vos droits et vos choix',
       ),
@@ -805,8 +815,8 @@ const _faceVerificationDocument = _LegalDocument(
         'Consentement, retrait et révision',
       ),
       body: _LegalCopy(
-        'Capture begins only after you actively select “I understand and agree.” Declining leaves the selfie uncaptured. If your current residence is verified in Québec, you can instead complete profile creation with a confirmed email and phone, without facial recognition. Photos added this way are not face matched and do not receive a face-verification label. You can choose to verify your profile photo later from your account. You may withdraw consent, ask for deletion or challenge a decision by contacting privacy@maplov.ca. Withdrawal does not invalidate processing completed before withdrawal.',
-        'La capture commence seulement après que vous avez choisi activement « Je comprends et j’accepte ». Un refus laisse le selfie non capturé. Si votre résidence actuelle est vérifiée au Québec, vous pouvez plutôt créer votre profil avec un courriel et un téléphone confirmés, sans reconnaissance faciale. Les photos ajoutées ainsi ne sont pas comparées au visage et ne portent pas la mention de vérification faciale. Vous pouvez choisir de vérifier votre photo de profil plus tard depuis votre compte. Vous pouvez retirer votre consentement, demander la suppression ou contester une décision en écrivant à privacy@maplov.ca. Le retrait n’invalide pas les traitements effectués avant celui-ci.',
+        'Capture begins only after you actively select “I understand and agree.” Declining leaves the selfie uncaptured. If your current residence is verified in Québec, you can instead complete profile creation after confirming your email or completing SMS registration, and verifying your phone and Québec residence, without facial recognition. SMS verification does not confirm your email; you can confirm it later in Security. Photos added this way are not face matched and do not receive a face-verification label. You can choose to verify your profile photo later from your account. You may withdraw consent, ask for deletion or challenge a decision by contacting privacy@maplov.ca. Withdrawal does not invalidate processing completed before withdrawal.',
+        'La capture commence seulement après que vous avez choisi activement « Je comprends et j’accepte ». Un refus laisse le selfie non capturé. Si votre résidence actuelle est vérifiée au Québec, vous pouvez plutôt créer votre profil après avoir confirmé votre courriel ou terminé l’inscription par SMS, puis vérifié votre téléphone et votre résidence au Québec, sans reconnaissance faciale. Le SMS ne confirme pas votre courriel; vous pourrez le confirmer plus tard dans Sécurité. Les photos ajoutées ainsi ne sont pas comparées au visage et ne portent pas la mention de vérification faciale. Vous pouvez choisir de vérifier votre photo de profil plus tard depuis votre compte. Vous pouvez retirer votre consentement, demander la suppression ou contester une décision en écrivant à privacy@maplov.ca. Le retrait n’invalide pas les traitements effectués avant celui-ci.',
       ),
     ),
   ],

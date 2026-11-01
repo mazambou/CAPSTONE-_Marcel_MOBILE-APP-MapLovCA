@@ -2,6 +2,34 @@ part of '../../app.dart';
 
 enum _DeletionScope { me, everyone }
 
+const _sharedDeletionBlocked =
+    'La suppression pour les deux participants est indisponible pour cette conversation. Vous pouvez uniquement la supprimer de votre côté.';
+
+String? _blockedActionText(String state, String action) {
+  if (state == 'none') return null;
+  if (state == 'mutual') {
+    return 'Vous avez bloqué cet utilisateur et il vous a également bloqué. Les interactions restent indisponibles tant que les deux blocages sont actifs.';
+  }
+  if (state == 'outgoing') {
+    return switch (action) {
+      'message' =>
+        'Vous avez bloqué cet utilisateur. Débloquez-le avant de pouvoir lui envoyer un message.',
+      'profile' =>
+        'Vous avez bloqué cet utilisateur. Débloquez-le pour consulter son profil.',
+      _ =>
+        'Vous avez bloqué cet utilisateur. Débloquez-le pour effectuer cette action.',
+    };
+  }
+  return switch (action) {
+    'message' =>
+      'Cet utilisateur vous a bloqué. Vous ne pouvez plus lui envoyer de messages.',
+    'profile' =>
+      'Cet utilisateur vous a bloqué. Vous ne pouvez plus consulter son profil.',
+    _ =>
+      'Cet utilisateur vous a bloqué. Vous ne pouvez pas effectuer cette action.',
+  };
+}
+
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key, this.conversationId, this.profile});
   final String? conversationId;
@@ -29,6 +57,8 @@ class _ChatScreenState extends State<ChatScreen> {
   String? _playingMessageId;
   String? _sendError;
   Future<void> Function()? _retrySend;
+  String _blockState = 'none';
+  MapLovMessage? _replyingTo;
 
   bool get _busy => _sending || _pickingAttachment;
   bool get _canSendText => !_busy && _text.text.trim().isNotEmpty;
@@ -43,6 +73,7 @@ class _ChatScreenState extends State<ChatScreen> {
     _text.addListener(_handleComposerChanged);
     unawaited(MapLovRepository.instance.markConversationRead(conversationId));
     unawaited(_loadReadReceiptEntitlement());
+    unawaited(_refreshBlockState());
     _player.onPlayerComplete.listen((_) {
       if (mounted) setState(() => _playingMessageId = null);
     });
@@ -73,11 +104,93 @@ class _ChatScreenState extends State<ChatScreen> {
     if (mounted) setState(() {});
   }
 
-  void _openProfile() {
+  Future<void> _refreshBlockState() async {
+    final state = await MapLovRepository.instance.chatBlockState(profile.id);
+    if (mounted) setState(() => _blockState = state);
+  }
+
+  void _showChatNotice(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  Future<bool> _allowInteraction(String action) async {
+    final state = await MapLovRepository.instance.chatBlockState(profile.id);
+    if (mounted) setState(() => _blockState = state);
+    final message = _blockedActionText(state, action);
+    if (message != null) _showChatNotice(message);
+    return message == null;
+  }
+
+  Future<void> _openProfile() async {
+    if (!await _allowInteraction('profile') || !mounted) return;
     Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => PublicProfileScreen(profile: profile)),
     );
+  }
+
+  Future<void> _toggleBlock() async {
+    final current = await MapLovRepository.instance.chatBlockState(profile.id);
+    if (current == 'outgoing' || current == 'mutual') {
+      await MapLovRepository.instance.unblockUser(profile.id);
+    } else {
+      await MapLovRepository.instance.blockUser(profile.id);
+    }
+    await _refreshBlockState();
+  }
+
+  Future<void> _openChatMenu() async {
+    await _refreshBlockState();
+    if (!mounted) return;
+    final ownBlock = _blockState == 'outgoing' || _blockState == 'mutual';
+    final size = MediaQuery.sizeOf(context);
+    final selection = await showMenu<String>(
+      context: context,
+      position: RelativeRect.fromLTRB(size.width - 285, 72, 12, 0),
+      items: [
+        PopupMenuItem(
+          value: 'block',
+          child: Text(
+            ownBlock ? 'Débloquer cet utilisateur' : 'Bloquer cet utilisateur',
+          ),
+        ),
+        const PopupMenuItem(
+          value: 'report',
+          child: Text('Signaler l’utilisateur'),
+        ),
+        const PopupMenuDivider(),
+        const PopupMenuItem(
+          value: 'clear',
+          child: Text('Effacer la conversation'),
+        ),
+      ],
+    );
+    if (!mounted) return;
+    if (selection == 'block') {
+      try {
+        await _toggleBlock();
+      } catch (error) {
+        _showChatNotice(
+          'Impossible de modifier le blocage : ' + error.toString(),
+        );
+      }
+    } else if (selection == 'report') {
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ReportUserScreen(
+            profile: profile,
+            conversationId: conversationId,
+          ),
+        ),
+      );
+      if (mounted) await _refreshBlockState();
+    } else if (selection == 'clear') {
+      await _clearChat();
+    }
   }
 
   void _scheduleScrollToBottom(String? lastMessageId) {
@@ -149,13 +262,26 @@ class _ChatScreenState extends State<ChatScreen> {
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Unable to delete this message: $error')),
+          SnackBar(
+            content: Text(
+              error.toString().contains('SHARED_DELETION_BLOCKED')
+                  ? _sharedDeletionBlocked
+                  : 'Unable to delete this message: ' + error.toString(),
+            ),
+          ),
         );
       }
     }
   }
 
-  Future<void> _confirmDelete(MapLovMessage message) async {
+  Future<void> _confirmDelete(
+    MapLovMessage message, {
+    required bool mine,
+  }) async {
+    final state = await MapLovRepository.instance.chatBlockState(profile.id);
+    if (mounted) setState(() => _blockState = state);
+    if (!mounted) return;
+    final blocked = state != 'none';
     final scope = await showDialog<_DeletionScope>(
       context: context,
       builder: (context) => AlertDialog(
@@ -172,14 +298,25 @@ class _ChatScreenState extends State<ChatScreen> {
             onPressed: () => Navigator.pop(context, _DeletionScope.me),
             child: const Text('Delete for me'),
           ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, _DeletionScope.everyone),
-            child: const Text('Delete for everyone'),
-          ),
+          if (!blocked && mine)
+            FilledButton(
+              onPressed: () => Navigator.pop(context, _DeletionScope.everyone),
+              child: const Text('Delete for everyone'),
+            ),
         ],
       ),
     );
     if (scope == null || !mounted) return;
+    if (scope == _DeletionScope.everyone) {
+      final current = await MapLovRepository.instance.chatBlockState(
+        profile.id,
+      );
+      if (!mounted) return;
+      if (current != 'none') {
+        _showChatNotice(_sharedDeletionBlocked);
+        return;
+      }
+    }
     if (scope == _DeletionScope.everyone && message.read) {
       final allowed = await _requireSubscriptionFeature(
         context,
@@ -191,7 +328,103 @@ class _ChatScreenState extends State<ChatScreen> {
     await _delete(message, forEveryone: scope == _DeletionScope.everyone);
   }
 
+  Future<void> _chooseReaction(MapLovMessage message) async {
+    if (!await _allowInteraction('reaction') || !mounted) return;
+    final mine = message.reactions
+        .where(
+          (item) => item['user_id'] == MapLovRepository.instance.currentUserId,
+        )
+        .firstOrNull?['emoji'];
+    final selected = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Réagir avec un émoji'),
+        content: Wrap(
+          spacing: 8,
+          children: [
+            for (final emoji in const [
+              '❤️',
+              '👍',
+              '😂',
+              '😍',
+              '😮',
+              '😢',
+              '👏',
+              '🔥',
+              '😘',
+              '🙏',
+              '💯',
+              '👎',
+            ])
+              IconButton(
+                onPressed: () => Navigator.pop(context, emoji),
+                icon: Text(emoji, style: const TextStyle(fontSize: 25)),
+              ),
+          ],
+        ),
+        actions: [
+          if (mine != null)
+            TextButton(
+              onPressed: () => Navigator.pop(context, ''),
+              child: const Text('Retirer ma réaction'),
+            ),
+        ],
+      ),
+    );
+    if (selected == null) return;
+    try {
+      await MapLovRepository.instance.setMessageReaction(
+        message.id,
+        selected.isEmpty ? null : selected,
+      );
+    } catch (_) {
+      await _allowInteraction('reaction');
+    }
+  }
+
+  Future<void> _messageActions(MapLovMessage message, bool mine) async {
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.reply),
+              title: const Text('Répondre'),
+              onTap: () => Navigator.pop(context, 'reply'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.delete_outline),
+              title: const Text('Supprimer ce message'),
+              onTap: () => Navigator.pop(context, 'delete'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.sentiment_satisfied_alt_outlined),
+              title: const Text('Réagir avec un émoji'),
+              onTap: () => Navigator.pop(context, 'react'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (!mounted) return;
+    if (action == 'reply') {
+      if (!await _allowInteraction('message')) return;
+      setState(() => _replyingTo = message);
+      _messageFocusNode.requestFocus();
+    } else if (action == 'delete') {
+      await _confirmDelete(message, mine: mine);
+    } else if (action == 'react') {
+      await _chooseReaction(message);
+    }
+  }
+
   Future<void> _clearChat() async {
+    final state = await MapLovRepository.instance.chatBlockState(profile.id);
+    if (mounted) setState(() => _blockState = state);
+    if (!mounted) return;
+    final blocked = state != 'none';
     final scope = await showDialog<_DeletionScope>(
       context: context,
       builder: (context) => AlertDialog(
@@ -208,14 +441,25 @@ class _ChatScreenState extends State<ChatScreen> {
             onPressed: () => Navigator.pop(context, _DeletionScope.me),
             child: const Text('Clear for me'),
           ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, _DeletionScope.everyone),
-            child: const Text('Clear for everyone'),
-          ),
+          if (!blocked)
+            FilledButton(
+              onPressed: () => Navigator.pop(context, _DeletionScope.everyone),
+              child: const Text('Clear for everyone'),
+            ),
         ],
       ),
     );
     if (scope == null || !mounted) return;
+    if (scope == _DeletionScope.everyone) {
+      final current = await MapLovRepository.instance.chatBlockState(
+        profile.id,
+      );
+      if (!mounted) return;
+      if (current != 'none') {
+        _showChatNotice(_sharedDeletionBlocked);
+        return;
+      }
+    }
     if (scope == _DeletionScope.everyone) {
       final allowed = await _requireSubscriptionFeature(
         context,
@@ -237,7 +481,13 @@ class _ChatScreenState extends State<ChatScreen> {
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Unable to clear this chat: $error')),
+          SnackBar(
+            content: Text(
+              error.toString().contains('SHARED_DELETION_BLOCKED')
+                  ? _sharedDeletionBlocked
+                  : 'Unable to clear this chat: ' + error.toString(),
+            ),
+          ),
         );
       }
     }
@@ -425,22 +675,41 @@ class _ChatScreenState extends State<ChatScreen> {
         read: _visibleReadReceipt(message),
       );
     }
+    content = Column(
+      crossAxisAlignment: mine
+          ? CrossAxisAlignment.end
+          : CrossAxisAlignment.start,
+      children: [
+        if (message.replyToId != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Text(
+              '↪ ' + (message.replyPreview ?? 'Message précédent'),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(color: AppColors.grayText, fontSize: 12),
+            ),
+          ),
+        content,
+        if (message.reactions.isNotEmpty)
+          Wrap(
+            spacing: 4,
+            children: [
+              for (final reaction in message.reactions)
+                Text(
+                  reaction['emoji'] ?? '',
+                  style: const TextStyle(fontSize: 18),
+                ),
+            ],
+          ),
+      ],
+    );
     return Semantics(
       label: mine ? 'Sent message' : 'Received message',
       child: GestureDetector(
-        onTap: mine && !message.deleted ? () => _confirmDelete(message) : null,
-        onLongPress: !mine && !message.deleted
-            ? () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => ReportUserScreen(
-                    profile: profile,
-                    targetType: 'message',
-                    targetId: message.id,
-                  ),
-                ),
-              )
-            : null,
+        onLongPress: message.deleted
+            ? null
+            : () => _messageActions(message, mine),
         child: content,
       ),
     );
@@ -451,15 +720,20 @@ class _ChatScreenState extends State<ChatScreen> {
     final value = _text.text.trim();
     if (value.isEmpty) return;
     final requestId = MapLovRepository.instance.createClientMessageId();
+    final replyTo = _replyingTo?.id;
     final sent = await _sendWithStatus(
       () => MapLovRepository.instance.sendMessage(
         conversationId,
         value,
         clientMessageId: requestId,
+        replyToId: replyTo,
       ),
       'Text message',
     );
-    if (sent && _text.text.trim() == value) _text.clear();
+    if (sent && _text.text.trim() == value) {
+      _text.clear();
+      if (mounted) setState(() => _replyingTo = null);
+    }
   }
 
   Future<bool> _sendWithStatus(
@@ -476,12 +750,22 @@ class _ChatScreenState extends State<ChatScreen> {
       await action();
       return true;
     } catch (_) {
+      String? blockedMessage;
+      try {
+        final state = await MapLovRepository.instance.chatBlockState(
+          profile.id,
+        );
+        blockedMessage = _blockedActionText(state, 'message');
+        if (mounted) setState(() => _blockState = state);
+      } catch (_) {}
       if (mounted) {
         setState(() {
-          _sendError = '$label could not be sent.';
-          _retrySend = () async {
-            await _sendWithStatus(action, label);
-          };
+          _sendError = blockedMessage ?? '$label could not be sent.';
+          _retrySend = blockedMessage == null
+              ? () async {
+                  await _sendWithStatus(action, label);
+                }
+              : null;
         });
       }
       return false;
@@ -715,32 +999,40 @@ class _ChatScreenState extends State<ChatScreen> {
                     ),
                     Row(
                       children: [
-                        Text(
-                          profile.isOnline ? 'Online' : 'Offline',
-                          style: TextStyle(
-                            color: profile.isOnline
-                                ? const Color(0xFF12B76A)
-                                : AppColors.grayText,
-                            fontSize: 13,
+                        Flexible(
+                          child: Text(
+                            profile.isOnline ? 'Online' : 'Offline',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: profile.isOnline
+                                  ? const Color(0xFF12B76A)
+                                  : AppColors.grayText,
+                              fontSize: 13,
+                            ),
                           ),
                         ),
                         const SizedBox(width: 7),
-                        Container(
-                          key: const Key('chat_match_badge'),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 7,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFFFEEF2),
-                            borderRadius: BorderRadius.circular(99),
-                          ),
-                          child: Text(
-                            '${profile.compatibilityScore}% Match',
-                            style: const TextStyle(
-                              color: AppColors.coral,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w800,
+                        Flexible(
+                          child: Container(
+                            key: const Key('chat_match_badge'),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 7,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFFEEF2),
+                              borderRadius: BorderRadius.circular(99),
+                            ),
+                            child: Text(
+                              '${profile.compatibilityScore}% Match',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: AppColors.coral,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w800,
+                              ),
                             ),
                           ),
                         ),
@@ -768,31 +1060,10 @@ class _ChatScreenState extends State<ChatScreen> {
           padding: EdgeInsets.zero,
           icon: const Icon(Icons.videocam_outlined),
         ),
-        SizedBox(
-          width: 40,
-          child: PopupMenuButton<String>(
-            padding: EdgeInsets.zero,
-            itemBuilder: (_) => const [
-              PopupMenuItem(value: 'block', child: Text('Block user')),
-              PopupMenuItem(value: 'report', child: Text('Report user')),
-              PopupMenuDivider(),
-              PopupMenuItem(value: 'clear', child: Text('Clear chat')),
-            ],
-            onSelected: (value) {
-              if (value == 'clear') {
-                unawaited(_clearChat());
-                return;
-              }
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => value == 'block'
-                      ? BlockUserScreen(profile: profile)
-                      : ReportUserScreen(profile: profile),
-                ),
-              );
-            },
-          ),
+        IconButton(
+          tooltip: 'Options de conversation',
+          onPressed: _openChatMenu,
+          icon: const Icon(Icons.more_vert),
         ),
       ],
     ),
@@ -800,7 +1071,6 @@ class _ChatScreenState extends State<ChatScreen> {
       top: false,
       child: Column(
         children: [
-          const _ChatPrivacyBanner(),
           Expanded(
             child: StreamBuilder<List<MapLovMessage>>(
               stream: _messageStream,
@@ -864,6 +1134,21 @@ class _ChatScreenState extends State<ChatScreen> {
                   onPressed: _retrySend,
                   child: const Text('Retry'),
                 ),
+              ),
+            ),
+          if (_replyingTo != null)
+            ListTile(
+              dense: true,
+              leading: const Icon(Icons.reply, color: AppColors.coral),
+              title: Text(
+                _replyingTo!.body ?? '[' + _replyingTo!.kind + ']',
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+              trailing: IconButton(
+                tooltip: 'Annuler la réponse',
+                onPressed: () => setState(() => _replyingTo = null),
+                icon: const Icon(Icons.close),
               ),
             ),
           Container(
@@ -985,34 +1270,6 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
         ],
       ),
-    ),
-  );
-}
-
-class _ChatPrivacyBanner extends StatelessWidget {
-  const _ChatPrivacyBanner();
-
-  @override
-  Widget build(BuildContext context) => Container(
-    margin: const EdgeInsets.fromLTRB(22, 14, 22, 8),
-    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
-    decoration: BoxDecoration(
-      gradient: const LinearGradient(
-        colors: [Color(0xFFFFF0F3), Color(0xFFFFF7F8)],
-      ),
-      borderRadius: BorderRadius.circular(16),
-    ),
-    child: const Row(
-      children: [
-        Icon(Icons.shield_outlined, color: AppColors.deepPink, size: 30),
-        SizedBox(width: 12),
-        Expanded(
-          child: Text(
-            'Messages are private. Only chat participants can access this conversation.',
-            style: TextStyle(fontSize: 13, height: 1.25),
-          ),
-        ),
-      ],
     ),
   );
 }

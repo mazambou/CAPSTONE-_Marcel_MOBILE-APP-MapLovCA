@@ -13,6 +13,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'data/mock_data.dart';
 import 'config/app_config.dart';
@@ -55,6 +56,7 @@ part 'pages/auth/magic_link_page.dart';
 part 'pages/auth/auth_callback_page.dart';
 part 'pages/auth/reset_password_page.dart';
 part 'pages/auth/verify_email_page.dart';
+part 'pages/auth/registration_sms_fallback_page.dart';
 part 'pages/auth/verify_phone_page.dart';
 part 'pages/auth/widgets/auth_widgets.dart';
 part 'pages/community/posts_page.dart';
@@ -216,6 +218,24 @@ class MapLoveApp extends StatefulWidget {
   State<MapLoveApp> createState() => _MapLoveAppState();
 }
 
+class _MapLovNavigatorObserver extends NavigatorObserver {
+  _MapLovNavigatorObserver(this.onRouteChanged);
+
+  final void Function(Route<dynamic>?) onRouteChanged;
+
+  @override
+  void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    super.didPush(route, previousRoute);
+    onRouteChanged(route);
+  }
+
+  @override
+  void didReplace({Route<dynamic>? newRoute, Route<dynamic>? oldRoute}) {
+    super.didReplace(newRoute: newRoute, oldRoute: oldRoute);
+    onRouteChanged(newRoute);
+  }
+}
+
 Future<String> _authenticatedLandingRoute() async {
   await AuthService.instance.validateCurrentAccount();
   if (await AuthService.instance.requiresSocialRegistrationGate()) {
@@ -236,10 +256,28 @@ class _MapLoveAppState extends State<MapLoveApp> with WidgetsBindingObserver {
   // Navigator when the MaterialApp rebuilds after a locale change. Flutter
   // otherwise can leave inherited-widget dependents attached during route
   // replacement (the `_dependents.isEmpty` assertion).
-  final _navigatorObserver = NavigatorObserver();
+  late final _navigatorObserver = _MapLovNavigatorObserver(_afterRouteChange);
   StreamSubscription<MapLovAuthEvent>? _authSubscription;
   Timer? _presenceHeartbeat;
   bool _authNavigationInProgress = false;
+  bool _emailReminderShownForSession = false;
+
+  void _afterRouteChange(Route<dynamic>? route) {
+    if (route == null ||
+        route.settings.name == AppRoutes.splash ||
+        _emailReminderShownForSession ||
+        !AuthService.instance.needsEmailVerificationReminder) {
+      return;
+    }
+    _emailReminderShownForSession = true;
+    if (AuthService.instance.consumeEmailReminderSkip()) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final navigator = _navigatorObserver.navigator;
+      if (mounted && navigator != null && navigator.mounted) {
+        unawaited(_showPendingEmailReminder(navigator.context));
+      }
+    });
+  }
 
   @override
   void initState() {
@@ -252,6 +290,7 @@ class _MapLoveAppState extends State<MapLoveApp> with WidgetsBindingObserver {
         _startPresence();
       } else if (event == MapLovAuthEvent.signedOut) {
         _presenceHeartbeat?.cancel();
+        _emailReminderShownForSession = false;
       }
       if (event == MapLovAuthEvent.signedIn ||
           event == MapLovAuthEvent.passwordRecovery) {
@@ -534,12 +573,6 @@ Future<bool> confirmFaceVerificationConsent(BuildContext context) async =>
       barrierDismissible: false,
       builder: (dialogContext) => AlertDialog(
         title: const Text('Private selfie verification'),
-        content: const SingleChildScrollView(
-          child: Text(
-            'MapLov will store one private selfie as the biometric reference for this account. Image bytes are sent to AWS Rekognition to detect one face, compare the selfie with existing private references to limit duplicate accounts, and verify this and later profile photos.\n\n'
-            'The selfie is never displayed to members or used for advertising. It remains private while the account is active and follows the 30-day account-deletion schedule. Face comparison is probabilistic and can produce a false match or rejection. You can ask privacy@maplov.ca to review a decision, withdraw consent or delete the reference; withdrawal may prevent continued use of features that require it.',
-          ),
-        ),
         actions: [
           TextButton(
             onPressed: () async {

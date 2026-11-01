@@ -10,7 +10,7 @@ class PreferencesScreen extends StatefulWidget {
 class _PreferencesScreenState extends State<PreferencesScreen> {
   RangeValues ages = const RangeValues(24, 38);
   String searchMode = 'Near me';
-  double distance = 50;
+  double distance = 100;
   String selectedCity = 'Any city';
   String preferredCountry = 'Canada';
   String preferredRegion = 'Any region';
@@ -18,7 +18,7 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
   String residenceRegion = 'Any region';
   String residenceCity = 'Any city';
   String? soughtGender;
-  String relationshipGoal = 'Long-term';
+  String relationshipGoal = 'Any';
   String language = 'Any language';
   String personality = 'Any personality';
   bool requiredLanguage = false;
@@ -86,7 +86,7 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
           ? null
           : _displayGenderFilterValue(saved.genders.first);
       showingGenderSuggestion = shouldSuggestGenders && soughtGender != null;
-      relationshipGoal = saved.relationshipGoals.firstOrNull ?? 'Long-term';
+      relationshipGoal = saved.relationshipGoals.firstOrNull ?? 'Any';
       language = saved.languages.firstOrNull ?? 'Any language';
       personality = saved.personalities.firstOrNull ?? 'Any personality';
       preferredCountry = loadedPreferredCountry;
@@ -96,7 +96,8 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
           profile?['residence_region'] as String? ?? residenceRegion;
       residenceCity = profile?['city'] as String? ?? residenceCity;
       requiredLanguage = saved.requiredLanguages;
-      requiredGoal = saved.requiredRelationshipGoal;
+      requiredGoal =
+          saved.requiredRelationshipGoal && relationshipGoal != 'Any';
       premiumPlus = subscription.isPremium;
       vipAvailable = subscription.isVip;
       upcomingArrivals = arrivals;
@@ -292,7 +293,9 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
                 ].nonNulls.toList()
               : const [],
           genders: [_storedGenderFilterValue(soughtGender!)],
-          relationshipGoals: [relationshipGoal],
+          relationshipGoals: relationshipGoal == 'Any'
+              ? const []
+              : [relationshipGoal],
           languages: language == 'Any language'
               ? const []
               : language == 'English & French'
@@ -336,7 +339,7 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
           requiredGenders: true,
           requiredLocation: true,
           requiredLanguages: requiredLanguage,
-          requiredRelationshipGoal: requiredGoal,
+          requiredRelationshipGoal: requiredGoal && relationshipGoal != 'Any',
         ),
       );
       if (!await _captureCurrentLocation(confirm: completingRegistration)) {
@@ -779,17 +782,21 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
       DropdownButtonFormField<String>(
         initialValue: relationshipGoal,
         decoration: InputDecoration(labelText: context.tr('Relationship goal')),
-        items: ['Long-term', 'Dating', 'Friendship', 'Networking']
+        items: ['Any', 'Long-term', 'Dating', 'Friendship', 'Networking']
             .map((value) => DropdownMenuItem(value: value, child: Text(value)))
             .toList(),
-        onChanged: (value) =>
-            setState(() => relationshipGoal = value ?? relationshipGoal),
+        onChanged: (value) => setState(() {
+          relationshipGoal = value ?? relationshipGoal;
+          if (relationshipGoal == 'Any') requiredGoal = false;
+        }),
       ),
       SwitchListTile.adaptive(
         contentPadding: EdgeInsets.zero,
         title: const Text('Required relationship goal'),
         value: requiredGoal,
-        onChanged: (value) => setState(() => requiredGoal = value),
+        onChanged: relationshipGoal == 'Any'
+            ? null
+            : (value) => setState(() => requiredGoal = value),
       ),
       const SizedBox(height: 12),
       DropdownButtonFormField<String>(

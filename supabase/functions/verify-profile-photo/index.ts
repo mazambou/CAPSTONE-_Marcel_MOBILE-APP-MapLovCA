@@ -54,6 +54,17 @@ function duplicateAccountBlockActive(): boolean {
   return !Number.isFinite(deadline) || Date.now() >= deadline;
 }
 
+function isWindowCreatedTestAccount(user: {
+  app_metadata?: Record<string, unknown>;
+}): boolean {
+  const metadata = user.app_metadata;
+  const deadline = Date.parse(Deno.env.get('DUPLICATE_ACCOUNT_BYPASS_UNTIL') ?? '');
+  const created = Date.parse(String(metadata?.maplov_test_created_at ?? ''));
+  return metadata?.maplov_test_duplicate === true &&
+    Number.isFinite(deadline) && Number.isFinite(created) &&
+    created < deadline;
+}
+
 Deno.serve(async (request) => {
   if (request.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers: corsHeaders });
@@ -405,7 +416,8 @@ Deno.serve(async (request) => {
             ? mappedUser !== user.id
             : match.Face?.ExternalImageId !== externalImageId;
         });
-        if (otherMatch && (upgrading || duplicateAccountBlockActive())) {
+        if (otherMatch && !isWindowCreatedTestAccount(user) &&
+            (upgrading || duplicateAccountBlockActive())) {
           const faceId = otherMatch.Face?.FaceId;
           duplicate = {
             userId: faceId ? usersByFaceId.get(faceId) : undefined,

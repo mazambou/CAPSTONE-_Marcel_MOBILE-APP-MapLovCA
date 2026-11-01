@@ -274,8 +274,11 @@ subject = "Your MapLov email was changed"
 content_path = "./templates/email_changed_notification.html"
 
 [auth.sms]
-# Allow/disallow new user signups via SMS to your project.
-enable_signup = false
+# Phone/password sign-in is used after the server verifies a registration SMS.
+# MapLov still creates the account through email signup and Twilio Verify.
+# The CLI disables local phone login without a Supabase SMS provider. Production
+# enables phone login through the Management API; see docs/production_auth.md.
+enable_signup = true
 # If enabled, users need to confirm their phone number before signing in.
 enable_confirmations = false
 # Template for sending OTP to users
@@ -420,6 +423,18 @@ verify_jwt = true
 
 [functions.quick-action]
 verify_jwt = true
+
+[functions.registration-sms-fallback]
+verify_jwt = false
+
+[functions.shared-phone-alias-login]
+verify_jwt = false
+
+[functions.shared-phone-contact-email]
+verify_jwt = true
+
+[functions.test-duplicate-accounts]
+verify_jwt = false
 
 [functions.verify-store-purchase]
 verify_jwt = true

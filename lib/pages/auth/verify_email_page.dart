@@ -15,6 +15,16 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
   String? _message;
   bool _messageIsError = false;
 
+  @override
+  void initState() {
+    super.initState();
+    if (AuthService.instance.isSharedPhoneEmailPending) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) unawaited(_resend());
+      });
+    }
+  }
+
   String get _email =>
       widget.email ??
       AuthService.instance.emailForVerification ??
@@ -35,7 +45,10 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
       return;
     }
     final code = _codeController.text.trim();
-    if (!RegExp(r'^\d{6,8}$').hasMatch(code)) {
+    final sharedEmailPending = AuthService.instance.isSharedPhoneEmailPending;
+    if (!(sharedEmailPending
+        ? RegExp(r'^\d{8}$')
+        : RegExp(r'^\d{6,8}$')).hasMatch(code)) {
       setState(() {
         _message = 'Enter the verification code sent by email.';
         _messageIsError = true;
@@ -49,7 +62,9 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
     try {
       await AuthService.instance.verifyEmailCode(email: _email, code: code);
       if (!mounted) return;
-      if (!AuthService.instance.isConfigured) {
+      if (sharedEmailPending && AuthService.instance.isEmailVerified) {
+        Navigator.pop(context, true);
+      } else if (!AuthService.instance.isConfigured) {
         _continueToProfile();
       } else {
         setState(() {
@@ -102,6 +117,49 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
     }
   }
 
+  Future<void> _chooseResend() async {
+    final phone = await AuthService.instance.phoneNumberForVerification();
+    if (!mounted) return;
+    if (!AuthService.instance.isConfigured ||
+        AuthService.instance.hasActiveSession ||
+        phone == null ||
+        phone.isEmpty) {
+      await _resend();
+      return;
+    }
+
+    final verifyBySms = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Choose how to continue'),
+        content: const Text(
+          'Email still delayed? You can verify your phone by SMS and confirm your email later.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Resend email code'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Verify with SMS instead'),
+          ),
+        ],
+      ),
+    );
+    if (!mounted || verifyBySms == null) return;
+    if (verifyBySms) {
+      await Navigator.push<void>(
+        context,
+        MaterialPageRoute<void>(
+          builder: (_) => RegistrationSmsFallbackScreen(email: _email),
+        ),
+      );
+    } else {
+      await _resend();
+    }
+  }
+
   void _continueToProfile() {
     if (!mounted) return;
     Navigator.pushNamedAndRemoveUntil(
@@ -130,7 +188,11 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
       ),
       const SizedBox(height: 10),
       Text(
-        'We sent a verification code to $_email. Enter it below to continue creating your profile.',
+        context
+            .tr(
+              'Enter the verification code sent to {email}. If it has expired, request a new code below.',
+            )
+            .replaceFirst('{email}', _email),
         textAlign: TextAlign.center,
         style: const TextStyle(color: AppColors.grayText),
       ),
@@ -165,7 +227,7 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
         onPressed: _isLoading ? () {} : _verify,
       ),
       OutlinedButton(
-        onPressed: _isLoading ? null : _resend,
+        onPressed: _isLoading ? null : _chooseResend,
         child: const Text('Resend code'),
       ),
     ],

@@ -10,6 +10,8 @@ class PublicProfileScreen extends StatefulWidget {
 }
 
 class _PublicProfileScreenState extends State<PublicProfileScreen> {
+  String _blockState = 'checking';
+  Timer? _blockRefreshTimer;
   late bool liked = widget.profile?.likedByMe ?? false;
   FriendshipItem? friendship;
   bool friendshipLoading = true;
@@ -17,14 +19,55 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
   @override
   void initState() {
     super.initState();
+    if (AuthService.instance.needsEmailVerificationReminder) return;
     final id = widget.profile?.id;
+    if (id != null && id.isNotEmpty) {
+      unawaited(_refreshBlockState(id));
+      _blockRefreshTimer = Timer.periodic(
+        const Duration(seconds: 10),
+        (_) => unawaited(_refreshBlockState(id)),
+      );
+    } else {
+      _blockState = 'none';
+    }
     if (id != null && id.isNotEmpty) {
       unawaited(MapLovRepository.instance.recordProfileView(id));
     }
     unawaited(_loadFriendship());
   }
 
+  @override
+  void dispose() {
+    _blockRefreshTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _refreshBlockState(String id) async {
+    try {
+      final state = await MapLovRepository.instance.chatBlockState(id);
+      if (mounted) setState(() => _blockState = state);
+    } catch (_) {
+      if (mounted) setState(() => _blockState = 'unavailable');
+    }
+  }
+
+  Future<bool> _allowProfileAction(String action) async {
+    final id = widget.profile?.id;
+    if (id == null) return true;
+    final state = await MapLovRepository.instance.chatBlockState(id);
+    if (mounted) setState(() => _blockState = state);
+    final notice = _blockedActionText(state, action);
+    if (notice == null) return true;
+    if (mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(notice)));
+    }
+    return false;
+  }
+
   Future<void> _toggleLike(UserProfile profile) async {
+    if (!await _allowProfileAction('other') || !mounted) return;
     final result = await _toggleProfileLikeFromDetails(context, profile);
     if (result != null && mounted) setState(() => liked = result.liked);
   }
@@ -89,6 +132,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
   );
 
   Future<void> _friendAction(UserProfile profile) async {
+    if (!await _allowProfileAction('other')) return;
     if (friendshipLoading) return;
     setState(() => friendshipLoading = true);
     try {
@@ -157,13 +201,33 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (AuthService.instance.needsEmailVerificationReminder) {
+      return const _EmailVerificationRequiredPage();
+    }
     final selectedProfile = widget.profile ?? demoProfileOrUnavailable;
+    if (_blockState == 'checking') {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+    final blockedNotice = _blockedActionText(_blockState, 'profile');
+    if (blockedNotice != null || _blockState == 'unavailable') {
+      return _AppPage(
+        title: 'Profil',
+        children: [
+          Text(blockedNotice ?? 'Ce profil n’est pas disponible.'),
+          TextButton(
+            onPressed: () => _refreshBlockState(selectedProfile.id),
+            child: const Text('Actualiser'),
+          ),
+        ],
+      );
+    }
     return _AppPage(
       title: '${selectedProfile.name}, ${selectedProfile.age}',
       children: [
         GestureDetector(
           key: Key('public_profile_photo_${selectedProfile.name}'),
           onTap: () async {
+            if (!await _allowProfileAction('other') || !context.mounted) return;
             if (!await _requireProfilePhotos(context, minimum: 1) ||
                 !context.mounted) {
               return;
@@ -219,13 +283,17 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
                 size: 18,
               ),
               label: Text('${selectedProfile.compatibilityScore}%'),
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) =>
-                      CompatibilityDetailsScreen(profile: selectedProfile),
-                ),
-              ),
+              onPressed: () async {
+                if (!await _allowProfileAction('other') || !context.mounted)
+                  return;
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) =>
+                        CompatibilityDetailsScreen(profile: selectedProfile),
+                  ),
+                );
+              },
             ),
           ],
         ),
@@ -269,7 +337,10 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
           child: OutlinedButton.icon(
             key: Key('public_profile_like_${selectedProfile.name}'),
             onPressed: () => _toggleLike(selectedProfile),
-            icon: Icon(liked ? Icons.favorite : Icons.favorite_border),
+            icon: Transform.scale(
+              scale: 1.35,
+              child: Icon(liked ? Icons.favorite : Icons.favorite_border),
+            ),
             label: Text(liked ? 'Liked' : 'Like profile'),
             style: OutlinedButton.styleFrom(
               foregroundColor: AppColors.deepPink,
@@ -303,6 +374,8 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
                 imagePath: selectedProfile.imagePath,
                 icon: Icons.photo_library_outlined,
                 onTap: () async {
+                  if (!await _allowProfileAction('other') || !context.mounted)
+                    return;
                   if (!await _requireProfilePhotos(context, minimum: 1) ||
                       !context.mounted) {
                     return;
@@ -327,12 +400,17 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
                     'assets/secret_garden/secret_garden_locked_placeholder.png',
                 icon: Icons.lock_outline,
                 locked: true,
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => SecretGardenScreen(owner: selectedProfile),
-                  ),
-                ),
+                onTap: () async {
+                  if (!await _allowProfileAction('other') || !context.mounted)
+                    return;
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) =>
+                          SecretGardenScreen(owner: selectedProfile),
+                    ),
+                  );
+                },
               ),
             ),
           ],
@@ -361,6 +439,8 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
             Expanded(
               child: FilledButton.icon(
                 onPressed: () async {
+                  if (!await _allowProfileAction('message') || !context.mounted)
+                    return;
                   final id = await MapLovRepository.instance.startConversation(
                     selectedProfile.id,
                   );

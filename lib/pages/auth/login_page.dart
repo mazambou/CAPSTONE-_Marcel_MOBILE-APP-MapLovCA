@@ -436,7 +436,7 @@ class _LoginCard extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(height: 13),
+          const SizedBox(height: 17),
           const Row(
             children: [
               Expanded(child: Divider(color: AppColors.divider)),

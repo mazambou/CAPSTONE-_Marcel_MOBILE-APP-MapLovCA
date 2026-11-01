@@ -1,8 +1,13 @@
 part of '../../app.dart';
 
-class SecurityScreen extends StatelessWidget {
+class SecurityScreen extends StatefulWidget {
   const SecurityScreen({super.key});
 
+  @override
+  State<SecurityScreen> createState() => _SecurityScreenState();
+}
+
+class _SecurityScreenState extends State<SecurityScreen> {
   @override
   Widget build(BuildContext context) => _AppPage(
     title: 'Security',
@@ -24,6 +29,22 @@ class SecurityScreen extends StatelessWidget {
         subtitle: Text(
           AuthService.instance.currentEmail ?? 'No email address available',
         ),
+        trailing: AuthService.instance.isEmailVerified
+            ? null
+            : const Icon(Icons.chevron_right),
+        onTap: AuthService.instance.isEmailVerified
+            ? null
+            : () async {
+                await Navigator.push<bool>(
+                  context,
+                  MaterialPageRoute<bool>(
+                  builder: (_) => VerifyEmailScreen(
+                    email: AuthService.instance.currentEmail,
+                  ),
+                ),
+                );
+                if (mounted) setState(() {});
+              },
       ),
       ListTile(
         leading: const Icon(Icons.alternate_email_outlined),

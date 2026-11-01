@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -33,10 +34,35 @@ class SignUpResult {
   final bool requiresEmailConfirmation;
 }
 
+class TestAccountOption {
+  const TestAccountOption({
+    required this.id,
+    required this.authEmail,
+    required this.contactEmail,
+    required this.name,
+    required this.createdAt,
+  });
+
+  final String id;
+  final String authEmail;
+  final String contactEmail;
+  final String name;
+  final DateTime? createdAt;
+}
+
 class AccountDeletionException implements Exception {
   const AccountDeletionException(this.code, this.message);
 
   final String code;
+  final String message;
+
+  @override
+  String toString() => message;
+}
+
+class RegistrationSmsException implements Exception {
+  const RegistrationSmsException(this.message);
+
   final String message;
 
   @override
@@ -55,6 +81,9 @@ class AuthService {
   static const _pendingPhoneEmailKey = 'maplov_pending_phone_email';
   static const _pendingPhoneCountryKey = 'maplov_pending_phone_country';
   static const _pendingPhoneCallingCodeKey = 'maplov_pending_calling_code';
+  static const _pendingRegistrationSecretKey =
+      'maplov_pending_registration_secret';
+  final FlutterSecureStorage _secureStorage = const FlutterSecureStorage();
 
   static const _africanCountryCodes = <String>{
     'DZ',
@@ -127,6 +156,8 @@ class AuthService {
 
   String? _pendingPhoneCache;
   String? _pendingPhoneEmailCache;
+  String? _pendingRegistrationPassword;
+  bool _skipNextEmailReminder = false;
   String? _residenceCountryCodeCache;
   String? _residenceCountryUserIdCache;
   MapLovAuthIntent? _pendingAuthIntent;
@@ -134,8 +165,17 @@ class AuthService {
   SupabaseClient? get _client => SupabaseConfig.client;
   bool get isConfigured => SupabaseConfig.isConfigured;
   bool get hasActiveSession => _client?.auth.currentSession != null;
+  bool get isTestDuplicateAccount =>
+      _client?.auth.currentUser?.appMetadata['maplov_test_duplicate'] == true;
   MapLovAuthIntent? get pendingAuthIntent => _pendingAuthIntent;
-  String? get currentEmail => _client?.auth.currentUser?.email;
+  String? get currentEmail {
+    final user = _client?.auth.currentUser;
+    final contactEmail = user?.appMetadata['maplov_contact_email'];
+    return contactEmail is String && contactEmail.isNotEmpty
+        ? contactEmail
+        : user?.email;
+  }
+
   String? get emailForVerification {
     final activeEmail = currentEmail?.trim().toLowerCase();
     if (activeEmail?.isNotEmpty == true) return activeEmail;
@@ -143,10 +183,48 @@ class AuthService {
     return pendingEmail?.isNotEmpty == true ? pendingEmail : null;
   }
 
-  bool get isEmailVerified =>
-      !isConfigured || _client?.auth.currentUser?.emailConfirmedAt != null;
-  bool get isPhoneVerified =>
-      !isConfigured || _client?.auth.currentUser?.phoneConfirmedAt != null;
+  bool get isEmailVerified {
+    if (!isConfigured) return true;
+    final user = _client?.auth.currentUser;
+    if (user == null) return false;
+    final contactEmail = user.appMetadata['maplov_contact_email'];
+    if (contactEmail is String && contactEmail.isNotEmpty) {
+      return user.appMetadata['maplov_contact_email_verified'] == true;
+    }
+    return user.emailConfirmedAt != null;
+  }
+
+  bool get isSharedPhoneEmailPending {
+    final metadata = _client?.auth.currentUser?.appMetadata;
+    return metadata?['maplov_shared_test_phone_verified'] == true &&
+        metadata?['maplov_contact_email_verified'] != true;
+  }
+
+  bool get needsEmailVerificationReminder =>
+      hasActiveSession &&
+      !isEmailVerified &&
+      _client?.auth.currentUser?.appMetadata['maplov_sms_fallback_verified'] ==
+          true;
+  bool consumeEmailReminderSkip() {
+    final skip = _skipNextEmailReminder;
+    _skipNextEmailReminder = false;
+    return skip;
+  }
+
+  bool get isPhoneVerified {
+    if (!isConfigured) return true;
+    final user = _client?.auth.currentUser;
+    final metadata = user?.appMetadata;
+    return user?.phoneConfirmedAt != null ||
+        (metadata?['maplov_test_duplicate'] == true &&
+            metadata?['maplov_test_phone_verified'] == true &&
+            metadata?['maplov_contact_phone'] ==
+                user?.userMetadata?['phone_number']) ||
+        (metadata?['maplov_shared_test_phone_verified'] == true &&
+            metadata?['maplov_shared_test_phone'] ==
+                user?.userMetadata?['phone_number']);
+  }
+
   String? get residenceCountryCode {
     final currentUserId = _client?.auth.currentUser?.id;
     if (_residenceCountryUserIdCache == currentUserId &&
@@ -165,8 +243,18 @@ class AuthService {
       isAfricanResidenceCountry(residenceCountryCode);
   String? get pendingPhoneNumber {
     final user = _client?.auth.currentUser;
-    final authPhone = user?.phone ?? user?.userMetadata?['phone_number'];
-    if (authPhone is String && authPhone.isNotEmpty) return authPhone;
+    if (user?.appMetadata['maplov_test_duplicate'] == true) {
+      final contactPhone = user?.appMetadata['maplov_contact_phone'];
+      if (contactPhone is String && contactPhone.isNotEmpty) {
+        return contactPhone;
+      }
+    }
+    final authPhone = user?.phone;
+    if (authPhone?.isNotEmpty == true) return authPhone;
+    final metadataPhone = user?.userMetadata?['phone_number'];
+    if (metadataPhone is String && metadataPhone.isNotEmpty) {
+      return metadataPhone;
+    }
     final currentEmail = user?.email?.trim().toLowerCase();
     if (_pendingPhoneCache?.isNotEmpty == true &&
         (currentEmail == null || currentEmail == _pendingPhoneEmailCache)) {
@@ -283,10 +371,19 @@ class AuthService {
     await clearPendingAuthIntent();
     final normalizedIdentifier = identifier.trim();
     if (normalizedIdentifier.contains('@')) {
-      await client.auth.signInWithPassword(
-        email: normalizedIdentifier.toLowerCase(),
-        password: password,
-      );
+      final email = normalizedIdentifier.toLowerCase();
+      try {
+        await client.auth.signInWithPassword(email: email, password: password);
+      } on AuthException catch (error) {
+        final message = error.message.toLowerCase();
+        if (!message.contains('invalid login credentials') &&
+            !message.contains('email not confirmed')) {
+          rethrow;
+        }
+        final alias = await _resolveSharedPhoneLoginAlias(email, password);
+        if (alias == null) rethrow;
+        await client.auth.signInWithPassword(email: alias, password: password);
+      }
     } else {
       await client.auth.signInWithPassword(
         phone: normalizedIdentifier,
@@ -296,6 +393,30 @@ class AuthService {
     final preferences = await SharedPreferences.getInstance();
     await preferences.setBool(_rememberSessionKey, rememberSession);
     await validateCurrentAccount();
+    await _clearPendingRegistrationSecret();
+  }
+
+  Future<String?> _resolveSharedPhoneLoginAlias(
+    String email,
+    String password,
+  ) async {
+    final client = _client;
+    if (client == null) return null;
+    try {
+      final response = await client.functions.invoke(
+        'shared-phone-alias-login',
+        body: {'email': email, 'password': password},
+      );
+      final data = response.data;
+      if (data is Map &&
+          data['code'] == 'alias_ready' &&
+          data['auth_email'] is String) {
+        return data['auth_email'] as String;
+      }
+    } catch (_) {
+      // Keep the original login error when no matching test account exists.
+    }
+    return null;
   }
 
   Future<void> validateCurrentAccount() async {
@@ -381,6 +502,7 @@ class AuthService {
     final normalizedPhone = phone.replaceAll(RegExp(r'[\s().-]'), '');
     _pendingPhoneCache = normalizedPhone;
     _pendingPhoneEmailCache = normalizedEmail;
+    await _clearPendingRegistrationSecret();
     final preferences = await SharedPreferences.getInstance();
     await preferences.setString(_pendingPhoneKey, normalizedPhone);
     await preferences.setString(_pendingPhoneEmailKey, normalizedEmail);
@@ -414,6 +536,22 @@ class AuthService {
           'legal_accepted_at': legalAcceptedAt.toUtc().toIso8601String(),
         },
       );
+      if (response.session == null) {
+        _pendingRegistrationPassword = password;
+        try {
+          await _secureStorage.write(
+            key: _pendingRegistrationSecretKey,
+            value: jsonEncode({
+              'email': normalizedEmail,
+              'phone': normalizedPhone,
+              'password': password,
+              'stored_at': DateTime.now().toUtc().toIso8601String(),
+            }),
+          );
+        } catch (_) {
+          // The active registration can still continue with the memory copy.
+        }
+      }
       return SignUpResult(requiresEmailConfirmation: response.session == null);
     } catch (_) {
       await clearPendingAuthIntent();
@@ -422,6 +560,132 @@ class AuthService {
   }
 
   Future<bool> signInWithGoogle() => _signInWithOAuth(OAuthProvider.google);
+
+  Future<bool> get testDuplicateWindowActive async {
+    final client = _client;
+    if (client == null) return false;
+    try {
+      final response = await client.functions.invoke(
+        'test-duplicate-accounts',
+        body: {'action': 'status'},
+      );
+      return response.data is Map && response.data['active'] == true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<Map<String, dynamic>> _callTestAccounts(
+    Map<String, dynamic> body,
+  ) async {
+    final client = _client;
+    if (client == null) {
+      throw const RegistrationSmsException('MapLov is not connected.');
+    }
+    try {
+      final response = await client.functions.invoke(
+        'test-duplicate-accounts',
+        body: body,
+      );
+      if (response.data case final Map data) {
+        return Map<String, dynamic>.from(data);
+      }
+      throw const RegistrationSmsException(
+        'The server returned an invalid response.',
+      );
+    } on FunctionException catch (error) {
+      Object? code;
+      final details = error.details;
+      if (details is Map) {
+        code = details['code'];
+      } else if (details is String) {
+        try {
+          final decoded = jsonDecode(details);
+          if (decoded is Map) code = decoded['code'];
+        } on FormatException {
+          // Keep the stable message below for a plain-text gateway response.
+        }
+      }
+      throw RegistrationSmsException(_registrationSmsMessage(code));
+    }
+  }
+
+  Future<void> sendTestDuplicateRegistrationCode({
+    required String email,
+    required String phone,
+  }) async {
+    final result = await _callTestAccounts({
+      'action': 'send_registration',
+      'email': email.trim().toLowerCase(),
+      'phone': phone,
+    });
+    if (result['code'] != 'code_sent') {
+      throw RegistrationSmsException(_registrationSmsMessage(result['code']));
+    }
+  }
+
+  Future<void> completeTestDuplicateRegistration({
+    required String email,
+    required String phone,
+    required String code,
+    required String password,
+    required Map<String, dynamic> metadata,
+  }) async {
+    final result = await _callTestAccounts({
+      'action': 'complete_registration',
+      'email': email.trim().toLowerCase(),
+      'phone': phone,
+      'code': code.trim(),
+      'password': password,
+      'metadata': metadata,
+    });
+    final alias = result['auth_email'];
+    if (result['code'] != 'account_created' || alias is! String) {
+      throw RegistrationSmsException(_registrationSmsMessage(result['code']));
+    }
+    await signIn(identifier: alias, password: password, rememberSession: true);
+  }
+
+  Future<void> sendAccountSelectionCode(String phone) async {
+    final result = await _callTestAccounts({
+      'action': 'send_login',
+      'phone': phone.trim(),
+    });
+    if (result['code'] != 'code_sent') {
+      throw RegistrationSmsException(_registrationSmsMessage(result['code']));
+    }
+  }
+
+  Future<List<TestAccountOption>> checkAccountSelectionCode({
+    required String phone,
+    required String code,
+  }) async {
+    final result = await _callTestAccounts({
+      'action': 'check_login',
+      'phone': phone.trim(),
+      'code': code.trim(),
+    });
+    final rows = result['accounts'];
+    if (result['code'] != 'accounts_ready' || rows is! List) {
+      throw RegistrationSmsException(_registrationSmsMessage(result['code']));
+    }
+    return rows
+        .whereType<Map>()
+        .map((row) {
+          final created = row['created_at'];
+          return TestAccountOption(
+            id: row['id']?.toString() ?? '',
+            authEmail: row['auth_email']?.toString() ?? '',
+            contactEmail: row['contact_email']?.toString() ?? '',
+            name: row['name']?.toString() ?? 'MapLov',
+            createdAt: created is String ? DateTime.tryParse(created) : null,
+          );
+        })
+        .where(
+          (account) => account.id.isNotEmpty && account.authEmail.isNotEmpty,
+        )
+        .toList(growable: false);
+  }
 
   Future<bool> signInWithApple() => _signInWithOAuth(OAuthProvider.apple);
 
@@ -505,6 +769,16 @@ class AuthService {
   Future<void> requestEmailChange(String email) async {
     final client = _client;
     if (client == null) return;
+    if (isSharedPhoneEmailPending) {
+      throw const AuthException(
+        'Verify your current email before changing it.',
+      );
+    }
+    if (isTestDuplicateAccount) {
+      throw const AuthException(
+        'Contact email changes are unavailable for test accounts. Contact support.',
+      );
+    }
     await _rememberAuthIntent(MapLovAuthIntent.emailChange);
     try {
       await client.auth.updateUser(
@@ -520,6 +794,10 @@ class AuthService {
   Future<void> resendVerificationEmail(String email) async {
     final client = _client;
     if (client == null) return;
+    if (isSharedPhoneEmailPending) {
+      await _sharedPhoneContactEmail(action: 'send');
+      return;
+    }
     await _rememberAuthIntent(MapLovAuthIntent.emailConfirmation);
     await client.auth.resend(
       type: OtpType.signup,
@@ -533,6 +811,16 @@ class AuthService {
   }) async {
     final client = _client;
     if (client == null) return;
+    if (isSharedPhoneEmailPending) {
+      await _sharedPhoneContactEmail(action: 'check', code: code);
+      await client.auth.refreshSession();
+      if (!isEmailVerified) {
+        throw const RegistrationSmsException(
+          'Email verification could not be completed. Try again.',
+        );
+      }
+      return;
+    }
     final response = await client.auth.verifyOTP(
       email: email.trim().toLowerCase(),
       token: code.trim(),
@@ -543,7 +831,241 @@ class AuthService {
         'Email verification did not create an authenticated session.',
       );
     }
+    await _clearPendingRegistrationSecret();
   }
+
+  Future<void> _sharedPhoneContactEmail({
+    required String action,
+    String? code,
+  }) async {
+    final client = _client;
+    if (client == null) return;
+    try {
+      final response = await client.functions.invoke(
+        'shared-phone-contact-email',
+        body: {'action': action, if (code != null) 'code': code.trim()},
+      );
+      final data = response.data;
+      final expected = action == 'send' ? 'code_sent' : 'email_verified';
+      if (data is! Map || data['code'] != expected) {
+        throw RegistrationSmsException(
+          _sharedPhoneEmailMessage(data is Map ? data['code'] : null),
+        );
+      }
+    } on FunctionException catch (error) {
+      final details = error.details;
+      Object? resultCode;
+      if (details is Map) {
+        resultCode = details['code'];
+      } else if (details is String) {
+        try {
+          final decoded = jsonDecode(details);
+          if (decoded is Map) resultCode = decoded['code'];
+        } on FormatException {
+          // Keep a stable message when an intermediary returns plain text.
+        }
+      }
+      throw RegistrationSmsException(_sharedPhoneEmailMessage(resultCode));
+    }
+  }
+
+  String _sharedPhoneEmailMessage(Object? code) => switch (code) {
+    'email_rate_limited' =>
+      'Too many email requests. Wait before requesting another code.',
+    'email_provider_unavailable' =>
+      'The email service is temporarily unavailable. Try again later.',
+    'invalid_code' => 'The email code is invalid or has expired.',
+    'email_already_in_use' =>
+      'This email address is already used by another account. Contact support.',
+    'email_verification_unavailable' =>
+      'Email verification is unavailable for this account.',
+    _ => 'Email verification could not be completed. Try again.',
+  };
+
+  Future<void> sendRegistrationSmsFallback({
+    required String email,
+    required String phone,
+  }) async {
+    await _registrationSmsFallback(action: 'send', email: email, phone: phone);
+  }
+
+  Future<void> verifyRegistrationSmsFallback({
+    required String email,
+    required String phone,
+    required String code,
+  }) async {
+    final result = await _registrationSmsFallback(
+      action: 'check',
+      email: email,
+      phone: phone,
+      code: code,
+    );
+    _skipNextEmailReminder = true;
+    try {
+      final tokenHash = result['token_hash'];
+      if (tokenHash is String && tokenHash.isNotEmpty) {
+        final client = _client;
+        if (client == null) {
+          throw const RegistrationSmsException(
+            'SMS verification is unavailable.',
+          );
+        }
+        final response = await client.auth.verifyOTP(
+          tokenHash: tokenHash,
+          type: OtpType.email,
+        );
+        if (response.session == null) {
+          throw const RegistrationSmsException(
+            'SMS session could not be opened.',
+          );
+        }
+        final preferences = await SharedPreferences.getInstance();
+        await preferences.setBool(_rememberSessionKey, true);
+        await validateCurrentAccount();
+        await _clearPendingRegistrationSecret();
+      } else {
+        final password = await _registrationPasswordFor(email, phone);
+        await signIn(
+          identifier: result['auth_email'] as String? ?? phone,
+          password: password,
+          rememberSession: true,
+        );
+      }
+    } catch (_) {
+      _skipNextEmailReminder = false;
+      rethrow;
+    }
+    if (!hasActiveSession) {
+      throw const RegistrationSmsException(
+        'Phone verified. Sign in with your phone number and password to continue.',
+      );
+    }
+  }
+
+  Future<Map> _registrationSmsFallback({
+    required String action,
+    required String email,
+    required String phone,
+    String? code,
+  }) async {
+    String? password;
+    try {
+      password = await _registrationPasswordFor(email, phone);
+    } on RegistrationSmsException {
+      // The allowlisted test phone can use its SMS code as the first proof.
+    }
+    final client = _client;
+    if (client == null) {
+      throw const RegistrationSmsException('SMS verification is unavailable.');
+    }
+    try {
+      final body = <String, String>{
+        'action': action,
+        'email': email.trim().toLowerCase(),
+        'phone': phone,
+        if (code != null) 'code': code.trim(),
+      };
+      if (password != null) body['password'] = password;
+      final response = await client.functions.invoke(
+        'registration-sms-fallback',
+        body: body,
+      );
+      final data = response.data;
+      final resultCode = data is Map ? data['code'] : null;
+      final expected = action == 'send'
+          ? 'code_sent'
+          : 'phone_verified_email_pending';
+      if (resultCode != expected) {
+        throw RegistrationSmsException(_registrationSmsMessage(resultCode));
+      }
+      return data is Map ? data : const {};
+    } on FunctionException catch (error) {
+      final details = error.details;
+      Object? resultCode;
+      if (details is Map) {
+        resultCode = details['code'];
+      } else if (details is String) {
+        try {
+          final decoded = jsonDecode(details);
+          if (decoded is Map) resultCode = decoded['code'];
+        } on FormatException {
+          // Keep a stable message when an intermediary returns plain text.
+        }
+      }
+      throw RegistrationSmsException(_registrationSmsMessage(resultCode));
+    }
+  }
+
+  Future<String> _registrationPasswordFor(String email, String phone) async {
+    String? password = _pendingRegistrationPassword;
+    if (password == null) {
+      try {
+        final stored = await _secureStorage.read(
+          key: _pendingRegistrationSecretKey,
+        );
+        if (stored != null) {
+          final values = jsonDecode(stored);
+          if (values is Map) {
+            final storedAt = DateTime.tryParse(
+              values['stored_at']?.toString() ?? '',
+            );
+            final age = storedAt == null
+                ? null
+                : DateTime.now().toUtc().difference(storedAt);
+            if (values['email'] == email.trim().toLowerCase() &&
+                values['phone'] == phone &&
+                age != null &&
+                !age.isNegative &&
+                age < const Duration(hours: 24)) {
+              password = values['password'] as String?;
+              _pendingRegistrationPassword = password;
+            }
+          }
+        }
+      } catch (_) {
+        // Corrupt or inaccessible secure storage cannot prove registration.
+      }
+    }
+    if (password == null ||
+        _pendingPhoneEmailCache != email.trim().toLowerCase() ||
+        _pendingPhoneCache != phone) {
+      throw const RegistrationSmsException(
+        'Registration proof is unavailable or has expired. Start registration again.',
+      );
+    }
+    return password;
+  }
+
+  Future<void> _clearPendingRegistrationSecret() async {
+    _pendingRegistrationPassword = null;
+    try {
+      await _secureStorage.delete(key: _pendingRegistrationSecretKey);
+    } catch (_) {
+      // Sign-out and successful verification must still finish.
+    }
+  }
+
+  String _registrationSmsMessage(Object? code) => switch (code) {
+    'invalid_request' => 'Check your email, phone number and password.',
+    'registration_unavailable' =>
+      'This registration could not be verified by SMS. If you already have an account with this phone number, sign in to that account.',
+    'phone_already_linked' =>
+      'This phone number is already linked to another MapLov account. Sign in to that account.',
+    'email_confirmation_required' =>
+      'Confirm this account’s email first. You can then verify this phone number by SMS.',
+    'sms_rate_limited' => 'Too many SMS requests. Try again later.',
+    'sms_provider_unavailable' =>
+      'The SMS provider is temporarily unavailable. Try again later.',
+    'invalid_code' => 'The SMS code is invalid or has expired.',
+    'test_window_closed' => 'The temporary test account period has ended.',
+    'source_account_unavailable' =>
+      'A verified account with this email and phone number is required.',
+    'account_unavailable' => 'No account is available for this phone number.',
+    'account_creation_failed' =>
+      'The test account could not be created. Request a new SMS code.',
+    'age_ineligible' => 'You must be at least 18 years old to use MapLov.',
+    _ => 'SMS verification is temporarily unavailable. Try again later.',
+  };
 
   Future<void> sendPhoneVerification() async {
     final client = _client;
@@ -588,10 +1110,22 @@ class AuthService {
     if (phone == null || phone.isEmpty) {
       throw const AuthException('No phone number is attached to this account.');
     }
-    await client.functions.invoke(
-      'quick-action',
-      body: {'phone': phone, 'code': code.trim()},
-    );
+    try {
+      await client.functions.invoke(
+        'quick-action',
+        body: {'phone': phone, 'code': code.trim()},
+      );
+    } on FunctionException catch (error) {
+      final details = error.details;
+      if (details is Map &&
+          details['error'] ==
+              'This phone number is already linked to another account') {
+        throw const RegistrationSmsException(
+          'This phone number is already linked to another MapLov account. Sign in to that account.',
+        );
+      }
+      rethrow;
+    }
     await client.auth.refreshSession();
   }
 
@@ -650,6 +1184,8 @@ class AuthService {
 
   Future<void> signOut({bool allDevices = false}) async {
     await clearPendingAuthIntent();
+    await _clearPendingRegistrationSecret();
+    _skipNextEmailReminder = false;
     _residenceCountryCodeCache = null;
     _residenceCountryUserIdCache = null;
     final client = _client;
@@ -666,6 +1202,7 @@ class AuthService {
   }
 
   Future<void> discardRejectedRegistration() async {
+    await _clearPendingRegistrationSecret();
     final preferences = await SharedPreferences.getInstance();
     await preferences.remove(_pendingPhoneKey);
     await preferences.remove(_pendingPhoneEmailKey);
@@ -748,13 +1285,14 @@ class AuthService {
 
   String messageFor(Object error) {
     if (error is AccountDeletionException) return error.message;
+    if (error is RegistrationSmsException) return error.message;
     final raw = error is AuthException ? error.message : error.toString();
     final message = raw.toLowerCase();
     if (message.contains('invalid login credentials')) {
       return 'Incorrect email, phone number, or password.';
     }
     if (message.contains('email not confirmed')) {
-      return 'Please verify your email with the code before signing in.';
+      return 'Verify your email code, or sign in with your verified phone number and password.';
     }
     if (message.contains('suspended') || message.contains('banned')) {
       return raw;

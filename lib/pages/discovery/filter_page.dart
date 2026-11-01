@@ -12,6 +12,25 @@ String _displayGenderFilterValue(String value) => switch (value) {
   _ => value,
 };
 
+const _quickLanguageOptions = ['Any', 'English', 'French', 'Spanish'];
+const _quickRelationshipGoalOptions = [
+  'Any',
+  'Long-term relationship',
+  'Marriage',
+  'Dating',
+  'Friendship',
+];
+
+String _displayRelationshipGoalValue(String value) => switch (value) {
+  'Long-term' => 'Long-term relationship',
+  _ => value,
+};
+
+String _storedRelationshipGoalValue(String value) => switch (value) {
+  'Long-term relationship' => 'Long-term',
+  _ => value,
+};
+
 class FilterScreen extends StatefulWidget {
   const FilterScreen({super.key, this.initialFilters});
 
@@ -24,7 +43,7 @@ class FilterScreen extends StatefulWidget {
 class _FilterScreenState extends State<FilterScreen> {
   RangeValues ages = const RangeValues(18, 80);
   String locationMode = 'Near me';
-  double distance = 50;
+  double distance = 100;
   String selectedCity = 'Any city';
   String selectedCountry = 'Canada';
   String selectedRegion = 'Any region';
@@ -35,9 +54,9 @@ class _FilterScreenState extends State<FilterScreen> {
   String originRegion = 'Any region';
   String originCity = 'Any city';
   RangeValues standardAges = const RangeValues(18, 80);
-  double standardDistance = 50;
+  double standardDistance = 100;
   RangeValues advancedAges = const RangeValues(18, 80);
-  double advancedDistance = 50;
+  double advancedDistance = 100;
   bool standardVerified = false;
   bool advancedVerified = false;
   bool photoVerified = false;
@@ -102,7 +121,11 @@ class _FilterScreenState extends State<FilterScreen> {
       final preferences =
           widget.initialFilters ??
           await MapLovRepository.instance.myPreferences();
-      final country = profile?['country_name'] as String?;
+      final savedResidenceCountry =
+          (profile?['residence_country_name'] as String?)?.trim();
+      final country = savedResidenceCountry?.isNotEmpty == true
+          ? savedResidenceCountry
+          : profile?['country_name'] as String?;
       final region = profile?['residence_region'] as String?;
       final city = profile?['city'] as String?;
       final loadedResidenceCountry = country?.trim().isNotEmpty == true
@@ -196,13 +219,21 @@ class _FilterScreenState extends State<FilterScreen> {
           originCountry = loadedOriginCountry;
           originRegion = loadedOriginRegion;
           originCity = preferences.originCities.firstOrNull ?? 'Any city';
-          quickLanguage = preferences.languages.firstOrNull ?? 'Any';
-          standardSelections['Language'] = quickLanguage;
-          advancedSelections['Language'] = quickLanguage;
+          final savedLanguage = preferences.languages.firstOrNull ?? 'Any';
+          quickLanguage = _quickLanguageOptions.contains(savedLanguage)
+              ? savedLanguage
+              : 'Any';
+          standardSelections['Language'] = savedLanguage;
+          advancedSelections['Language'] = savedLanguage;
+          final savedGoal = _displayRelationshipGoalValue(
+            preferences.relationshipGoals.firstOrNull ?? 'Any',
+          );
           quickRelationshipGoal =
-              preferences.relationshipGoals.firstOrNull ?? 'Any';
-          standardSelections['Relationship goal'] = quickRelationshipGoal;
-          advancedSelections['Relationship goal'] = quickRelationshipGoal;
+              _quickRelationshipGoalOptions.contains(savedGoal)
+              ? savedGoal
+              : 'Any';
+          standardSelections['Relationship goal'] = savedGoal;
+          advancedSelections['Relationship goal'] = savedGoal;
           final savedReligion = preferences.religions.firstOrNull ?? 'Any';
           standardSelections['Religion'] = savedReligion;
           advancedSelections['Religion'] = savedReligion;
@@ -339,7 +370,7 @@ class _FilterScreenState extends State<FilterScreen> {
     setState(() {
       ages = const RangeValues(18, 80);
       locationMode = 'Near me';
-      distance = 50;
+      distance = 100;
       selectedCity = 'Any city';
       selectedCountry = residenceCountry;
       selectedRegion = 'Any region';
@@ -347,9 +378,9 @@ class _FilterScreenState extends State<FilterScreen> {
       originRegion = 'Any region';
       originCity = 'Any city';
       standardAges = const RangeValues(18, 80);
-      standardDistance = 50;
+      standardDistance = 100;
       advancedAges = const RangeValues(18, 80);
-      advancedDistance = 50;
+      advancedDistance = 100;
       standardVerified = false;
       advancedVerified = false;
       photoVerified = false;
@@ -535,7 +566,9 @@ class _FilterScreenState extends State<FilterScreen> {
         languages: language == null || language == 'Any'
             ? const []
             : [language],
-        relationshipGoals: goal == null || goal == 'Any' ? const [] : [goal],
+        relationshipGoals: goal == null || goal == 'Any'
+            ? const []
+            : [_storedRelationshipGoalValue(goal)],
         verifiedOnly: tab == 2
             ? advancedVerified
             : tab == 1 && standardVerified,
@@ -857,7 +890,7 @@ class _FilterScreenState extends State<FilterScreen> {
           initialValue: quickLanguage,
           isExpanded: true,
           decoration: InputDecoration(labelText: context.tr('Languages')),
-          items: const ['Any', 'English', 'French', 'Spanish']
+          items: _quickLanguageOptions
               .map(
                 (value) => DropdownMenuItem(value: value, child: Text(value)),
               )
@@ -872,19 +905,11 @@ class _FilterScreenState extends State<FilterScreen> {
           decoration: InputDecoration(
             labelText: context.tr('Relationship goal'),
           ),
-          items:
-              const [
-                    'Any',
-                    'Long-term relationship',
-                    'Marriage',
-                    'Dating',
-                    'Friendship',
-                  ]
-                  .map(
-                    (value) =>
-                        DropdownMenuItem(value: value, child: Text(value)),
-                  )
-                  .toList(),
+          items: _quickRelationshipGoalOptions
+              .map(
+                (value) => DropdownMenuItem(value: value, child: Text(value)),
+              )
+              .toList(),
           onChanged: (value) =>
               setState(() => quickRelationshipGoal = value ?? 'Any'),
         ),
@@ -2181,9 +2206,9 @@ class _MyCountryFilter extends StatelessWidget {
             onChanged: onCityChanged,
           ),
           const SizedBox(height: 10),
-          const Text(
-            'Select Any city to search everywhere in Canada.',
-            style: TextStyle(color: AppColors.grayText, fontSize: 12),
+          Text(
+            'Select Any city to search everywhere in $country.',
+            style: const TextStyle(color: AppColors.grayText, fontSize: 12),
           ),
         ],
       ),

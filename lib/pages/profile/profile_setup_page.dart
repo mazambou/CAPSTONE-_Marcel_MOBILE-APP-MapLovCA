@@ -442,7 +442,9 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            context.tr('Confirm your email, phone and residence first.'),
+            context.tr(
+              'Verify your email or SMS registration, phone and residence first.',
+            ),
           ),
         ),
       );
@@ -572,7 +574,9 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            context.tr('Confirm your email, phone and residence first.'),
+            context.tr(
+              'Verify your email or SMS registration, phone and residence first.',
+            ),
           ),
         ),
       );
@@ -717,7 +721,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                     faceReferenceReady
                         ? 'Your reference selfie is verified, kept private and never displayed on your profile.'
                         : useAccountVerification
-                        ? 'MapLov checks your confirmed email, phone and residence. Your public profile photo is not face matched or labeled face verified.'
+                        ? 'MapLov checks your verified email or SMS registration, phone and residence. Your public profile photo is not face matched or labeled face verified.'
                         : 'Take one clear, front-facing selfie. MapLov keeps it private, compares it with existing private reference selfies to prevent duplicate accounts, and uses it to confirm your profile photos. It never appears on your profile.',
                   ),
                   style: const TextStyle(
@@ -801,7 +805,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                   if (useAccountVerification && !accountVerificationReady)
                     Text(
                       context.tr(
-                        'Confirm your email and phone, and verify your residence before adding a photo.',
+                        'Verify your email or complete SMS registration, then verify your phone and residence before adding a photo.',
                       ),
                     ),
                 ],

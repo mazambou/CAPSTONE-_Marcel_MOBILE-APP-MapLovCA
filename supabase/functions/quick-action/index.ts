@@ -194,13 +194,46 @@ Deno.serve(async (req) => {
       SUPABASE_SERVICE_ROLE_KEY,
     );
 
+    const { data: linkedElsewhere, error: linkedError } =
+      await adminClient.rpc("registration_sms_phone_linked_elsewhere", {
+        owner_user: user.id,
+        phone_value: phone,
+      });
+    if (linkedError) {
+      console.error("Phone ownership lookup failed", { code: linkedError.code });
+      return jsonResponse({ error: "Unable to confirm phone number" }, 503);
+    }
+    const testDeadline = Date.parse(
+      Deno.env.get("DUPLICATE_ACCOUNT_BYPASS_UNTIL") ?? "",
+    );
+    const sharedPhoneAllowed = linkedElsewhere === true &&
+      phone === Deno.env.get("MAPLOV_SHARED_TEST_PHONE") &&
+      Number.isFinite(testDeadline) &&
+      Date.now() < testDeadline &&
+      Boolean(user.email_confirmed_at);
+    if (linkedElsewhere === true && !sharedPhoneAllowed) {
+      return jsonResponse(
+        { error: "This phone number is already linked to another account" },
+        409,
+      );
+    }
+
     const { error: updateError } =
       await adminClient.auth.admin.updateUserById(
         user.id,
-        {
-          phone,
-          phone_confirm: true,
-        },
+        sharedPhoneAllowed
+          ? {
+            app_metadata: {
+              ...user.app_metadata,
+              maplov_shared_test_phone_verified: true,
+              maplov_shared_test_phone: phone,
+              maplov_shared_test_phone_verified_at: new Date().toISOString(),
+            },
+          }
+          : {
+            phone,
+            phone_confirm: true,
+          },
       );
 
     if (updateError) {

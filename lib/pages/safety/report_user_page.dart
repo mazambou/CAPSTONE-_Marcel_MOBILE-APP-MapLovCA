@@ -6,19 +6,22 @@ class ReportUserScreen extends StatefulWidget {
     this.profile,
     this.targetType = 'user',
     this.targetId,
+    this.conversationId,
   });
   final UserProfile? profile;
   final String targetType;
   final String? targetId;
+  final String? conversationId;
 
   @override
   State<ReportUserScreen> createState() => _ReportUserScreenState();
 }
 
 class _ReportUserScreenState extends State<ReportUserScreen> {
-  String reason = 'Fake profile';
+  String reason = 'Harcèlement';
   final comment = TextEditingController();
   bool blockAfterReporting = false;
+  bool submitting = false;
 
   @override
   void dispose() {
@@ -27,28 +30,45 @@ class _ReportUserScreenState extends State<ReportUserScreen> {
   }
 
   Future<void> _submit() async {
+    if (submitting) return;
+    setState(() => submitting = true);
     final target =
         widget.targetId ?? widget.profile?.id ?? demoProfileOrUnavailable.id;
-    await MapLovRepository.instance.report(
-      targetType: widget.targetType,
-      targetId: target,
-      reason: reason,
-      comment: comment.text.trim().isEmpty ? null : comment.text.trim(),
-    );
-    if (blockAfterReporting && widget.profile != null) {
-      await MapLovRepository.instance.blockUser(widget.profile!.id);
-    }
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Report submitted for review.')),
+    try {
+      await MapLovRepository.instance.report(
+        targetType: widget.targetType,
+        targetId: target,
+        reason: reason,
+        comment: comment.text.trim().isEmpty ? null : comment.text.trim(),
+        conversationId: widget.conversationId,
       );
-      Navigator.pop(context, true);
+      if (blockAfterReporting && widget.profile != null) {
+        await MapLovRepository.instance.blockUser(widget.profile!.id);
+      }
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Signalement et preuves enregistrés.')),
+        );
+        Navigator.pop(context, true);
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Signalement non confirmé : ' + error.toString()),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => submitting = false);
     }
   }
 
   @override
   Widget build(BuildContext context) => _AppPage(
-    title: 'Report ${widget.targetType}',
+    title: widget.targetType == 'user'
+        ? 'Signaler l’utilisateur'
+        : 'Signaler le contenu',
     children: [
       if (widget.profile != null)
         ListTile(
@@ -63,22 +83,22 @@ class _ReportUserScreenState extends State<ReportUserScreen> {
         )
       else
         const _UserSafetyCard(),
-      const _SectionTitle('Why are you reporting this?'),
+      const _SectionTitle('Pourquoi effectuez-vous ce signalement ?'),
       RadioGroup<String>(
         groupValue: reason,
         onChanged: (selected) => setState(() => reason = selected ?? reason),
         child: Column(
           children:
               [
-                    'Harassment',
-                    'Fake profile',
-                    'Inappropriate content',
-                    'Spam or scam',
-                    'Suspected minor',
-                    'Child sexual exploitation',
-                    'Non-consensual intimate content',
-                    'Threat or immediate danger',
-                    'Other',
+                    'Harcèlement',
+                    'Faux profil',
+                    'Contenu inapproprié',
+                    'Spam',
+                    'Mineur présumé',
+                    'Exploitation sexuelle d’un enfant',
+                    'Contenu illégitime',
+                    'Menace ou danger immédiat',
+                    'Autre',
                   ]
                   .map(
                     (value) =>
@@ -90,7 +110,7 @@ class _ReportUserScreenState extends State<ReportUserScreen> {
       TextField(
         controller: comment,
         maxLines: 4,
-        decoration: InputDecoration(labelText: context.tr('Optional comment')),
+        decoration: const InputDecoration(labelText: 'Précisions (facultatif)'),
       ),
       if (widget.profile != null)
         CheckboxListTile(
@@ -114,7 +134,7 @@ class _ReportUserScreenState extends State<ReportUserScreen> {
         ),
       ),
       const SizedBox(height: 20),
-      _PrimaryButton('Submit report', onPressed: _submit),
+      _PrimaryButton('Envoyer le signalement', onPressed: _submit),
     ],
   );
 }

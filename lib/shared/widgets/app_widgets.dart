@@ -443,6 +443,76 @@ class _UserSafetyCard extends StatelessWidget {
 
 const int discoverProfileMinimumPhotoCount = 4;
 
+class _EmailVerificationRequiredPage extends StatelessWidget {
+  const _EmailVerificationRequiredPage();
+
+  @override
+  Widget build(BuildContext context) => _AppPage(
+    title: 'Verify your email',
+    children: [
+      const SizedBox(height: 24),
+      const Text(
+        'Verify your email to view member profiles.',
+        textAlign: TextAlign.center,
+      ),
+      const SizedBox(height: 20),
+      _PrimaryButton(
+        'Verify email',
+        onPressed: () async {
+          final verified = await Navigator.push<bool>(
+            context,
+            MaterialPageRoute<bool>(
+              builder: (_) => VerifyEmailScreen(
+                email: AuthService.instance.currentEmail,
+              ),
+            ),
+          );
+          if (verified == true && context.mounted) Navigator.pop(context);
+        },
+      ),
+    ],
+  );
+}
+
+Future<void> _showPendingEmailReminder(BuildContext context) async {
+  if (!context.mounted ||
+      !AuthService.instance.needsEmailVerificationReminder) {
+    return;
+  }
+  final verifyNow = await showDialog<bool>(
+    context: context,
+    barrierDismissible: false,
+    builder: (dialogContext) => AlertDialog(
+      title: Text(context.tr('Finish email verification')),
+      content: Text(
+        context.tr(
+          'Your phone is verified. Verify your email to open member profiles. You can continue now and finish later.',
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(dialogContext, false),
+          child: Text(context.tr('Continue')),
+        ),
+        TextButton(
+          onPressed: () => Navigator.pop(dialogContext, true),
+          child: Text(context.tr('Verify email')),
+        ),
+      ],
+    ),
+  );
+  if (verifyNow == true && context.mounted) {
+    await Navigator.push<bool>(
+      context,
+      MaterialPageRoute<bool>(
+        builder: (_) => VerifyEmailScreen(
+          email: AuthService.instance.currentEmail,
+        ),
+      ),
+    );
+  }
+}
+
 int discoverProfileMissingPhotoCount(int currentPhotoCount) {
   final missing = discoverProfileMinimumPhotoCount - currentPhotoCount;
   if (missing <= 0) return 0;

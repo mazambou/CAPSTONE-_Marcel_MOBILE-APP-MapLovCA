@@ -1,6 +1,10 @@
 export type AuthEmailUser = {
   email: string;
   new_email?: string;
+  app_metadata?: {
+    maplov_test_duplicate?: boolean;
+    maplov_contact_email?: string;
+  };
 };
 
 export type AuthEmailData = {
@@ -39,6 +43,13 @@ function required(value: string | undefined, field: string): string {
     throw new InvalidHookPayloadError(`Missing required field: ${field}`);
   }
   return normalized;
+}
+
+function deliveryEmail(user: AuthEmailUser): string {
+  const contact = user.app_metadata?.maplov_test_duplicate === true
+    ? user.app_metadata.maplov_contact_email?.trim().toLowerCase()
+    : undefined;
+  return required(contact || user.email, "user.email");
 }
 
 function escapeHtml(value: string): string {
@@ -166,7 +177,7 @@ function emailChangeMessages(
   data: AuthEmailData,
   supabaseUrl: string,
 ): OutgoingEmail[] {
-  const currentEmail = required(user.email, "user.email");
+  const currentEmail = deliveryEmail(user);
   const newEmail = required(user.new_email, "user.new_email");
   const redirectTo = required(data.redirect_to, "email_data.redirect_to");
   const tokenHash = required(data.token_hash, "email_data.token_hash");
@@ -246,7 +257,7 @@ export function buildAuthEmails(
     throw new InvalidHookPayloadError("Invalid Send Email Hook payload");
   }
 
-  const userEmail = required(payload.user.email, "user.email");
+  const userEmail = deliveryEmail(payload.user);
   const data = payload.email_data;
   const action = required(
     data.email_action_type,

@@ -10,7 +10,7 @@ class PrivacyScreen extends StatefulWidget {
 class _PrivacyScreenState extends State<PrivacyScreen> {
   bool discoverable = true;
   bool approximateDistance = true;
-  bool onlineStatus = false;
+  bool onlineStatus = true;
   bool vip = false;
   bool savingInvisibleMode = false;
 
@@ -28,7 +28,7 @@ class _PrivacyScreenState extends State<PrivacyScreen> {
       discoverable = profile?['is_discoverable'] as bool? ?? true;
       approximateDistance =
           profile?['show_approximate_distance'] as bool? ?? true;
-      onlineStatus = profile?['show_online_status'] as bool? ?? false;
+      onlineStatus = profile?['show_online_status'] as bool? ?? true;
       vip = subscription.isVip;
     });
   }

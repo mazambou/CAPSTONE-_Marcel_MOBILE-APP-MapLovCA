@@ -627,6 +627,110 @@ class MapLovLocalizations {
     'Check your inbox': 'Vérifiez votre boîte de réception',
     'Verify your email': 'Vérifiez votre courriel',
     'Verify email': 'Vérifier le courriel',
+    'Verify with SMS': 'Vérifier par SMS',
+    'Verify with SMS instead': 'Vérifier plutôt par SMS',
+    'Choose how to continue': 'Choisissez comment continuer',
+    'Resend email code': 'Renvoyer le code par courriel',
+    'Your email is taking longer than expected':
+        'Votre courriel prend plus de temps que prévu',
+    'Your registration phone number is unavailable. Return to email verification.':
+        'Votre numéro d’inscription est indisponible. Revenez à la vérification du courriel.',
+    'We can send a code to the phone number ending in {digits}.':
+        'Nous pouvons envoyer un code au numéro se terminant par {digits}.',
+    'SMS verifies your phone number. Your email will remain unverified until you confirm it later in Security.':
+        'Le SMS vérifie votre numéro de téléphone. Votre courriel restera non vérifié jusqu’à sa confirmation dans Sécurité.',
+    'Account password': 'Mot de passe du compte',
+    'SMS code': 'Code SMS',
+    'Create another test account': 'Créer un autre compte de test',
+    'Use the same verified email and phone for the temporary test period.':
+        'Utiliser le même courriel et le même numéro vérifiés pendant la période de test.',
+    'Verify your test account': 'Vérifier votre compte de test',
+    'Enter the code sent by SMS to create another account with the same contact details.':
+        'Saisissez le code SMS pour créer un autre compte avec les mêmes coordonnées.',
+    'Create test account': 'Créer le compte de test',
+    'Choose an account with SMS': 'Choisir un compte par SMS',
+    'Choose your MapLov account': 'Choisir votre compte MapLov',
+    'Verify your phone by SMS, then choose the account you want to open.':
+        'Vérifiez votre téléphone par SMS, puis choisissez le compte à ouvrir.',
+    'Enter the phone number in international format.':
+        'Saisissez le numéro au format international.',
+    'Enter the password for the selected account.':
+        'Saisissez le mot de passe du compte choisi.',
+    'MapLov account': 'Compte MapLov',
+    'Created {date}': 'Créé le {date}',
+    'Account code {code}': 'Code du compte {code}',
+    'Reset this account password': 'Réinitialiser le mot de passe de ce compte',
+    'Contact email changes are unavailable for test accounts. Contact support.':
+        'Le changement de courriel est indisponible pour les comptes de test. Contactez le soutien.',
+    'Verify SMS code': 'Vérifier le code SMS',
+    'Send SMS code': 'Envoyer un code SMS',
+    'Resend SMS code': 'Renvoyer le code SMS',
+    'Use email code instead': 'Utiliser plutôt le code courriel',
+    'Finish email verification': 'Terminer la vérification du courriel',
+    'Your phone is verified. Verify your email to open member profiles. You can continue now and finish later.':
+        'Votre téléphone est vérifié. Confirmez votre courriel pour ouvrir les profils des membres. Vous pouvez continuer et terminer plus tard.',
+    'Verify your email to view member profiles.':
+        'Confirmez votre courriel pour voir les profils des membres.',
+    'Verify your current email before changing it.':
+        'Confirmez votre courriel actuel avant de le modifier.',
+    'Too many email requests. Wait before requesting another code.':
+        'Trop de demandes de courriel. Attendez avant de demander un autre code.',
+    'The email service is temporarily unavailable. Try again later.':
+        'Le service de courriel est temporairement indisponible. Réessayez plus tard.',
+    'The email code is invalid or has expired.':
+        'Le code courriel est invalide ou a expiré.',
+    'This email address is already used by another account. Contact support.':
+        'Cette adresse courriel est déjà utilisée par un autre compte. Contactez le soutien.',
+    'Email verification is unavailable for this account.':
+        'La vérification du courriel est indisponible pour ce compte.',
+    'Email verification could not be completed. Try again.':
+        'La vérification du courriel a échoué. Réessayez.',
+    'We can send a code to {phone}.':
+        'Nous pouvons envoyer un code au numéro {phone}.',
+    'Sign in instead': 'Se connecter plutôt',
+    'Verify your email code, or sign in with your verified phone number and password.':
+        'Vérifiez le code reçu par courriel, ou connectez-vous avec votre numéro de téléphone vérifié et votre mot de passe.',
+    'Please wait…': 'Veuillez patienter…',
+    'Enter your account password to receive an SMS code.':
+        'Saisissez le mot de passe du compte pour recevoir un code SMS.',
+    'A verification code was sent by SMS.':
+        'Un code de vérification a été envoyé par SMS.',
+    'Enter the code sent by SMS.': 'Saisissez le code envoyé par SMS.',
+    'Email still delayed? You can verify your phone by SMS and confirm your email later.':
+        'Le courriel tarde toujours ? Vous pouvez vérifier votre téléphone par SMS et confirmer votre courriel plus tard.',
+    'Enter the verification code sent to {email}. If it has expired, request a new code below.':
+        'Saisissez le code envoyé à {email}. S’il a expiré, demandez un nouveau code ci-dessous.',
+    'Check your email, phone number and password.':
+        'Vérifiez votre courriel, votre numéro de téléphone et votre mot de passe.',
+    'This registration could not be verified by SMS. If you already have an account with this phone number, sign in to that account.':
+        'Cette inscription n’a pas pu être vérifiée par SMS. Si vous avez déjà un compte avec ce numéro, connectez-vous à ce compte.',
+    'This phone number is already linked to another MapLov account. Sign in to that account.':
+        'Ce numéro est déjà associé à un autre compte MapLov. Connectez-vous à ce compte.',
+    'Confirm this account’s email first. You can then verify this phone number by SMS.':
+        'Confirmez d’abord le courriel de ce compte. Vous pourrez ensuite vérifier ce numéro par SMS.',
+    'Registration proof is unavailable or has expired. Start registration again.':
+        'La preuve d’inscription est indisponible ou expirée. Recommencez l’inscription.',
+    'Too many SMS requests. Try again later.':
+        'Trop de demandes de SMS. Réessayez plus tard.',
+    'The SMS provider is temporarily unavailable. Try again later.':
+        'Le service SMS est temporairement indisponible. Réessayez plus tard.',
+    'The SMS code is invalid or has expired.':
+        'Le code SMS est invalide ou a expiré.',
+    'The temporary test account period has ended.':
+        'La période temporaire de création de comptes de test est terminée.',
+    'A verified account with this email and phone number is required.':
+        'Un compte vérifié avec ce courriel et ce numéro est nécessaire.',
+    'No account is available for this phone number.':
+        'Aucun compte n’est disponible pour ce numéro.',
+    'The test account could not be created. Request a new SMS code.':
+        'Le compte de test n’a pas pu être créé. Demandez un nouveau code SMS.',
+    'SMS verification is temporarily unavailable. Try again later.':
+        'La vérification par SMS est temporairement indisponible. Réessayez plus tard.',
+    'SMS verification is unavailable.':
+        'La vérification par SMS est indisponible.',
+    'Phone verified. Sign in with your phone number and password to continue.':
+        'Téléphone vérifié. Connectez-vous avec votre numéro et votre mot de passe pour continuer.',
+    'Phone verified. Continuing…': 'Téléphone vérifié. Poursuite…',
     'Email verified. Continuing…': 'Courriel vérifié. Poursuite…',
     'Enter the verification code sent by email.':
         'Saisissez le code de vérification envoyé par courriel.',
@@ -689,17 +793,17 @@ class MapLovLocalizations {
     'Take my private selfie': 'Prendre mon selfie privé',
     'Account checks without facial recognition':
         'Vérifications du compte sans reconnaissance faciale',
-    'MapLov checks your confirmed email, phone and residence. Your public profile photo is not face matched or labeled face verified.':
-        'MapLov vérifie votre courriel, votre téléphone et votre résidence confirmés. Votre photo de profil publique n’est pas comparée à un visage et ne porte pas la mention de vérification faciale.',
+    'MapLov checks your verified email or SMS registration, phone and residence. Your public profile photo is not face matched or labeled face verified.':
+        'MapLov vérifie votre courriel ou votre inscription par SMS, votre téléphone et votre résidence. Votre photo de profil publique n’est pas comparée à un visage et ne porte pas la mention de vérification faciale.',
     'Continue without facial recognition':
         'Continuer sans reconnaissance faciale',
     'Use the private selfie instead': 'Utiliser plutôt le selfie privé',
-    'Confirm your email and phone, and verify your residence before adding a photo.':
-        'Confirmez votre courriel et votre téléphone, puis vérifiez votre résidence avant d’ajouter une photo.',
-    'Confirm your email, phone and residence first.':
-        'Confirmez d’abord votre courriel, votre téléphone et votre résidence.',
-    'Confirm your email, phone and residence before adding photos.':
-        'Confirmez votre courriel, votre téléphone et votre résidence avant d’ajouter des photos.',
+    'Verify your email or complete SMS registration, then verify your phone and residence before adding a photo.':
+        'Vérifiez votre courriel ou terminez l’inscription par SMS, puis vérifiez votre téléphone et votre résidence avant d’ajouter une photo.',
+    'Verify your email or SMS registration, phone and residence first.':
+        'Vérifiez d’abord votre courriel ou votre inscription par SMS, votre téléphone et votre résidence.',
+    'Verify your email or SMS registration, phone and residence before adding photos.':
+        'Vérifiez votre courriel ou votre inscription par SMS, votre téléphone et votre résidence avant d’ajouter des photos.',
     'Add a real public profile photo to continue. It will not be face matched.':
         'Ajoutez une véritable photo de profil publique pour continuer. Elle ne sera pas comparée à un visage.',
     'Private selfie verification': 'Vérification par selfie privé',
@@ -1171,8 +1275,8 @@ class MapLovLocalizations {
     'Location and privacy': 'Localisation et vie privée',
     'Premium subscriptions': 'Abonnements Premium',
     'Exporting or deleting your data': 'Exporter ou supprimer vos données',
-    'Register with one email address and one phone number, confirm your email, complete your profile and verify the SMS code. MapLov permits one personal account per person.':
-        'Inscrivez-vous avec une adresse courriel et un numéro de téléphone, confirmez votre courriel, complétez votre profil et vérifiez le code SMS. MapLov autorise un seul compte personnel par personne.',
+    'Register with one email address and one phone number. Confirm your email, or verify your phone by SMS if the email is delayed. An email left pending can be confirmed later in Security. MapLov permits one personal account per person.':
+        'Inscrivez-vous avec une adresse courriel et un numéro de téléphone. Confirmez votre courriel ou, s’il tarde, vérifiez votre téléphone par SMS. Un courriel en attente peut être confirmé plus tard dans Sécurité. MapLov autorise un seul compte personnel par personne.',
     'Complete the required profile fields, add a main photo, keep Discover visibility enabled and check the other account’s age, gender and location filters. Your own profile never appears in your Discover results.':
         'Complétez les champs obligatoires du profil, ajoutez une photo principale, gardez la visibilité dans Découvrir activée et vérifiez les filtres d’âge, de genre et de localisation de l’autre compte. Votre propre profil n’apparaît jamais dans vos résultats Découvrir.',
     'A main profile photo and at least three additional photos are required before opening full member profiles from Discover. Use clear, recent photos that belong to you.':

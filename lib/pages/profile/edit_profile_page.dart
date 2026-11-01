@@ -35,6 +35,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   String incomeLevel = 'Prefer not to say';
   double height = 170;
   bool saving = false;
+  bool refreshingResidence = false;
   bool loadingRegions = false;
   bool loadingCities = false;
   int _geographyRequest = 0;
@@ -186,6 +187,88 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       if (mounted && request == _geographyRequest) {
         setState(() => loadingCities = false);
       }
+    }
+  }
+
+  Future<void> _refreshResidenceFromLocation() async {
+    if (refreshingResidence) return;
+    setState(() => refreshingResidence = true);
+    try {
+      final detected = await LocationService.instance.detectResidence();
+      await _loadCountries();
+      final detectedCountry = _worldCountries
+          .where(
+            (value) =>
+                value.toLowerCase() == detected.country.trim().toLowerCase(),
+          )
+          .firstOrNull;
+      if (detectedCountry == null) {
+        throw ResidenceDetectionFailure(
+          'MapLov does not yet support profiles from ${detected.country}.',
+        );
+      }
+      await MapLovRepository.instance.updateLocation(
+        latitude: detected.position.latitude,
+        longitude: detected.position.longitude,
+        accuracy: detected.position.accuracy,
+      );
+      await MapLovRepository.instance.syncResidenceFromLocation(
+        country: detectedCountry,
+        countryCode: detected.countryCode,
+        region: detected.region,
+        city: detected.city,
+      );
+      final updated = await MapLovRepository.instance.myProfileDetails();
+      final updatedCountry =
+          updated?['residence_country_name'] as String? ??
+          updated?['country_name'] as String?;
+      if (updatedCountry == null || updatedCountry.isEmpty) {
+        throw const ResidenceDetectionFailure(
+          'Unable to confirm the updated residence country.',
+        );
+      }
+      final updatedRegion =
+          updated?['residence_region'] as String? ??
+          _firstRegionForCountry(updatedCountry);
+      final updatedCity =
+          updated?['residence_city'] as String? ??
+          updated?['city'] as String? ??
+          detected.city;
+      await _loadRegions(updatedCountry);
+      await _loadCities(updatedCountry, updatedRegion);
+      final countryId = _countryId(updatedCountry);
+      if (countryId == null) {
+        throw const ResidenceDetectionFailure(
+          'Unable to match the detected country to the country catalog.',
+        );
+      }
+      await MapLovRepository.instance.updateResidenceGeographyIds(
+        countryId: countryId,
+        regionId: _regionId(updatedCountry, updatedRegion),
+        cityId: _cityId(updatedCountry, updatedRegion, updatedCity),
+      );
+      if (!mounted) return;
+      setState(() {
+        country = updatedCountry;
+        region = updatedRegion;
+        city.text = updatedCity;
+        citySelection = _cityBelongsToSelection(country, region, updatedCity)
+            ? updatedCity
+            : 'Other city';
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Residence country updated to $updatedCountry.'),
+        ),
+      );
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(LocationService.residenceErrorMessage(error))),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => refreshingResidence = false);
     }
   }
 
@@ -378,6 +461,18 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         helperText:
             'Updated automatically from your current location. It cannot be changed manually.',
       ),
+      OutlinedButton.icon(
+        key: const Key('refresh_residence_country'),
+        onPressed: refreshingResidence
+            ? null
+            : () => unawaited(_refreshResidenceFromLocation()),
+        icon: const Icon(Icons.my_location),
+        label: Text(
+          refreshingResidence
+              ? 'Checking current location…'
+              : 'Refresh country from current location',
+        ),
+      ),
       const SizedBox(height: 12),
       _dropdown(
         'Region',
@@ -388,7 +483,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             region,
         }.toList(),
         (value) => unawaited(_changeResidenceRegion(value)),
-        enabled: !loadingRegions,
+        enabled: !loadingRegions && !refreshingResidence,
       ),
       const SizedBox(height: 12),
       _dropdown(
@@ -399,7 +494,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           citySelection = value;
           if (value != 'Other city') city.text = value;
         },
-        enabled: !loadingCities,
+        enabled: !loadingCities && !refreshingResidence,
       ),
       if (citySelection == 'Other city') ...[
         const SizedBox(height: 12),
@@ -719,6 +814,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   Widget _saveButton() => _PrimaryButton(
     saving ? 'Saving…' : 'Save changes',
-    onPressed: saving ? () {} : _save,
+    onPressed: saving || refreshingResidence ? () {} : _save,
   );
 }

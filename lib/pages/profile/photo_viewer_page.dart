@@ -26,6 +26,81 @@ class PhotoViewerScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final currentUserId = MapLovRepository.instance.currentUserId;
+    final viewingAnotherMember =
+        popularPhotos.isNotEmpty ||
+        (profile != null && profile!.id != currentUserId);
+    if (viewingAnotherMember &&
+        AuthService.instance.needsEmailVerificationReminder) {
+      return const _EmailVerificationRequiredPage();
+    }
+    if (popularPhotos.isNotEmpty) {
+      return FutureBuilder<List<PopularPhotoEntry>>(
+        future: _allowedPopularPhotos(),
+        builder: (context, snapshot) {
+          if (!snapshot.hasData) {
+            return const Scaffold(
+              body: Center(child: CircularProgressIndicator()),
+            );
+          }
+          if (snapshot.data!.isEmpty) {
+            return const _AppPage(
+              title: 'Photos',
+              children: [Text('Ce profil n’est pas disponible.')],
+            );
+          }
+          return _PopularPhotoViewer(
+            photos: snapshot.data!,
+            initialIndex: popularInitialIndex.clamp(
+              0,
+              snapshot.data!.length - 1,
+            ),
+          );
+        },
+      );
+    }
+    final targetId = profile?.id;
+    if (targetId != null && targetId != currentUserId) {
+      return StreamBuilder<String>(
+        stream: _watchBlockState(targetId),
+        builder: (context, snapshot) {
+          if (!snapshot.hasData) {
+            return const Scaffold(
+              body: Center(child: CircularProgressIndicator()),
+            );
+          }
+          final notice = _blockedActionText(snapshot.data!, 'other');
+          if (notice != null) {
+            return _AppPage(title: 'Photos', children: [Text(notice)]);
+          }
+          return _visibleViewer(context);
+        },
+      );
+    }
+    return _visibleViewer(context);
+  }
+
+  Stream<String> _watchBlockState(String targetId) async* {
+    while (true) {
+      yield await MapLovRepository.instance.chatBlockState(targetId);
+      await Future<void>.delayed(const Duration(seconds: 10));
+    }
+  }
+
+  Future<List<PopularPhotoEntry>> _allowedPopularPhotos() async {
+    final states = <String, String>{};
+    for (final photo in popularPhotos) {
+      if (!states.containsKey(photo.profile.id)) {
+        states[photo.profile.id] = await MapLovRepository.instance
+            .chatBlockState(photo.profile.id);
+      }
+    }
+    return popularPhotos
+        .where((photo) => states[photo.profile.id] == 'none')
+        .toList();
+  }
+
+  Widget _visibleViewer(BuildContext context) {
     if (popularPhotos.isNotEmpty) {
       return _PopularPhotoViewer(
         photos: popularPhotos,
@@ -1287,10 +1362,11 @@ class _PhotoViewerHeader extends StatelessWidget {
           tooltip: profileLiked ? 'Remove profile like' : 'Like profile',
           onPressed: onProfileLike,
           constraints: const BoxConstraints.tightFor(width: 56, height: 56),
+          padding: EdgeInsets.zero,
           icon: Icon(
             profileLiked ? Icons.favorite : Icons.favorite_border,
             color: AppColors.deepPink,
-            size: 33,
+            size: 42,
           ),
         ),
         if (!compact) const SizedBox(width: 4),
@@ -1521,7 +1597,7 @@ class _PhotoActions extends StatelessWidget {
               ).showSnackBar(const SnackBar(content: Text('Super Like sent.'))),
               child: const _SuperLikeGlyph(
                 key: Key('super_like_love_icon'),
-                size: 31,
+                size: 40,
               ),
             ),
           ],

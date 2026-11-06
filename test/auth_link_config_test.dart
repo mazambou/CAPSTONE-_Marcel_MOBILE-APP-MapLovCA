@@ -53,7 +53,7 @@ void main() {
     expect(emailSection, contains('enable_signup = true'));
     expect(emailSection, contains('enable_confirmations = true'));
     expect(emailSection, isNot(contains('enable_confirmations = false')));
-    expect(emailSection, contains('otp_length = 6'));
+    expect(emailSection, contains('otp_length = 8'));
   });
 
   test('signup confirmation email contains a code instead of a link', () {

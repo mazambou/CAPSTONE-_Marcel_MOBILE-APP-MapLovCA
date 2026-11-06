@@ -481,6 +481,15 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   Future<void> _toggleLike(UserProfile profile) async {
     if (!await _requireProfilePhotos(context, minimum: 1) || !mounted) return;
+    final blockedMessage = await _blockedProfileInteractionMessage(profile.id);
+    if (!mounted) return;
+    if (blockedMessage != null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(blockedMessage)));
+      await _loadProfiles(forceRefresh: true);
+      return;
+    }
     final previous = likedProfiles.contains(profile.name);
     setState(() {
       if (previous) {
@@ -500,7 +509,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           MaterialPageRoute(builder: (_) => NewMatchScreen(profile: profile)),
         );
       }
-    } catch (error) {
+    } catch (_) {
       if (!mounted) return;
       setState(() {
         if (previous) {
@@ -509,9 +518,19 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           likedProfiles.remove(profile.name);
         }
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Unable to update this like: $error')),
+      final blockedMessage = await _blockedProfileInteractionMessage(
+        profile.id,
       );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            blockedMessage ??
+                'Impossible de modifier ce J’aime pour le moment.',
+          ),
+        ),
+      );
+      if (blockedMessage != null) await _loadProfiles(forceRefresh: true);
     }
   }
 
@@ -1127,7 +1146,7 @@ class _DiscoverHeader extends StatelessWidget {
           ),
           IconButton(
             key: const Key('home_rewind_button'),
-            tooltip: 'Rewind last profile like',
+            tooltip: context.tr('Rewind last profile like'),
             onPressed: onRewind,
             icon: const Icon(Icons.undo_rounded, size: 27),
           ),
@@ -1291,14 +1310,19 @@ class _DiscoverGridCard extends StatelessWidget {
                   if (profile.isNew) const SizedBox(width: 5),
                   if (!profile.isNew && !profile.isArrivingSoon) const Spacer(),
                   if (profile.isArrivingSoon) const Spacer(),
-                  Flexible(
-                    child: _GridStatusBadge(
-                      statusKey: Key('profile_status_${profile.id}'),
-                      label: profile.isOnline ? '● Online' : '● Offline',
-                      foregroundColor: profile.isOnline
-                          ? const Color(0xFF37E19A)
-                          : const Color(0xFF9E9E9E),
-                      backgroundColor: const Color(0xA6000000),
+                  Semantics(
+                    label: context.tr(profile.isOnline ? 'Online' : 'Offline'),
+                    child: Container(
+                      key: Key('profile_status_${profile.id}'),
+                      width: 12,
+                      height: 12,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: profile.isOnline
+                            ? const Color(0xFF37E19A)
+                            : const Color(0xFF9E9E9E),
+                        border: Border.all(color: Colors.white, width: 1.5),
+                      ),
                     ),
                   ),
                 ],
@@ -1402,13 +1426,11 @@ class _DiscoverGridCard extends StatelessWidget {
 
 class _GridStatusBadge extends StatelessWidget {
   const _GridStatusBadge({
-    this.statusKey,
     required this.label,
     required this.foregroundColor,
     required this.backgroundColor,
   });
 
-  final Key? statusKey;
   final String label;
   final Color foregroundColor;
   final Color backgroundColor;
@@ -1422,7 +1444,6 @@ class _GridStatusBadge extends StatelessWidget {
         borderRadius: BorderRadius.circular(999),
       ),
       child: Text(
-        key: statusKey,
         label,
         style: TextStyle(
           color: foregroundColor,

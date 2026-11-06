@@ -82,6 +82,292 @@ class MapLovLocalizations {
       _values[locale.languageCode]?[key] ?? _values['en']![key] ?? key;
 
   static const _french = <String, String>{
+    'Blocked': 'Bloqué',
+    'Block this user': 'Bloquer cet utilisateur',
+    'Unblock this user': 'Débloquer cet utilisateur',
+    'User blocked': 'Utilisateur bloqué',
+    'You blocked this user and they also blocked you. Interactions remain unavailable until both blocks are removed.':
+        'Vous avez bloqué cet utilisateur et il vous a également bloqué. Les interactions restent indisponibles tant que les deux blocages sont actifs.',
+    'You blocked this user. Unblock them before sending a message.':
+        'Vous avez bloqué cet utilisateur. Débloquez-le avant de pouvoir lui envoyer un message.',
+    'You blocked this user. Unblock them to view their profile.':
+        'Vous avez bloqué cet utilisateur. Débloquez-le pour consulter son profil.',
+    'You blocked this user. Unblock them to do this.':
+        'Vous avez bloqué cet utilisateur. Débloquez-le pour effectuer cette action.',
+    'This user blocked you. You can no longer send them messages.':
+        'Cet utilisateur vous a bloqué. Vous ne pouvez plus lui envoyer de messages.',
+    'This user blocked you. You can no longer view their profile.':
+        'Cet utilisateur vous a bloqué. Vous ne pouvez plus consulter son profil.',
+    'This user blocked you. You cannot do this.':
+        'Cet utilisateur vous a bloqué. Vous ne pouvez pas effectuer cette action.',
+    'Deleting for both participants is unavailable in this conversation. You can only delete it on your side.':
+        'La suppression pour les deux participants est indisponible pour cette conversation. Vous pouvez uniquement la supprimer de votre côté.',
+    'React with an emoji': 'Réagir avec un émoji',
+    'Remove my reaction': 'Retirer ma réaction',
+    'Reply': 'Répondre',
+    'Previous message': 'Message précédent',
+    'Cancel reply': 'Annuler la réponse',
+    'Conversation options': 'Options de conversation',
+    'Report content': 'Signaler le contenu',
+    'Harassment': 'Harcèlement',
+    'Fake profile': 'Faux profil',
+    'Inappropriate content': 'Contenu inapproprié',
+    'Spam': 'Spam',
+    'Illegitimate content': 'Contenu illégitime',
+    'Optional details': 'Précisions (facultatif)',
+    'Report and evidence saved.': 'Signalement et preuves enregistrés.',
+    'Conversation evidence': 'Preuves de conversation',
+    'Author': 'Auteur',
+    'Reporting member': 'Signalant',
+    'Reported person': 'Personne signalée',
+    'Missing name': 'Nom indisponible',
+    'Reply to a message': 'Réponse à un message',
+    'Reported account': 'Compte signalé',
+    'Reported content': 'Contenu signalé',
+    'Message from': 'Message de',
+    'Report could not be confirmed': 'Signalement non confirmé',
+    'Captured': 'Capturé le',
+    'Reason': 'Motif',
+    'Details': 'Précisions',
+    'Message content was already erased before evidence retention.':
+        'Le contenu du message avait déjà été effacé avant sa conservation comme preuve.',
+    'No conversation messages were available when this report was filed.':
+        'Aucun message de conversation n’était disponible au moment du signalement.',
+    'Open preserved attachment': 'Ouvrir la pièce jointe conservée',
+    'Attachment copying is incomplete. Review available text and retry evidence finalization.':
+        'La copie des pièces jointes est incomplète. Examinez les textes disponibles et réessayez de finaliser les preuves.',
+    'Submitted': 'Soumis le',
+    'Under review': 'En cours d’examen',
+    'Open': 'Ouvert',
+    'Resolved': 'Résolu',
+    'Dismissed': 'Classé',
+    'Warn reported account': 'Avertir le compte signalé',
+    'Ban reported account': 'Exclure le compte signalé',
+    'Management': 'Gestion',
+    'Discovery, completion and verification status.':
+        'Statut de découverte, de complétion et de vérification.',
+    'The database record and stored file will be removed.':
+        'L’enregistrement et le fichier stocké seront supprimés.',
+    'Review, verify or permanently remove profile photos.':
+        'Examiner, vérifier ou supprimer définitivement les photos de profil.',
+    'Approve': 'Approuver',
+    'Verify': 'Vérifier',
+    'Restore': 'Restaurer',
+    'Store subscriptions remain controlled by Apple or Google. Manual grants last 30 days.':
+        'Les abonnements restent gérés par Apple ou Google. Les accès manuels durent 30 jours.',
+    'Grant Plus (30 days)': 'Accorder Plus (30 jours)',
+    'Grant VIP (30 days)': 'Accorder VIP (30 jours)',
+    'End manual access': 'Terminer l’accès manuel',
+    'Server-validated Apple and Google transaction history.':
+        'Historique des transactions Apple et Google validées par le serveur.',
+    'Start': 'Début',
+    'End': 'Fin',
+    'Promotion enabled': 'Promotion activée',
+    'Invalid configuration.': 'Configuration invalide.',
+    'Recover': 'Récupérer',
+    'Send an in-app system notification to every active account.':
+        'Envoyer une notification système à chaque compte actif.',
+    'Cancel a pending deletion and restore the profile when the authentication account still exists.':
+        'Annuler une suppression en attente et restaurer le profil si le compte de connexion existe encore.',
+    'Profiles awaiting validation': 'Profils en attente de validation',
+    'No profiles are awaiting validation.':
+        'Aucun profil n’attend de validation.',
+    'Keep suspended': 'Maintenir la suspension',
+    'Approve profile': 'Approuver le profil',
+    'This authentication link is invalid, expired, or was opened on a different device.':
+        'Ce lien de connexion est invalide, expiré ou a été ouvert sur un autre appareil.',
+    'Return to login': 'Retour à la connexion',
+    'Completing secure authentication…':
+        'Finalisation de la connexion sécurisée…',
+    'Your authentication account, profile, stored files, private reference selfie and biometric index will be permanently erased. You can then create a new account.':
+        'Votre compte de connexion, votre profil, vos fichiers, votre selfie privé de référence et votre index biométrique seront définitivement effacés. Vous pourrez ensuite créer un nouveau compte.',
+    'Resend recovery code': 'Renvoyer le code de récupération',
+    'Forgot Password?': 'Mot de passe oublié ?',
+    'A phone number is required for every MapLov account.':
+        'Un numéro de téléphone est requis pour chaque compte MapLov.',
+    'SMS verification is not required in your country. Your selfie remains the identity verification method.':
+        'La vérification par SMS n’est pas requise dans votre pays. Le selfie reste la méthode de vérification d’identité.',
+    'Main Profile Discovery': 'Découverte principale des profils',
+    'Refine the profiles shown in Discover.':
+        'Affinez les profils affichés dans Découvrir.',
+    'No profile like to rewind.': 'Aucun J’aime de profil à annuler.',
+    'Your last profile like was restored.':
+        'Votre dernier J’aime de profil a été restauré.',
+    'Show VIP Profiles Only': 'Afficher uniquement les profils VIP',
+    'Show Premium Plus & Premium VIP':
+        'Afficher les membres Premium Plus et Premium VIP',
+    'Show Most Liked Profiles': 'Afficher les profils les plus aimés',
+    'Reset filters': 'Réinitialiser les filtres',
+    'Send a message': 'Envoyer un message',
+    'Open the list of people who liked your profile.':
+        'Ouvrir la liste des personnes qui ont aimé votre profil.',
+    'View likes': 'Voir les J’aime',
+    'This match is no longer available.': 'Ce match n’est plus disponible.',
+    'View matches': 'Voir les matchs',
+    'Choose whether to remove this message only from your account or from both accounts.':
+        'Choisissez si vous souhaitez supprimer ce message de votre compte seulement ou des deux comptes.',
+    'Delete this message': 'Supprimer ce message',
+    'Choose whether to clear this history only from your account or from both accounts.':
+        'Choisissez si vous souhaitez effacer cet historique de votre compte seulement ou des deux comptes.',
+    'Compare plans': 'Comparer les niveaux',
+    'MapLov store': 'Boutique MapLov',
+    'Choose a payment method': 'Choisir un moyen de paiement',
+    'Select payment method': 'Choisir le moyen de paiement',
+    'Choose a period': 'Choisir la période',
+    'Annual subscription is processed by Stripe.':
+        'L’abonnement annuel est traité par Stripe.',
+    'This Stripe purchase is available on the MapLov web version.':
+        'Cet achat Stripe est disponible sur la version Web de MapLov.',
+    'What you get': 'Ce que vous obtenez',
+    '⭐ Annual plans offer the biggest savings.':
+        '⭐ Les formules annuelles offrent les économies les plus importantes.',
+    'Manage': 'Gérer',
+    'One-time purchases': 'Achats ponctuels',
+    'No subscription required. The exact price is shown in secure Stripe checkout.':
+        'Sans abonnement. Le prix exact est affiché dans le paiement sécurisé Stripe.',
+    'Invisible browsing in Discover': 'Navigation invisible dans Découvrir',
+    'Start exploring': 'Commencer à explorer',
+    'Back to plans': 'Retour aux forfaits',
+    'Manage this subscription on the secure MapLov web version.':
+        'Gérez cet abonnement sur la version Web sécurisée de MapLov.',
+    'Cancel renewal?': 'Annuler le renouvellement ?',
+    'Keep': 'Conserver',
+    'Confirm cancellation': 'Confirmer l’annulation',
+    'Renewal cancelled.': 'Renouvellement annulé.',
+    'My subscription': 'Mon abonnement',
+    'My purchases': 'Mes achats',
+    'No active Pass or Boost.': 'Aucun Pass ou Boost actif.',
+    'One-time purchase history': 'Historique des achats ponctuels',
+    'Actions': 'Actions',
+    'Discover Premium offers': 'Découvrir les offres Premium',
+    'Cancel automatic renewal': 'Annuler le renouvellement automatique',
+    'Unable to open the store subscription settings.':
+        'Impossible d’ouvrir les paramètres d’abonnement du store.',
+    'No payment transactions yet.':
+        'Aucune transaction de paiement pour le moment.',
+    'Profile photo updated.': 'Photo de profil mise à jour.',
+    'Your profile photo is shown first. The other photos belong to your public album. You can choose any visible album photo as your profile photo.':
+        'Votre photo de profil apparaît en premier. Les autres photos appartiennent à votre album public. Vous pouvez choisir toute photo visible de l’album comme photo de profil.',
+    'This profile is unavailable.': 'Ce profil n’est pas disponible.',
+    'No Super Likes available': 'Aucun Super Like disponible',
+    'Buy a Super Like pack to send this special reaction.':
+        'Achetez un lot de Super Likes pour envoyer cette réaction spéciale.',
+    'View packs': 'Voir les lots',
+    'VIP members can choose whether their profile appears in Discover.':
+        'Les membres VIP peuvent choisir si leur profil apparaît dans Découvrir.',
+    'Show my origin on my profile': 'Afficher mon origine sur mon profil',
+    'Displays only your country and city of origin. Your origin region always remains hidden.':
+        'Affiche uniquement votre pays et votre ville d’origine. Votre région d’origine reste masquée.',
+    'See who viewed your profile': 'Voir qui a consulté votre profil',
+    'View your profile performance': 'Voir les performances de votre profil',
+    'This person already exists in the system':
+        'Cette personne existe déjà dans le système',
+    'The new provisional registration and its uploaded selfie have been removed. For security, recover and sign in to the existing account before deleting all its data, including the private selfie, and creating a new account.':
+        'La nouvelle inscription provisoire et son selfie ont été supprimés. Pour votre sécurité, récupérez le compte existant et connectez-vous avant d’effacer toutes ses données, y compris le selfie privé, puis de créer un autre compte.',
+    'Recover account to delete data':
+        'Récupérer le compte pour supprimer les données',
+    'Choose your gender to continue.': 'Choisissez votre genre pour continuer.',
+    'Verify your country of residence with GPS before continuing.':
+        'Vérifiez votre pays de résidence par GPS avant de continuer.',
+    'Refresh': 'Actualiser',
+    'Confirm block': 'Confirmer le blocage',
+    'Describe the problem without including a password, OTP or sensitive document.':
+        'Décrivez le problème sans inclure de mot de passe, de code temporaire ni de document sensible.',
+    'Please provide a subject and details.':
+        'Indiquez un sujet et des précisions.',
+    'Send': 'Envoyer',
+    'Unable to load this legal document.':
+        'Impossible de charger ce document juridique.',
+    'Save photo display': 'Enregistrer l’affichage des photos',
+    'Stay out of Discover. Your profile becomes visible after you like someone or send a message.':
+        'Restez absent de Découvrir. Votre profil devient visible après un J’aime ou l’envoi d’un message.',
+    'Change email address': 'Modifier l’adresse courriel',
+    'Delete Account': 'Supprimer le compte',
+    'Discover\nand connect': 'Découvrir\net échanger',
+    'See more,\nsearch better': 'Voir plus,\nmieux chercher',
+    'The king of\nprivacy and control': 'Le roi de\nla confidentialité',
+    'Profile and public photos': 'Profil et photos publiques',
+    'Discover, send likes and create matches':
+        'Découvrir, aimer des profils et créer des matchs',
+    'Text, photo, voice and document messages':
+        'Messages texte, photo, vocaux et documents',
+    'Quick and standard filters': 'Filtres rapides et standards',
+    'Friends and community posts': 'Amis et publications de la communauté',
+    '1 Secret Garden album and 10 photos': '1 album Jardin secret et 10 photos',
+    'Blocking, reporting and photo moderation':
+        'Blocage, signalement et modération des photos',
+    'Everything in Free, plus:': 'Tout ce qui est inclus dans Gratuit, plus :',
+    'See who liked your profile': 'Voir qui a aimé votre profil',
+    'Advanced filters': 'Filtres avancés',
+    'Country search by region and city': 'Recherche par pays, région et ville',
+    'Clear your unread messages for everyone':
+        'Effacer vos messages non lus pour tous',
+    '3 Secret Garden albums and 30 photos':
+        '3 albums Jardin secret et 30 photos',
+    '20 Secret Garden requests per day': '20 demandes Jardin secret par jour',
+    'Early access to New Accounts after 7 days':
+        'Accès anticipé aux nouveaux comptes après 7 jours',
+    'Unlimited profile rewinds': 'Retours illimités aux profils précédents',
+    'Priority placement in received Likes': 'Priorité dans les J’aime reçus',
+    'Read receipts for conversations': 'Accusés de lecture des conversations',
+    'Choose Plus': 'Choisir Plus',
+    'Everything in Plus, plus:': 'Tout ce qui est inclus dans Plus, plus :',
+    'Your profile appears after you like or message':
+        'Votre profil apparaît après un J’aime ou un message',
+    'Exclusive VIP profile badge': 'Badge de profil VIP exclusif',
+    'International search by country and region':
+        'Recherche internationale par pays et région',
+    'Advanced statistics': 'Statistiques avancées',
+    'Delete a message for everyone after it is read':
+        'Supprimer un message pour tous après sa lecture',
+    'Clear a full conversation on both accounts':
+        'Effacer une conversation entière sur les deux comptes',
+    '10 Secret Garden albums and 100 photos':
+        '10 albums Jardin secret et 100 photos',
+    '100 Secret Garden requests per day': '100 demandes Jardin secret par jour',
+    'Exclusive access to New Accounts during their first 7 days':
+        'Accès exclusif aux nouveaux comptes pendant leurs 7 premiers jours',
+    'Priority customer support': 'Assistance clientèle prioritaire',
+    'Become VIP': 'Devenir VIP',
+    'Stripe catalog': 'Catalogue Stripe',
+    'Create or verify the 14 test products and Price IDs. This action is idempotent and reserved for MapLov administrators.':
+        'Crée ou vérifie les 14 produits et Price IDs de test. Cette action est idempotente et réservée aux administrateurs MapLov.',
+    'Syncing…': 'Synchronisation…',
+    'Sync with Stripe': 'Synchroniser avec Stripe',
+    'Schedule Stripe promotional prices. The Price ID must match the entered CAD amount.':
+        'Planifiez les prix promotionnels Stripe. Le Price ID doit correspondre au montant CAD saisi.',
+    'No promotion configured.': 'Aucune promotion configurée.',
+    'New promotion': 'Nouvelle promotion',
+    'Edit promotion': 'Modifier la promotion',
+    'Name (Black Friday, Valentine’s Day…)':
+        'Nom (Black Friday, Saint-Valentin…)',
+    'Product': 'Produit',
+    'Regular price CAD': 'Prix normal CAD',
+    'Promotional price CAD': 'Prix promotionnel CAD',
+    'Promotional Stripe Price ID': 'Stripe Price ID promotionnel',
+    'You will be redirected to the provider’s secure page. MapLov never receives your card details.':
+        'Vous serez redirigé vers la page sécurisée du prestataire. MapLov ne reçoit jamais les données de votre carte.',
+    'Flutterwave will stop charging for future months. Your benefits remain active until the end of the period already paid for.':
+        'Flutterwave ne prélèvera plus les prochains mois. Vos avantages restent actifs jusqu’à la fin de la période déjà payée.',
+    'Invisible navigation in Discover': 'Navigation invisible dans Découvrir',
+    'Coming soon': 'Arrive bientôt',
+    '✈️ Coming soon': '✈️ Arrive bientôt',
+    'Looking for a meaningful relationship ❤️':
+        'À la recherche d’une relation sérieuse ❤️',
+    'I love travelling, discovering new restaurants and spending time in nature. 🌿':
+        'J’aime voyager, découvrir de nouveaux restaurants et passer du temps dans la nature. 🌿',
+    'Toronto, Canada • Today': 'Toronto, Canada • Aujourd’hui',
+    'Subject': 'Sujet',
+    'Description': 'Description',
+    'Title': 'Titre',
+    'Send message': 'Envoyer le message',
+    'Refresh GPS residence': 'Actualiser la résidence par GPS',
+    'Rewind last profile like': 'Annuler le dernier J’aime de profil',
+    'Use as profile photo': 'Utiliser comme photo de profil',
+    'Refresh GPS country': 'Actualiser le pays par GPS',
+    'Recovery code': 'Code de récupération',
+    'Phone number (+country code)': 'Numéro de téléphone (+indicatif pays)',
+    'Current city of residence name': 'Nom de la ville de résidence',
     'Photo not verified': 'Photo non vérifiée',
     'Your profile photo has not been face verified. You can verify it whenever you choose.':
         'Votre photo de profil n’a pas été vérifiée par comparaison faciale. Vous pouvez la vérifier quand vous le souhaitez.',
@@ -1341,10 +1627,51 @@ class MapLovLocalizations {
     'Allow international discovery': 'Autoriser la découverte internationale',
     'When disabled, your profile is hidden from searches that use the International option.':
         'Lorsque cette option est désactivée, votre profil est masqué des recherches utilisant l’option International.',
+    '🏆 MOST POPULAR': '🏆 LE PLUS POPULAIRE',
+    '⭐ BEST VALUE': '⭐ MEILLEURE OFFRE',
+    'MapLov Plus monthly': 'MapLov Plus mensuel',
+    'See who liked and viewed your profile':
+        'Voir qui a aimé et consulté votre profil',
+    'Advanced filters and Country search by region and city':
+        'Filtres avancés et recherche Country par région et ville',
+    'Subscribe': 'S’abonner',
+  };
+
+  static final _englishFromFrench = <String, String>{
+    for (final entry in _french.entries) entry.value: entry.key,
   };
 
   String translate(String value) {
-    if (locale.languageCode != 'fr') return value;
+    if (locale.languageCode != 'fr') {
+      final blockedName = RegExp(
+        r'^Vous avez bloqué (.+)\.$',
+      ).firstMatch(value);
+      if (blockedName != null) return 'You blocked ${blockedName.group(1)}.';
+      final savings = RegExp(
+        r'^Économisez (\d+),(\d{2}) \$ \((\d+) %\)$',
+      ).firstMatch(value);
+      if (savings != null) {
+        return 'Save \$${savings.group(1)}.${savings.group(2)} (${savings.group(3)}%)';
+      }
+      final cadPrice = RegExp(
+        r'^(\d+),(\d{2}) \$ CAD( / an| / mois)?$',
+      ).firstMatch(value);
+      if (cadPrice != null) {
+        final period = cadPrice.group(3);
+        return 'CAD \$${cadPrice.group(1)}.${cadPrice.group(2)}${period == ' / an'
+            ? ' / year'
+            : period == ' / mois'
+            ? ' / month'
+            : ''}';
+      }
+      final monthlyEquivalent = RegExp(
+        r'^Seulement (\d+),(\d{2}) \$ CAD / mois$',
+      ).firstMatch(value);
+      if (monthlyEquivalent != null) {
+        return 'Only CAD \$${monthlyEquivalent.group(1)}.${monthlyEquivalent.group(2)} / month';
+      }
+      return _englishFromFrench[value] ?? value;
+    }
     final exact = _french[value];
     if (exact != null) return exact;
     for (final entry in _french.entries) {
@@ -1438,6 +1765,8 @@ class MapLovLocalizations {
           'Impossible de charger tous les détails du profil',
       'Unable to load photo moderation':
           'Impossible de charger la modération des photos',
+      'Unable to load report evidence':
+          'Impossible de charger les preuves du signalement',
       'Unable to load your saved filters. Default filters will be used':
           'Impossible de charger vos filtres enregistrés. Les filtres par défaut seront utilisés',
       'Unable to open the gallery': 'Impossible d’ouvrir la galerie',

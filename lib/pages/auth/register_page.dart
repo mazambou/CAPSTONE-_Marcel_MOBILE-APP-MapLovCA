@@ -276,7 +276,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         )
                       : IconButton(
                           key: const Key('retry_phone_country_detection'),
-                          tooltip: 'Refresh GPS country',
+                          tooltip: context.tr('Refresh GPS country'),
                           onPressed: _isLoading
                               ? null
                               : () => unawaited(_detectResidence()),

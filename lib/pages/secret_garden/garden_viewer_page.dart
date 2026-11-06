@@ -186,7 +186,9 @@ class _GardenViewerScreenState extends State<GardenViewerScreen> {
                                         top: 12,
                                         right: 12,
                                         child: IconButton.filled(
-                                          tooltip: 'Delete private photo',
+                                          tooltip: context.tr(
+                                            'Delete private photo',
+                                          ),
                                           onPressed: () async {
                                             final items = await managedPhotos;
                                             await _delete(items[entry.$1]);

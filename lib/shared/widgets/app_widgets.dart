@@ -462,9 +462,8 @@ class _EmailVerificationRequiredPage extends StatelessWidget {
           final verified = await Navigator.push<bool>(
             context,
             MaterialPageRoute<bool>(
-              builder: (_) => VerifyEmailScreen(
-                email: AuthService.instance.currentEmail,
-              ),
+              builder: (_) =>
+                  VerifyEmailScreen(email: AuthService.instance.currentEmail),
             ),
           );
           if (verified == true && context.mounted) Navigator.pop(context);
@@ -505,9 +504,8 @@ Future<void> _showPendingEmailReminder(BuildContext context) async {
     await Navigator.push<bool>(
       context,
       MaterialPageRoute<bool>(
-        builder: (_) => VerifyEmailScreen(
-          email: AuthService.instance.currentEmail,
-        ),
+        builder: (_) =>
+            VerifyEmailScreen(email: AuthService.instance.currentEmail),
       ),
     );
   }
@@ -569,11 +567,28 @@ Future<bool> _requireProfilePhotos(
   return false;
 }
 
+Future<String?> _blockedProfileInteractionMessage(String profileId) async {
+  try {
+    final state = await MapLovRepository.instance.chatBlockState(profileId);
+    return _blockedActionText(state, 'other');
+  } catch (_) {
+    return null;
+  }
+}
+
 Future<ProfileLikeResult?> _toggleProfileLikeFromDetails(
   BuildContext context,
   UserProfile profile,
 ) async {
   if (!await _requireProfilePhotos(context, minimum: 1) || !context.mounted) {
+    return null;
+  }
+  final blockedMessage = await _blockedProfileInteractionMessage(profile.id);
+  if (!context.mounted) return null;
+  if (blockedMessage != null) {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(blockedMessage)));
     return null;
   }
   try {
@@ -596,10 +611,19 @@ Future<ProfileLikeResult?> _toggleProfileLikeFromDetails(
       );
     }
     return result;
-  } catch (error) {
+  } catch (_) {
     if (context.mounted) {
+      final blockedMessage = await _blockedProfileInteractionMessage(
+        profile.id,
+      );
+      if (!context.mounted) return null;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Unable to update this like: $error')),
+        SnackBar(
+          content: Text(
+            blockedMessage ??
+                'Impossible de modifier ce J’aime pour le moment.',
+          ),
+        ),
       );
     }
     return null;

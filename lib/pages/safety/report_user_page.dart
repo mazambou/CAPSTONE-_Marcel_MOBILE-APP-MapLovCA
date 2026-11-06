@@ -55,7 +55,9 @@ class _ReportUserScreenState extends State<ReportUserScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Signalement non confirmé : ' + error.toString()),
+            content: Text(
+              '${context.tr('Report could not be confirmed')} : $error',
+            ),
           ),
         );
       }
@@ -110,7 +112,7 @@ class _ReportUserScreenState extends State<ReportUserScreen> {
       TextField(
         controller: comment,
         maxLines: 4,
-        decoration: const InputDecoration(labelText: 'Précisions (facultatif)'),
+        decoration: InputDecoration(labelText: context.tr('Optional details')),
       ),
       if (widget.profile != null)
         CheckboxListTile(

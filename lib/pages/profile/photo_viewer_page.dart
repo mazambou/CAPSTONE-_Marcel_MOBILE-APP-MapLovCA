@@ -81,10 +81,10 @@ class PhotoViewerScreen extends StatelessWidget {
   }
 
   Stream<String> _watchBlockState(String targetId) async* {
-    while (true) {
-      yield await MapLovRepository.instance.chatBlockState(targetId);
-      await Future<void>.delayed(const Duration(seconds: 10));
-    }
+    yield await MapLovRepository.instance.chatBlockState(targetId);
+    yield* Stream<void>.periodic(
+      const Duration(seconds: 10),
+    ).asyncMap((_) => MapLovRepository.instance.chatBlockState(targetId));
   }
 
   Future<List<PopularPhotoEntry>> _allowedPopularPhotos() async {
@@ -598,6 +598,16 @@ class _SocialPhotoViewerState extends State<_SocialPhotoViewer> {
 
   Future<void> _toggleLike() async {
     if (_likeUpdating) return;
+    final blockedMessage = await _blockedProfileInteractionMessage(
+      widget.profile.id,
+    );
+    if (!mounted) return;
+    if (blockedMessage != null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(blockedMessage)));
+      return;
+    }
     final index = _currentIndex;
     final photoId = await _photoId(index);
     if (photoId == null || !mounted) {
@@ -643,14 +653,23 @@ class _SocialPhotoViewerState extends State<_SocialPhotoViewer> {
           ),
         );
       }
-    } catch (error) {
+    } catch (_) {
       if (!mounted) return;
       setState(() {
         _likedStates[index] = previousLiked;
         _likeCounts[index] = previousCount;
       });
+      final blockedMessage = await _blockedProfileInteractionMessage(
+        widget.profile.id,
+      );
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Unable to update this photo like: $error')),
+        SnackBar(
+          content: Text(
+            blockedMessage ??
+                'Impossible de modifier ce J’aime pour le moment.',
+          ),
+        ),
       );
     } finally {
       if (mounted) setState(() => _likeUpdating = false);
@@ -666,6 +685,16 @@ class _SocialPhotoViewerState extends State<_SocialPhotoViewer> {
 
   Future<void> _toggleSuperLike() async {
     if (_superLikeUpdating) return;
+    final blockedMessage = await _blockedProfileInteractionMessage(
+      widget.profile.id,
+    );
+    if (!mounted) return;
+    if (blockedMessage != null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(blockedMessage)));
+      return;
+    }
     final index = _currentIndex;
     final photoId = await _photoId(index);
     if (photoId == null || !mounted) {
@@ -729,8 +758,17 @@ class _SocialPhotoViewerState extends State<_SocialPhotoViewer> {
             ),
           );
         } else {
+          final blockedMessage = await _blockedProfileInteractionMessage(
+            widget.profile.id,
+          );
+          if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Unable to update this Super Like: $error')),
+            SnackBar(
+              content: Text(
+                blockedMessage ??
+                    'Impossible de modifier ce Super Like pour le moment.',
+              ),
+            ),
           );
         }
       }

@@ -880,7 +880,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                 right: 0,
                 bottom: 0,
                 child: IconButton.filled(
-                  tooltip: 'Add profile photo',
+                  tooltip: context.tr('Add profile photo'),
                   onPressed: uploadingPhoto ? null : _pickProfilePhoto,
                   icon: uploadingPhoto
                       ? const SizedBox.square(
@@ -1080,7 +1080,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                         )
                       : IconButton(
                           key: const Key('profile_setup_refresh_residence'),
-                          tooltip: 'Refresh GPS residence',
+                          tooltip: context.tr('Refresh GPS residence'),
                           onPressed: saving ? null : onRefreshCountry,
                           icon: const Icon(Icons.my_location),
                         )

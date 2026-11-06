@@ -376,7 +376,7 @@ class _ManagePhotosScreenState extends State<ManagePhotosScreen> {
                                 bottom: 7,
                                 child: IconButton.filled(
                                   key: Key('set_primary_photo_$id'),
-                                  tooltip: 'Use as profile photo',
+                                  tooltip: context.tr('Use as profile photo'),
                                   onPressed: () => _setPrimaryPhoto(photo),
                                   constraints: const BoxConstraints.tightFor(
                                     width: 40,
@@ -395,7 +395,7 @@ class _ManagePhotosScreenState extends State<ManagePhotosScreen> {
                                 right: 7,
                                 child: IconButton.filled(
                                   key: Key('delete_managed_photo_$id'),
-                                  tooltip: 'Delete photo',
+                                  tooltip: context.tr('Delete photo'),
                                   onPressed: () => _deletePhoto(photo),
                                   constraints: const BoxConstraints.tightFor(
                                     width: 38,

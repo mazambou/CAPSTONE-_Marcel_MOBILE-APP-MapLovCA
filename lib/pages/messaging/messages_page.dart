@@ -25,9 +25,9 @@ class _MessagesScreenState extends State<MessagesScreen> {
       ),
     );
     if (mounted) {
-      setState(
-        () => _conversations = MapLovRepository.instance.conversations(),
-      );
+      setState(() {
+        _conversations = MapLovRepository.instance.conversations();
+      });
     }
   }
 
@@ -62,9 +62,39 @@ class _MessagesScreenState extends State<MessagesScreen> {
                     leading: CircleAvatar(
                       backgroundImage: profileImageProvider(item.profile),
                     ),
-                    title: Text(
-                      item.profile.name,
-                      style: const TextStyle(fontWeight: FontWeight.w700),
+                    title: Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            item.profile.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                        if (item.blockedByMe) ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            key: Key('conversation_blocked_${item.id}'),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 7,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF0F0F0),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Text(
+                              'Bloqué',
+                              style: TextStyle(
+                                color: AppColors.darkText,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                     subtitle: Text(
                       item.preview,

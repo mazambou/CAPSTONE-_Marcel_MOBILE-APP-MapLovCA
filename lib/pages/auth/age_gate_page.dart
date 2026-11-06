@@ -324,7 +324,7 @@ class _BirthDatePickerDialogState extends State<_BirthDatePickerDialog> {
               children: [
                 IconButton(
                   key: const Key('previous_birth_year'),
-                  tooltip: 'Previous year',
+                  tooltip: context.tr('Previous year'),
                   onPressed: selected.year > widget.firstDate.year
                       ? () => _changeYear(-1)
                       : null,
@@ -345,7 +345,7 @@ class _BirthDatePickerDialogState extends State<_BirthDatePickerDialog> {
                 ),
                 IconButton(
                   key: const Key('next_birth_year'),
-                  tooltip: 'Next year',
+                  tooltip: context.tr('Next year'),
                   onPressed: selected.year < widget.lastDate.year
                       ? () => _changeYear(1)
                       : null,

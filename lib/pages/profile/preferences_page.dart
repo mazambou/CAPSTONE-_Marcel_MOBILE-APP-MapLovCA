@@ -471,7 +471,9 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
                   DropdownButtonFormField<String>(
                     initialValue: country,
                     isExpanded: true,
-                    decoration: const InputDecoration(labelText: 'Country'),
+                    decoration: InputDecoration(
+                      labelText: context.tr('Country'),
+                    ),
                     items: _worldCountries
                         .where((value) => value != residenceCountry)
                         .map(
@@ -508,7 +510,7 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
                     initialValue: regions.contains(region) ? region : null,
                     isExpanded: true,
                     decoration: InputDecoration(
-                      labelText: 'Region (optional)',
+                      labelText: context.tr('Region (optional)'),
                       suffixIcon: loadingRegions
                           ? const CircularProgressIndicator(strokeWidth: 2)
                           : null,
@@ -555,7 +557,7 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
                     initialValue: cities.contains(city) ? city : null,
                     isExpanded: true,
                     decoration: InputDecoration(
-                      labelText: 'City (optional)',
+                      labelText: context.tr('City (optional)'),
                       suffixIcon: loadingCities
                           ? const CircularProgressIndicator(strokeWidth: 2)
                           : null,
@@ -703,7 +705,7 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
               ),
               onTap: () => unawaited(_editUpcomingArrival(item)),
               trailing: IconButton(
-                tooltip: 'Delete',
+                tooltip: context.tr('Delete'),
                 icon: const Icon(Icons.delete_outline),
                 onPressed: () => unawaited(_deleteUpcomingArrival(item)),
               ),

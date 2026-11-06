@@ -32,7 +32,7 @@ class _HelpCenterScreenState extends State<HelpCenterScreen> {
                   key: const Key('support_subject'),
                   controller: subject,
                   maxLength: 160,
-                  decoration: const InputDecoration(labelText: 'Subject'),
+                  decoration: InputDecoration(labelText: context.tr('Subject')),
                 ),
                 TextField(
                   key: const Key('support_description'),
@@ -40,7 +40,9 @@ class _HelpCenterScreenState extends State<HelpCenterScreen> {
                   minLines: 4,
                   maxLines: 8,
                   maxLength: 5000,
-                  decoration: const InputDecoration(labelText: 'Description'),
+                  decoration: InputDecoration(
+                    labelText: context.tr('Description'),
+                  ),
                 ),
               ],
             ),

@@ -104,7 +104,7 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen> {
                               trailing: Wrap(
                                 children: [
                                   IconButton(
-                                    tooltip: 'Accept request',
+                                    tooltip: context.tr('Accept request'),
                                     onPressed: () => _respond(item, true),
                                     icon: const Icon(
                                       Icons.check,
@@ -112,7 +112,7 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen> {
                                     ),
                                   ),
                                   IconButton(
-                                    tooltip: 'Decline request',
+                                    tooltip: context.tr('Decline request'),
                                     onPressed: () => _respond(item, false),
                                     icon: const Icon(Icons.close),
                                   ),

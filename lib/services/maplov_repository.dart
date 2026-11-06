@@ -474,12 +474,14 @@ class ConversationItem {
     required this.preview,
     required this.updatedAt,
     this.unread = 0,
+    this.blockedByMe = false,
   });
   final String id;
   final UserProfile profile;
   final String preview;
   final DateTime updatedAt;
   final int unread;
+  final bool blockedByMe;
 }
 
 class MapLovMessage {
@@ -1585,7 +1587,7 @@ class MapLovRepository {
           path,
           bytes,
           fileOptions: FileOptions(
-            upsert: false,
+            upsert: true,
             contentType: _faceImageContentType(extension),
           ),
         );
@@ -2186,6 +2188,7 @@ class MapLovRepository {
               profile: p,
               preview: 'Start a conversation',
               updatedAt: DateTime.now(),
+              blockedByMe: _demoBlockedIds.contains(p.id),
             ),
           )
           .toList();
@@ -2195,6 +2198,13 @@ class MapLovRepository {
         .select('conversation_id')
         .eq('user_id', currentUserId!)
         .isFilter('left_at', null);
+    final blockedRows = await _client!
+        .from('blocks')
+        .select('blocked_id')
+        .eq('blocker_id', currentUserId!);
+    final blockedIds = blockedRows
+        .map((row) => row['blocked_id'] as String)
+        .toSet();
     final hiddenMessageRows = await _client!
         .from('message_deletions')
         .select('message_id')
@@ -2273,6 +2283,7 @@ class MapLovRepository {
               ? DateTime.now()
               : DateTime.parse(latest.first['created_at'] as String),
           unread: unreadRows.length,
+          blockedByMe: blockedIds.contains(profile.id),
         ),
       );
     }
@@ -2562,7 +2573,33 @@ class MapLovRepository {
         .uploadBinary(
           path,
           bytes,
-          fileOptions: const FileOptions(upsert: true),
+          fileOptions: FileOptions(
+            upsert: false,
+            contentType: switch (extension.toLowerCase()) {
+              'jpg' || 'jpeg' => 'image/jpeg',
+              'png' => 'image/png',
+              'webp' => 'image/webp',
+              'm4a' => 'audio/mp4',
+              'aac' => 'audio/aac',
+              'mp3' => 'audio/mpeg',
+              'ogg' => 'audio/ogg',
+              'pdf' => 'application/pdf',
+              'doc' => 'application/msword',
+              'docx' =>
+                'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+              'txt' => 'text/plain',
+              'rtf' => 'application/rtf',
+              'csv' => 'text/csv',
+              'xls' => 'application/vnd.ms-excel',
+              'xlsx' =>
+                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+              'ppt' => 'application/vnd.ms-powerpoint',
+              'pptx' =>
+                'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+              'zip' => 'application/zip',
+              _ => 'application/octet-stream',
+            },
+          ),
         );
     try {
       await _client!.from('messages').insert({
@@ -3521,21 +3558,71 @@ class MapLovRepository {
     bool pendingOnly = false,
   }) async {
     if (!isLive) return [];
-    if (pendingOnly) {
-      return List<Map<String, dynamic>>.from(
-        await _client!
-            .from('reports')
-            .select()
-            .inFilter('status', ['open', 'under_review'])
-            .order('created_at', ascending: false),
+    final rows = List<Map<String, dynamic>>.from(
+      pendingOnly
+          ? await _client!
+                .from('reports')
+                .select()
+                .inFilter('status', ['open', 'under_review'])
+                .order('created_at', ascending: false)
+          : await _client!
+                .from('reports')
+                .select()
+                .order('created_at', ascending: false),
+    );
+    if (rows.isEmpty) return rows;
+
+    final evidenceRows = await _client!
+        .from('report_conversation_evidence')
+        .select('report_id, reporter_id, reported_user_id, participant_names')
+        .inFilter('report_id', rows.map((row) => row['id'] as String).toList());
+    final evidenceByReport = {
+      for (final row in evidenceRows) row['report_id'] as String: row,
+    };
+    final userIds = <String>{};
+    for (final report in rows) {
+      final evidence = evidenceByReport[report['id']];
+      for (final id in [
+        evidence?['reporter_id'] ?? report['reporter_id'],
+        evidence?['reported_user_id'],
+        if (report['target_type'] == 'user') report['target_id'],
+      ]) {
+        if (id is String) userIds.add(id);
+      }
+    }
+    final liveNames = <String, String>{};
+    if (userIds.isNotEmpty) {
+      final profiles = await _client!
+          .from('profiles')
+          .select('id, first_name')
+          .inFilter('id', userIds.toList());
+      for (final profile in profiles) {
+        final name = (profile['first_name'] as String?)?.trim();
+        if (name != null && name.isNotEmpty) {
+          liveNames[profile['id'] as String] = name;
+        }
+      }
+    }
+    for (final report in rows) {
+      final evidence = evidenceByReport[report['id']];
+      final savedNames = evidence?['participant_names'] as Map? ?? const {};
+      String? nameFor(Object? id) {
+        if (id is! String) return null;
+        final savedName = savedNames[id];
+        return savedName is String && savedName.trim().isNotEmpty
+            ? savedName.trim()
+            : liveNames[id];
+      }
+
+      report['reporter_name'] = nameFor(
+        evidence?['reporter_id'] ?? report['reporter_id'],
+      );
+      report['reported_user_name'] = nameFor(
+        evidence?['reported_user_id'] ??
+            (report['target_type'] == 'user' ? report['target_id'] : null),
       );
     }
-    return List<Map<String, dynamic>>.from(
-      await _client!
-          .from('reports')
-          .select()
-          .order('created_at', ascending: false),
-    );
+    return rows;
   }
 
   Future<Map<String, dynamic>?> moderationReportEvidence(
@@ -4672,6 +4759,29 @@ class MapLovRepository {
       'ogg' =>
         bytes.length >= 4 &&
             String.fromCharCodes(bytes.sublist(0, 4)) == 'OggS',
+      'pdf' =>
+        bytes.length >= 5 &&
+            String.fromCharCodes(bytes.sublist(0, 5)) == '%PDF-',
+      'doc' || 'xls' || 'ppt' =>
+        bytes.length >= 8 &&
+            bytes[0] == 0xd0 &&
+            bytes[1] == 0xcf &&
+            bytes[2] == 0x11 &&
+            bytes[3] == 0xe0 &&
+            bytes[4] == 0xa1 &&
+            bytes[5] == 0xb1 &&
+            bytes[6] == 0x1a &&
+            bytes[7] == 0xe1,
+      'docx' || 'xlsx' || 'pptx' || 'zip' =>
+        bytes.length >= 4 &&
+            bytes[0] == 0x50 &&
+            bytes[1] == 0x4b &&
+            ((bytes[2] == 0x03 && bytes[3] == 0x04) ||
+                (bytes[2] == 0x05 && bytes[3] == 0x06)),
+      'rtf' =>
+        bytes.length >= 5 &&
+            String.fromCharCodes(bytes.sublist(0, 5)) == '{\\rtf',
+      'txt' || 'csv' => bytes.every((byte) => byte != 0),
       _ => false,
     };
     if (!signatureMatches) {

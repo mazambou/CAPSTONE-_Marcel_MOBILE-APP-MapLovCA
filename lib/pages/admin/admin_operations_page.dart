@@ -472,14 +472,18 @@ class _AdminPromotionsScreenState extends State<AdminPromotionsScreen> {
                 children: [
                   TextField(
                     controller: name,
-                    decoration: const InputDecoration(
-                      labelText: 'Nom (Black Friday, Saint-Valentin…)',
+                    decoration: InputDecoration(
+                      labelText: context.tr(
+                        'Name (Black Friday, Valentine’s Day…)',
+                      ),
                     ),
                   ),
                   const SizedBox(height: 12),
                   DropdownButtonFormField<String>(
                     initialValue: productId,
-                    decoration: const InputDecoration(labelText: 'Produit'),
+                    decoration: InputDecoration(
+                      labelText: context.tr('Product'),
+                    ),
                     items: ExternalPaymentProduct.values
                         .map(
                           (product) => DropdownMenuItem(
@@ -496,8 +500,8 @@ class _AdminPromotionsScreenState extends State<AdminPromotionsScreen> {
                     keyboardType: const TextInputType.numberWithOptions(
                       decimal: true,
                     ),
-                    decoration: const InputDecoration(
-                      labelText: 'Prix normal CAD',
+                    decoration: InputDecoration(
+                      labelText: context.tr('Regular price CAD'),
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -506,15 +510,15 @@ class _AdminPromotionsScreenState extends State<AdminPromotionsScreen> {
                     keyboardType: const TextInputType.numberWithOptions(
                       decimal: true,
                     ),
-                    decoration: const InputDecoration(
-                      labelText: 'Prix promotionnel CAD',
+                    decoration: InputDecoration(
+                      labelText: context.tr('Promotional price CAD'),
                     ),
                   ),
                   const SizedBox(height: 12),
                   TextField(
                     controller: stripePrice,
-                    decoration: const InputDecoration(
-                      labelText: 'Stripe Price ID promotionnel',
+                    decoration: InputDecoration(
+                      labelText: context.tr('Promotional Stripe Price ID'),
                       hintText: 'price_...',
                     ),
                   ),
@@ -607,7 +611,7 @@ class _AdminPromotionsScreenState extends State<AdminPromotionsScreen> {
     title: 'Promotions',
     actions: [
       IconButton(
-        tooltip: 'Nouvelle promotion',
+        tooltip: context.tr('New promotion'),
         onPressed: _edit,
         icon: const Icon(Icons.add),
       ),
@@ -644,7 +648,7 @@ class _AdminPromotionsScreenState extends State<AdminPromotionsScreen> {
               ),
               isThreeLine: true,
               trailing: IconButton(
-                tooltip: 'Modifier',
+                tooltip: context.tr('Edit'),
                 icon: const Icon(Icons.edit_outlined),
                 onPressed: () => _edit(item),
               ),
@@ -756,13 +760,13 @@ class _AdminGlobalNotificationsScreenState
       TextField(
         controller: _title,
         maxLength: 100,
-        decoration: const InputDecoration(labelText: 'Title'),
+        decoration: InputDecoration(labelText: context.tr('Title')),
       ),
       TextField(
         controller: _body,
         maxLength: 1000,
         maxLines: 6,
-        decoration: const InputDecoration(labelText: 'Message'),
+        decoration: InputDecoration(labelText: context.tr('Message')),
       ),
       FilledButton.icon(
         onPressed: _sending ? null : _send,

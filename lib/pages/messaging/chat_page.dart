@@ -132,14 +132,16 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  Future<void> _toggleBlock() async {
+  Future<bool> _toggleBlock() async {
     final current = await MapLovRepository.instance.chatBlockState(profile.id);
-    if (current == 'outgoing' || current == 'mutual') {
+    final wasBlockedByMe = current == 'outgoing' || current == 'mutual';
+    if (wasBlockedByMe) {
       await MapLovRepository.instance.unblockUser(profile.id);
     } else {
       await MapLovRepository.instance.blockUser(profile.id);
     }
     await _refreshBlockState();
+    return !wasBlockedByMe;
   }
 
   Future<void> _openChatMenu() async {
@@ -171,7 +173,22 @@ class _ChatScreenState extends State<ChatScreen> {
     if (!mounted) return;
     if (selection == 'block') {
       try {
-        await _toggleBlock();
+        final blocked = await _toggleBlock();
+        if (blocked && mounted) {
+          await showDialog<void>(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text('Utilisateur bloqué'),
+              content: Text('Vous avez bloqué ${profile.name}.'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('OK'),
+                ),
+              ],
+            ),
+          );
+        }
       } catch (error) {
         _showChatNotice(
           'Impossible de modifier le blocage : ' + error.toString(),
@@ -514,14 +531,9 @@ class _ChatScreenState extends State<ChatScreen> {
               alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
               child: Container(
                 margin: const EdgeInsets.symmetric(vertical: 6),
-                padding: const EdgeInsets.all(5),
+                padding: EdgeInsets.zero,
                 decoration: BoxDecoration(
-                  color: mine ? null : const Color(0xFFF5F5F5),
-                  gradient: mine
-                      ? const LinearGradient(
-                          colors: [Color(0xFFFF5A5F), Color(0xFFFF85A2)],
-                        )
-                      : null,
+                  color: Colors.white,
                   borderRadius: BorderRadius.circular(20),
                   boxShadow: const [
                     BoxShadow(
@@ -576,12 +588,7 @@ class _ChatScreenState extends State<ChatScreen> {
           margin: const EdgeInsets.symmetric(vertical: 6),
           padding: const EdgeInsets.fromLTRB(8, 7, 12, 7),
           decoration: BoxDecoration(
-            color: mine ? null : const Color(0xFFF5F5F5),
-            gradient: mine
-                ? const LinearGradient(
-                    colors: [Color(0xFFFF5A5F), Color(0xFFFF85A2)],
-                  )
-                : null,
+            color: const Color(0xFFF5F5F5),
             borderRadius: BorderRadius.circular(22),
             boxShadow: const [
               BoxShadow(color: Color(0x12000000), blurRadius: 10),
@@ -623,21 +630,16 @@ class _ChatScreenState extends State<ChatScreen> {
             maxWidth: MediaQuery.sizeOf(context).width * .76,
           ),
           decoration: BoxDecoration(
-            color: mine ? null : const Color(0xFFF5F5F5),
-            gradient: mine
-                ? const LinearGradient(
-                    colors: [Color(0xFFFF5A5F), Color(0xFFFF85A2)],
-                  )
-                : null,
+            color: const Color(0xFFF5F5F5),
             borderRadius: BorderRadius.circular(20),
-            border: mine ? null : Border.all(color: const Color(0xFFE7E7EC)),
+            border: Border.all(color: const Color(0xFFE7E7EC)),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(
                 Icons.description_outlined,
-                color: mine ? Colors.white : AppColors.coral,
+                color: AppColors.grayText,
                 size: 30,
               ),
               const SizedBox(width: 10),
@@ -650,7 +652,7 @@ class _ChatScreenState extends State<ChatScreen> {
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        color: mine ? Colors.white : AppColors.darkText,
+                        color: AppColors.darkText,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
@@ -749,7 +751,8 @@ class _ChatScreenState extends State<ChatScreen> {
     try {
       await action();
       return true;
-    } catch (_) {
+    } catch (error) {
+      debugPrint('MapLov chat $label send failed: $error');
       String? blockedMessage;
       try {
         final state = await MapLovRepository.instance.chatBlockState(
@@ -760,7 +763,11 @@ class _ChatScreenState extends State<ChatScreen> {
       } catch (_) {}
       if (mounted) {
         setState(() {
-          _sendError = blockedMessage ?? '$label could not be sent.';
+          _sendError =
+              blockedMessage ??
+              (error is ArgumentError
+                  ? '$label could not be sent: ${error.message}'
+                  : '$label could not be sent.');
           _retrySend = blockedMessage == null
               ? () async {
                   await _sendWithStatus(action, label);
@@ -995,6 +1002,29 @@ class _ChatScreenState extends State<ChatScreen> {
                             size: 20,
                           ),
                         ],
+                        if (_blockState == 'outgoing' ||
+                            _blockState == 'mutual') ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            key: const Key('chat_blocked_badge'),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 7,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF0F0F0),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Text(
+                              'Bloqué',
+                              style: TextStyle(
+                                color: AppColors.darkText,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                     Row(
@@ -1047,21 +1077,21 @@ class _ChatScreenState extends State<ChatScreen> {
       ),
       actions: [
         IconButton(
-          tooltip: 'Voice call',
+          tooltip: context.tr('Voice call'),
           onPressed: () => _showCallsUnavailable('Voice'),
           constraints: const BoxConstraints.tightFor(width: 40, height: 40),
           padding: EdgeInsets.zero,
           icon: const Icon(Icons.phone_outlined),
         ),
         IconButton(
-          tooltip: 'Video call',
+          tooltip: context.tr('Video call'),
           onPressed: () => _showCallsUnavailable('Video'),
           constraints: const BoxConstraints.tightFor(width: 40, height: 40),
           padding: EdgeInsets.zero,
           icon: const Icon(Icons.videocam_outlined),
         ),
         IconButton(
-          tooltip: 'Options de conversation',
+          tooltip: context.tr('Conversation options'),
           onPressed: _openChatMenu,
           icon: const Icon(Icons.more_vert),
         ),
@@ -1146,7 +1176,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 overflow: TextOverflow.ellipsis,
               ),
               trailing: IconButton(
-                tooltip: 'Annuler la réponse',
+                tooltip: context.tr('Cancel reply'),
                 onPressed: () => setState(() => _replyingTo = null),
                 icon: const Icon(Icons.close),
               ),
@@ -1170,7 +1200,7 @@ class _ChatScreenState extends State<ChatScreen> {
               children: [
                 IconButton(
                   key: const Key('chat_emoji_action'),
-                  tooltip: 'Emoji',
+                  tooltip: context.tr('Emoji'),
                   constraints: const BoxConstraints.tightFor(
                     width: 40,
                     height: 44,
@@ -1206,7 +1236,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   ),
                 ),
                 IconButton(
-                  tooltip: 'Choose a photo',
+                  tooltip: context.tr('Choose a photo'),
                   constraints: const BoxConstraints.tightFor(
                     width: 40,
                     height: 44,
@@ -1216,7 +1246,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   icon: const Icon(Icons.attach_file),
                 ),
                 IconButton(
-                  tooltip: 'Take a photo',
+                  tooltip: context.tr('Take a photo'),
                   constraints: const BoxConstraints.tightFor(
                     width: 40,
                     height: 44,
@@ -1231,7 +1261,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   padding: EdgeInsets.zero,
                   child: IconButton(
                     key: const Key('chat_voice_action'),
-                    tooltip: 'Voice message',
+                    tooltip: context.tr('Voice message'),
                     constraints: const BoxConstraints.tightFor(
                       width: 40,
                       height: 44,
@@ -1246,7 +1276,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 ),
                 IconButton(
                   key: const Key('chat_primary_action'),
-                  tooltip: 'Send message',
+                  tooltip: context.tr('Send message'),
                   constraints: const BoxConstraints.tightFor(
                     width: 40,
                     height: 44,
@@ -1604,7 +1634,7 @@ class _EmojiPanelState extends State<_EmojiPanel> {
                     ),
                   ),
                 IconButton(
-                  tooltip: 'Close emojis',
+                  tooltip: context.tr('Close emojis'),
                   onPressed: widget.onClose,
                   icon: const Icon(Icons.keyboard_alt_outlined),
                 ),

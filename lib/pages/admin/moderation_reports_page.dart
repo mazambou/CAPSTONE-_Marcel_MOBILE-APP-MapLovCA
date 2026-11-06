@@ -174,6 +174,23 @@ class _ModerationReportsScreenState extends State<ModerationReportsScreen> {
     final attachments = List<Map<String, dynamic>>.from(
       evidence?['attachments'] as List? ?? const [],
     );
+    final participantNames = evidence?['participant_names'] as Map? ?? const {};
+    final reporterId = evidence?['reporter_id']?.toString();
+    final reportedUserId = evidence?['reported_user_id']?.toString();
+    String authorLabel(Map<String, dynamic> message) {
+      final senderId = message['sender_id']?.toString();
+      final savedName = participantNames[senderId];
+      final name = savedName is String && savedName.trim().isNotEmpty
+          ? savedName.trim()
+          : context.tr('Missing name');
+      final role = senderId == reporterId
+          ? context.tr('Reporting member').toLowerCase()
+          : senderId == reportedUserId
+          ? context.tr('Reported person').toLowerCase()
+          : null;
+      return role == null ? name : '$name ($role)';
+    }
+
     await showDialog<void>(
       context: context,
       builder: (context) => AlertDialog(
@@ -185,11 +202,15 @@ class _ModerationReportsScreenState extends State<ModerationReportsScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text('Reason: ' + report['reason'].toString()),
+                Text(
+                  '${context.tr('Reason')} : ${context.tr(report['reason'].toString())}',
+                ),
                 if (report['comment'] != null)
-                  Text('Details: ' + report['comment'].toString()),
+                  Text('${context.tr('Details')} : ${report['comment']}'),
                 const SizedBox(height: 12),
-                Text('Captured: ' + _adminDateTime(evidence?['captured_at'])),
+                Text(
+                  '${context.tr('Captured')} : ${_adminDateTime(evidence?['captured_at'])}',
+                ),
                 if (evidence?['media_finalized_at'] == null)
                   const Text(
                     'Attachment copying is incomplete. Review available text and retry evidence finalization.',
@@ -210,14 +231,11 @@ class _ModerationReportsScreenState extends State<ModerationReportsScreen> {
                           : '[' + message['kind'].toString() + ']',
                     ),
                     subtitle: Text(
-                      'Author: ' +
-                          message['sender_id'].toString() +
-                          ' • ' +
+                      '${context.tr('Author')} : ${authorLabel(message)} • ' +
                           _adminDateTime(message['created_at']) +
                           (message['reply_to_id'] == null
                               ? ''
-                              : ' • Reply to: ' +
-                                    message['reply_to_id'].toString()),
+                              : ' • ${context.tr('Reply to a message')}'),
                     ),
                   ),
                   for (final attachment in attachments.where(
@@ -499,7 +517,15 @@ class _ModerationReportsScreenState extends State<ModerationReportsScreen> {
                                   ),
                                 ),
                               ),
-                              Chip(label: Text(report['status'] as String)),
+                              Chip(
+                                label: Text(switch (report['status']) {
+                                  'under_review' => 'Under review',
+                                  'open' => 'Open',
+                                  'resolved' => 'Resolved',
+                                  'dismissed' => 'Dismissed',
+                                  _ => report['status'].toString(),
+                                }),
+                              ),
                             ],
                           ),
                           SizedBox(
@@ -577,11 +603,17 @@ class _ModerationReportsScreenState extends State<ModerationReportsScreen> {
                               ],
                             ),
                           Text(
-                            'Target: ${report['target_type']} • ${report['target_id']}',
+                            report['target_type'] == 'user'
+                                ? '${context.tr('Reported account')} : ${report['reported_user_name'] ?? context.tr('Missing name')}'
+                                : report['target_type'] == 'message'
+                                ? '${context.tr('Message from')} : ${report['reported_user_name'] ?? context.tr('Missing name')}'
+                                : '${context.tr('Reported content')} : ${report['target_type']}',
                           ),
-                          Text('Reporter: ${report['reporter_id']}'),
                           Text(
-                            'Submitted: ${_adminDateTime(report['created_at'])}',
+                            '${context.tr('Reporting member')} : ${report['reporter_name'] ?? context.tr('Missing name')}',
+                          ),
+                          Text(
+                            '${context.tr('Submitted')} : ${_adminDateTime(report['created_at'])}',
                           ),
                           if (report['comment'] != null)
                             Text(report['comment'] as String),

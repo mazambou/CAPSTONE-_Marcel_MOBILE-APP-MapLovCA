@@ -273,7 +273,7 @@ class _PremiumHeader extends StatelessWidget {
           left: 0,
           top: 0,
           child: IconButton(
-            tooltip: 'Back',
+            tooltip: context.tr('Back'),
             onPressed: close,
             icon: const Icon(Icons.arrow_back_ios_new_rounded),
           ),
@@ -282,7 +282,7 @@ class _PremiumHeader extends StatelessWidget {
           right: 0,
           top: 0,
           child: IconButton(
-            tooltip: 'Close',
+            tooltip: context.tr('Close'),
             onPressed: close,
             icon: const Icon(Icons.close_rounded, size: 30),
           ),

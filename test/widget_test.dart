@@ -382,7 +382,7 @@ void main() {
     );
   });
 
-  testWidgets('password recovery accepts the emailed six-digit code', (
+  testWidgets('password recovery accepts the emailed eight-digit code', (
     tester,
   ) async {
     await tester.pumpWidget(
@@ -400,10 +400,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('password_recovery_code')), findsOneWidget);
-    expect(find.textContaining('enter the 6-digit code'), findsOneWidget);
+    expect(find.textContaining('enter the 8-digit code'), findsOneWidget);
     await tester.enterText(
       find.byKey(const Key('password_recovery_code')),
-      '123456',
+      '12345678',
     );
     await tester.tap(find.text('Verify recovery code'));
     await tester.pumpAndSettle();
@@ -425,7 +425,7 @@ void main() {
     expect(find.byKey(const Key('email_verification_code')), findsOneWidget);
     expect(
       find.text(
-        'We sent a verification code to jamie@example.com. Enter it below to continue creating your profile.',
+        'Enter the verification code sent to jamie@example.com. If it has expired, request a new code below.',
       ),
       findsOneWidget,
     );
@@ -807,19 +807,18 @@ void main() {
           const Key('popular_photo_00000000-0000-4000-8000-000000000002-0'),
         ),
       );
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 350));
+      await tester.pumpAndSettle();
 
       expect(find.byType(PhotoViewerScreen), findsNWidgets(2));
       expect(find.text('Alex, 30'), findsWidgets);
       expect(find.byKey(const Key('social_photo_comment')), findsOneWidget);
 
       await tester.tap(find.byIcon(Icons.chevron_right));
-      await tester.pump();
+      await tester.pumpAndSettle();
       expect(find.text('Taylor, 29'), findsWidgets);
 
       await tester.tap(find.byIcon(Icons.chevron_right));
-      await tester.pump();
+      await tester.pumpAndSettle();
       expect(find.text('Sophie, 27'), findsWidgets);
       expect(find.byIcon(Icons.info_outline), findsOneWidget);
     },
@@ -1738,6 +1737,7 @@ void main() {
           ),
         ),
       );
+      await tester.pumpAndSettle();
 
       expect(find.byKey(const Key('social_photo_like')), findsOneWidget);
       expect(find.byKey(const Key('social_photo_comment')), findsOneWidget);
@@ -1793,7 +1793,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Reference chat test'), findsOneWidget);
-    await tester.tap(find.text('Reference chat test'));
+    await tester.longPress(find.text('Reference chat test'));
+    await tester.pumpAndSettle();
+    expect(find.text('Delete this message'), findsOneWidget);
+    await tester.tap(find.text('Delete this message'));
     await tester.pumpAndSettle();
     expect(find.text('Delete message?'), findsOneWidget);
     await tester.tap(find.widgetWithText(TextButton, 'Delete for me'));
@@ -1854,6 +1857,86 @@ void main() {
 
     expect(find.byType(PublicProfileScreen), findsOneWidget);
     expect(find.text('Avery, 31'), findsWidgets);
+  });
+
+  testWidgets('chat confirms a block and labels the blocked contact', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    const profile = UserProfile(
+      id: 'chat-block-confirmation-test',
+      name: 'Alexandria',
+      age: 31,
+      city: 'Ottawa',
+      compatibilityScore: 87,
+      imagePath: 'assets/avatars/story_02.png',
+      photoDisplayStyle: PhotoDisplayStyle.profileDetails,
+      showsOriginOnProfile: false,
+    );
+    await tester.pumpWidget(
+      const MaterialApp(
+        locale: Locale('fr'),
+        supportedLocales: [Locale('en'), Locale('fr')],
+        localizationsDelegates: [
+          MapLovLocalizations.delegate,
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        home: ChatScreen(profile: profile),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('chat_blocked_badge')), findsNothing);
+
+    await tester.tap(find.byTooltip('Options de conversation'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Bloquer cet utilisateur'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Utilisateur bloqué'), findsOneWidget);
+    expect(find.text('Vous avez bloqué Alexandria.'), findsOneWidget);
+    expect(find.byKey(const Key('chat_blocked_badge')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    await tester.tap(find.text('OK'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Options de conversation'));
+    await tester.pumpAndSettle();
+    expect(find.text('Débloquer cet utilisateur'), findsOneWidget);
+    await tester.tap(find.text('Débloquer cet utilisateur'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('chat_blocked_badge')), findsNothing);
+  });
+
+  testWidgets('messages list updates the blocked label after leaving chat', (
+    tester,
+  ) async {
+    final repository = MapLovRepository.instance;
+    final item = (await repository.conversations()).first;
+    await repository.blockUser(item.profile.id);
+    addTearDown(() => repository.unblockUser(item.profile.id));
+
+    await tester.pumpWidget(const MaterialApp(home: MessagesScreen()));
+    await tester.pumpAndSettle();
+    final blockedBadge = Key('conversation_blocked_${item.id}');
+    expect(find.byKey(blockedBadge), findsOneWidget);
+
+    await tester.tap(find.text(item.profile.name));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Conversation options'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Unblock this user'));
+    await tester.pumpAndSettle();
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(blockedBadge), findsNothing);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('emoji panel inserts at cursor and send ignores rapid taps', (
@@ -1932,6 +2015,7 @@ void main() {
         ),
       ),
     );
+    await tester.pumpAndSettle();
 
     expect(find.text('About me'), findsOneWidget);
     await tester.tapAt(const Offset(195, 360));
@@ -2067,22 +2151,22 @@ void main() {
       }
       expect(find.text('KING'), findsOneWidget);
       expect(find.text('Invisible navigation in Discover'), findsOneWidget);
-      expect(find.text(r'12,99 $ CAD'), findsOneWidget);
-      expect(find.text(r'19,99 $ CAD'), findsOneWidget);
-      expect(find.text(r'Économisez 55,89 $ (36 %)'), findsOneWidget);
-      expect(find.text(r'Économisez 89,89 $ (37 %)'), findsOneWidget);
-      expect(find.text('🏆 LE PLUS POPULAIRE'), findsOneWidget);
-      expect(find.text('⭐ MEILLEURE OFFRE'), findsOneWidget);
-      expect(find.text(r'Seulement 8,33 $ CAD / mois'), findsOneWidget);
-      expect(find.text(r'Seulement 12,50 $ CAD / mois'), findsOneWidget);
+      expect(find.text(r'CAD $12.99'), findsOneWidget);
+      expect(find.text(r'CAD $19.99'), findsOneWidget);
+      expect(find.text(r'Save $55.89 (36%)'), findsOneWidget);
+      expect(find.text(r'Save $89.89 (37%)'), findsOneWidget);
+      expect(find.text('🏆 MOST POPULAR'), findsOneWidget);
+      expect(find.text('⭐ BEST VALUE'), findsOneWidget);
+      expect(find.text(r'Only CAD $8.33 / month'), findsOneWidget);
+      expect(find.text(r'Only CAD $12.50 / month'), findsOneWidget);
       expect(find.textContaining('Prix affiché par Stripe'), findsNothing);
       expect(find.textContaining('À partir de'), findsNothing);
-      expect(find.text(r'2,99 $ CAD'), findsNWidgets(3));
-      expect(find.text(r'4,99 $ CAD'), findsNWidgets(2));
-      expect(find.text(r'6,99 $ CAD'), findsNWidgets(2));
-      expect(find.text(r'7,99 $ CAD'), findsOneWidget);
-      expect(find.text(r'9,99 $ CAD'), findsOneWidget);
-      expect(find.text(r'11,99 $ CAD'), findsOneWidget);
+      expect(find.text(r'CAD $2.99'), findsNWidgets(3));
+      expect(find.text(r'CAD $4.99'), findsNWidgets(2));
+      expect(find.text(r'CAD $6.99'), findsNWidgets(2));
+      expect(find.text(r'CAD $7.99'), findsOneWidget);
+      expect(find.text(r'CAD $9.99'), findsOneWidget);
+      expect(find.text(r'CAD $11.99'), findsOneWidget);
       expect(find.text(r'Pack de 30 • 0,40 $ par Super Like.'), findsOneWidget);
       expect(find.text('0 Super Likes disponibles'), findsOneWidget);
       expect(find.text('Aucun Boost actif'), findsOneWidget);
@@ -2090,17 +2174,17 @@ void main() {
         find.byKey(const Key('store_product_maplov_plus_monthly')),
       );
       await tester.pumpAndSettle();
-      expect(find.text('MapLov Plus mensuel'), findsWidgets);
-      expect(find.text('Ce que vous obtenez'), findsOneWidget);
+      expect(find.text('MapLov Plus monthly'), findsWidgets);
+      expect(find.text('What you get'), findsOneWidget);
       expect(
-        find.text('Voir qui a aimé et consulté votre profil'),
+        find.text('See who liked and viewed your profile'),
         findsOneWidget,
       );
       expect(
-        find.text('Filtres avancés et recherche Country par région et ville'),
+        find.text('Advanced filters and Country search by region and city'),
         findsOneWidget,
       );
-      expect(find.text('S’abonner'), findsOneWidget);
+      expect(find.text('Subscribe'), findsOneWidget);
       expect(tester.takeException(), isNull);
     },
   );
@@ -2448,19 +2532,30 @@ void main() {
     await tester.pumpWidget(const MaterialApp(home: HomeScreen()));
     await tester.pumpAndSettle();
 
-    final online = tester.widget<app.Text>(
+    final online = tester.widget<Container>(
       find.byKey(
         const Key('profile_status_00000000-0000-4000-8000-000000000001'),
       ),
     );
-    final offline = tester.widget<app.Text>(
+    final offline = tester.widget<Container>(
       find.byKey(
         const Key('profile_status_00000000-0000-4000-8000-000000000002'),
       ),
     );
 
-    expect(online.style?.color, const Color(0xFF37E19A));
-    expect(offline.style?.color, const Color(0xFF9E9E9E));
+    expect(online.decoration, isA<BoxDecoration>());
+    expect((online.decoration! as BoxDecoration).shape, BoxShape.circle);
+    expect(
+      (online.decoration! as BoxDecoration).color,
+      const Color(0xFF37E19A),
+    );
+    expect(
+      (offline.decoration! as BoxDecoration).color,
+      const Color(0xFF9E9E9E),
+    );
+    expect(find.text('● Online'), findsNothing);
+    expect(find.text('● Offline'), findsNothing);
+    expect(find.text('Hors ligne'), findsNothing);
   });
 
   testWidgets('incoming like must be opened before liking back', (
@@ -2880,6 +2975,71 @@ void main() {
       translations.translate('Unknown dynamic content'),
       'Unknown dynamic content',
     );
+  });
+
+  test('recent chat and reporting labels respect both languages', () {
+    const english = MapLovLocalizations(Locale('en'));
+    const french = MapLovLocalizations(Locale('fr'));
+    expect(english.translate('Bloqué'), 'Blocked');
+    expect(french.translate('Blocked'), 'Bloqué');
+    expect(english.translate('Harcèlement'), 'Harassment');
+    expect(french.translate('Harassment'), 'Harcèlement');
+    expect(
+      english.translate('Vous avez bloqué Marcel.'),
+      'You blocked Marcel.',
+    );
+    expect(
+      french.translate('Conversation evidence'),
+      'Preuves de conversation',
+    );
+    expect(english.translate('Nom indisponible'), 'Missing name');
+    expect(english.translate(r'99,99 $ CAD / an'), r'CAD $99.99 / year');
+    expect(
+      english.translate(r'Économisez 55,89 $ (36 %)'),
+      r'Save $55.89 (36%)',
+    );
+    expect(
+      french.translate('Text, photo, voice and document messages'),
+      'Messages texte, photo, vocaux et documents',
+    );
+  });
+
+  testWidgets('reporting form follows the selected language', (tester) async {
+    const profile = UserProfile(
+      id: 'report-locale-test',
+      name: 'Marcel',
+      age: 30,
+      city: 'Toronto',
+      compatibilityScore: 80,
+      imagePath: 'assets/avatars/story_02.png',
+      photoDisplayStyle: PhotoDisplayStyle.profileDetails,
+    );
+    Future<void> render(Locale locale) => tester.pumpWidget(
+      MaterialApp(
+        locale: locale,
+        supportedLocales: const [Locale('en'), Locale('fr')],
+        localizationsDelegates: const [
+          MapLovLocalizations.delegate,
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        home: const ReportUserScreen(profile: profile),
+      ),
+    );
+
+    await render(const Locale('fr'));
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Pourquoi effectuez-vous ce signalement ?'),
+      findsOneWidget,
+    );
+    expect(find.text('Harcèlement'), findsOneWidget);
+
+    await render(const Locale('en'));
+    await tester.pumpAndSettle();
+    expect(find.text('Why are you reporting this?'), findsOneWidget);
+    expect(find.text('Harassment'), findsOneWidget);
   });
 
   test('saved language wins and device language is the first-run default', () {

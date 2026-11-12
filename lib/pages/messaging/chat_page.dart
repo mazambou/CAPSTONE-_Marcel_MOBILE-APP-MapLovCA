@@ -190,9 +190,7 @@ class _ChatScreenState extends State<ChatScreen> {
           );
         }
       } catch (error) {
-        _showChatNotice(
-          'Impossible de modifier le blocage : ' + error.toString(),
-        );
+        _showChatNotice('Impossible de modifier le blocage : $error');
       }
     } else if (selection == 'report') {
       await Navigator.push(
@@ -283,7 +281,7 @@ class _ChatScreenState extends State<ChatScreen> {
             content: Text(
               error.toString().contains('SHARED_DELETION_BLOCKED')
                   ? _sharedDeletionBlocked
-                  : 'Unable to delete this message: ' + error.toString(),
+                  : 'Unable to delete this message: $error',
             ),
           ),
         );
@@ -502,7 +500,7 @@ class _ChatScreenState extends State<ChatScreen> {
             content: Text(
               error.toString().contains('SHARED_DELETION_BLOCKED')
                   ? _sharedDeletionBlocked
-                  : 'Unable to clear this chat: ' + error.toString(),
+                  : 'Unable to clear this chat: $error',
             ),
           ),
         );
@@ -686,7 +684,7 @@ class _ChatScreenState extends State<ChatScreen> {
           Padding(
             padding: const EdgeInsets.only(top: 4),
             child: Text(
-              '↪ ' + (message.replyPreview ?? 'Message précédent'),
+              '↪ ${message.replyPreview ?? 'Message précédent'}',
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(color: AppColors.grayText, fontSize: 12),
@@ -1171,7 +1169,7 @@ class _ChatScreenState extends State<ChatScreen> {
               dense: true,
               leading: const Icon(Icons.reply, color: AppColors.coral),
               title: Text(
-                _replyingTo!.body ?? '[' + _replyingTo!.kind + ']',
+                _replyingTo!.body ?? '[${_replyingTo!.kind}]',
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),

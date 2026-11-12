@@ -53,13 +53,35 @@ class _ReportUserScreenState extends State<ReportUserScreen> {
       }
     } catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              '${context.tr('Report could not be confirmed')} : $error',
-            ),
-          ),
-        );
+        final message = error is ReportSubmissionException
+            ? switch (error.code) {
+                'report_rate_limited' => context.tr(
+                  'Daily reporting limit reached. For an urgent child safety concern, contact child-safety@maplov.ca.',
+                ),
+                'conversation_unavailable' => context.tr(
+                  'This conversation is no longer available for reporting.',
+                ),
+                'target_unavailable' => context.tr(
+                  'This profile is no longer available for reporting.',
+                ),
+                'report_already_open' => context.tr(
+                  'A report is already under review. Contact child-safety@maplov.ca if you have new information.',
+                ),
+                'evidence_unavailable' ||
+                'attachment_copy_failed' ||
+                'evidence_finalization_failed' => context.tr(
+                  'The report evidence could not be saved. Please try again.',
+                ),
+                _ => context.tr(
+                  'The report could not be saved. Please try again or contact child-safety@maplov.ca for a child safety concern.',
+                ),
+              }
+            : context.tr(
+                'The report could not be saved. Please try again or contact child-safety@maplov.ca for a child safety concern.',
+              );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(message)));
       }
     } finally {
       if (mounted) setState(() => submitting = false);

@@ -46,9 +46,8 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
     }
     final code = _codeController.text.trim();
     final sharedEmailPending = AuthService.instance.isSharedPhoneEmailPending;
-    if (!(sharedEmailPending
-        ? RegExp(r'^\d{8}$')
-        : RegExp(r'^\d{6,8}$')).hasMatch(code)) {
+    if (!(sharedEmailPending ? RegExp(r'^\d{8}$') : RegExp(r'^\d{6,8}$'))
+        .hasMatch(code)) {
       setState(() {
         _message = 'Enter the verification code sent by email.';
         _messageIsError = true;

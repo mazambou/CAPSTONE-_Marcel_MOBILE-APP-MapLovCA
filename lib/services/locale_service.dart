@@ -126,6 +126,18 @@ class MapLovLocalizations {
     'Reported content': 'Contenu signalé',
     'Message from': 'Message de',
     'Report could not be confirmed': 'Signalement non confirmé',
+    'Daily reporting limit reached. For an urgent child safety concern, contact child-safety@maplov.ca.':
+        'Limite quotidienne de signalements atteinte. Pour une préoccupation urgente concernant la sécurité d’un enfant, écrivez à child-safety@maplov.ca.',
+    'This conversation is no longer available for reporting.':
+        'Cette conversation n’est plus disponible pour un signalement.',
+    'This profile is no longer available for reporting.':
+        'Ce profil n’est plus disponible pour un signalement.',
+    'A report is already under review. Contact child-safety@maplov.ca if you have new information.':
+        'Un signalement est déjà en cours d’examen. Écrivez à child-safety@maplov.ca si vous avez de nouveaux renseignements.',
+    'The report evidence could not be saved. Please try again.':
+        'Les preuves du signalement n’ont pas pu être enregistrées. Réessayez.',
+    'The report could not be saved. Please try again or contact child-safety@maplov.ca for a child safety concern.':
+        'Le signalement n’a pas pu être enregistré. Réessayez ou écrivez à child-safety@maplov.ca pour une préoccupation concernant la sécurité d’un enfant.',
     'Captured': 'Capturé le',
     'Reason': 'Motif',
     'Details': 'Précisions',
@@ -143,6 +155,27 @@ class MapLovLocalizations {
     'Dismissed': 'Classé',
     'Warn reported account': 'Avertir le compte signalé',
     'Ban reported account': 'Exclure le compte signalé',
+    'Child safety decision': 'Décision de sécurité des mineurs',
+    'Record a human decision. This form does not send a report to an authority.':
+        'Consignez une décision humaine. Ce formulaire n’envoie aucun signalement à une autorité.',
+    'No external report required': 'Aucun signalement externe requis',
+    'External report already sent': 'Signalement externe déjà envoyé',
+    'Record external report': 'Consigner le signalement externe',
+    'Record review decision': 'Consigner la décision d’examen',
+    'Authority or organization': 'Autorité ou organisme',
+    'Receipt or case reference': 'Reçu ou référence du dossier',
+    'Reason no external report is required':
+        'Motif pour lequel aucun signalement externe n’est requis',
+    'Save decision': 'Enregistrer la décision',
+    'Decision not saved': 'Décision non enregistrée',
+    'Priority child safety report':
+        'Signalement prioritaire : sécurité des mineurs',
+    'Human review decision required before closure.':
+        'Une décision humaine est requise avant la clôture.',
+    'Child safety decision recorded.':
+        'Décision de sécurité des mineurs enregistrée.',
+    'Record child safety decision':
+        'Consigner une décision de sécurité des mineurs',
     'Management': 'Gestion',
     'Discovery, completion and verification status.':
         'Statut de découverte, de complétion et de vérification.',

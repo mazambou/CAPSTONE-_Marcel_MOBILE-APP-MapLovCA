@@ -20,7 +20,7 @@ select ok(
 );
 select col_is_pk(
   'public', 'profile_reporters', array['profile_id', 'reporter_id'],
-  'one account can report a profile only once'
+  'each reporter counts only once toward the moderation threshold'
 );
 select col_type_is(
   'public', 'profile_moderation_cases', 'report_count', 'integer',

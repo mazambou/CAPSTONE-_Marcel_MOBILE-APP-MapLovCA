@@ -7,6 +7,8 @@
 /account-deletion/   /account-deletion/index.html    200
 /child-safety        /child-safety/index.html        200
 /child-safety/       /child-safety/index.html        200
+/terms               /terms/index.html               200
+/terms/              /terms/index.html               200
 
 /auth/callback       /index.html                     200
 # Cloudflare Pages serves index.html for other client-side routes when no

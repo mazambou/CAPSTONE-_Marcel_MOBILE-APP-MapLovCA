@@ -38,10 +38,10 @@ class _SecurityScreenState extends State<SecurityScreen> {
                 await Navigator.push<bool>(
                   context,
                   MaterialPageRoute<bool>(
-                  builder: (_) => VerifyEmailScreen(
-                    email: AuthService.instance.currentEmail,
+                    builder: (_) => VerifyEmailScreen(
+                      email: AuthService.instance.currentEmail,
+                    ),
                   ),
-                ),
                 );
                 if (mounted) setState(() {});
               },

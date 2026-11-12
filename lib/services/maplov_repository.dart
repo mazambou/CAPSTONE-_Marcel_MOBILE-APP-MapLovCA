@@ -32,6 +32,15 @@ class AdminAccountDeletionException implements Exception {
   String toString() => message;
 }
 
+class ReportSubmissionException implements Exception {
+  const ReportSubmissionException(this.code);
+
+  final String code;
+
+  @override
+  String toString() => code;
+}
+
 class DiscoveryFilters {
   const DiscoveryFilters({
     this.minimumAge = 18,
@@ -2513,7 +2522,7 @@ class MapLovRepository {
         'kind': 'text',
         'body': text,
         'client_message_id': requestId,
-        if (replyToId != null) 'reply_to_id': replyToId,
+        'reply_to_id': ?replyToId,
       });
     } on PostgrestException catch (error) {
       if (error.code != '23505') rethrow;
@@ -3336,21 +3345,39 @@ class MapLovRepository {
   }) async {
     if (!isLive) return;
     if (targetType == 'user' || targetType == 'message') {
-      final response = await _client!.functions.invoke(
-        'report-conversation-evidence',
-        body: {
-          'targetType': targetType,
-          'targetId': targetId,
-          'reason': reason,
-          'comment': comment,
-          'conversationId': conversationId,
-        },
-      );
-      if (response.status != 200 ||
-          response.data is! Map ||
-          response.data['saved'] != true) {
-        throw StateError(
-          'The conversation evidence could not be saved yet. Please retry.',
+      try {
+        final response = await _client!.functions.invoke(
+          'report-conversation-evidence',
+          body: {
+            'targetType': targetType,
+            'targetId': targetId,
+            'reason': reason,
+            'comment': comment,
+            'conversationId': conversationId,
+          },
+        );
+        if (response.status != 200 ||
+            response.data is! Map ||
+            response.data['saved'] != true) {
+          throw const ReportSubmissionException('evidence_unavailable');
+        }
+      } on FunctionException catch (error) {
+        final details = error.details;
+        Map<String, dynamic> body = const {};
+        if (details is Map) {
+          body = Map<String, dynamic>.from(details);
+        } else if (details is String && details.trim().isNotEmpty) {
+          try {
+            final decoded = jsonDecode(details);
+            if (decoded is Map) body = Map<String, dynamic>.from(decoded);
+          } on FormatException {
+            // The gateway can return plain text; use a stable fallback.
+          }
+        }
+        throw ReportSubmissionException(
+          body['error'] is String
+              ? body['error'] as String
+              : 'report_unavailable',
         );
       }
       return;
@@ -3364,8 +3391,7 @@ class MapLovRepository {
             'target_id': targetId,
             'reason': reason,
             'comment': comment,
-            if (conversationId != null)
-              'reported_conversation_id': conversationId,
+            'reported_conversation_id': ?conversationId,
           })
           .select('id')
           .single();
@@ -3572,6 +3598,39 @@ class MapLovRepository {
     );
     if (rows.isEmpty) return rows;
 
+    final safetyActions = await _client!
+        .from('child_safety_case_actions')
+        .select(
+          'report_reference, action, authority, authority_reference, rationale, recorded_at',
+        )
+        .inFilter(
+          'report_reference',
+          rows.map((row) => row['id'] as String).toList(),
+        )
+        .order('recorded_at', ascending: false);
+    final latestSafetyAction = <String, Map<String, dynamic>>{};
+    for (final action in safetyActions) {
+      latestSafetyAction.putIfAbsent(
+        action['report_reference'] as String,
+        () => Map<String, dynamic>.from(action),
+      );
+    }
+    for (final report in rows) {
+      report['child_safety_action'] = latestSafetyAction[report['id']];
+    }
+    rows.sort((a, b) {
+      bool urgent(Map<String, dynamic> row) =>
+          row['status'] == 'open' || row['status'] == 'under_review';
+      bool safety(Map<String, dynamic> row) =>
+          row['reason'] == 'Exploitation sexuelle d’un enfant' ||
+          row['reason'] == 'Mineur présumé' ||
+          row['reason'] == 'Child sexual exploitation' ||
+          row['reason'] == 'Suspected minor';
+      final aPriority = urgent(a) && safety(a) ? 0 : 1;
+      final bPriority = urgent(b) && safety(b) ? 0 : 1;
+      return aPriority.compareTo(bPriority);
+    });
+
     final evidenceRows = await _client!
         .from('report_conversation_evidence')
         .select('report_id, reporter_id, reported_user_id, participant_names')
@@ -3670,6 +3729,26 @@ class MapLovRepository {
       'target_type': 'report',
       'target_id': id,
     });
+  }
+
+  Future<void> recordChildSafetyAction({
+    required String reportId,
+    required String action,
+    String? authority,
+    String? reference,
+    String? rationale,
+  }) async {
+    if (!isLive) return;
+    await _client!.rpc(
+      'record_child_safety_action',
+      params: {
+        'report_id_value': reportId,
+        'action_value': action,
+        'authority_value': authority,
+        'reference_value': reference,
+        'rationale_value': rationale,
+      },
+    );
   }
 
   Future<void> warnReportedUser(String reportId, String notes) async {
@@ -4704,7 +4783,7 @@ class MapLovRepository {
           : (replyRow['body'] as String?) ??
                 (replyRow['deleted_at'] != null
                     ? 'Message supprimé'
-                    : '[' + replyRow['kind'].toString() + ']'),
+                    : '[${replyRow['kind']}]'),
       reactions: reactions,
       read:
           row['sender_id'] == currentUserId &&

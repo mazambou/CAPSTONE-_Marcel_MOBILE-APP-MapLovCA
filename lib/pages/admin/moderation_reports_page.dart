@@ -33,6 +33,119 @@ class _ModerationReportsScreenState extends State<ModerationReportsScreen> {
     setState(() => _reload());
   }
 
+  bool _isChildSafetyReport(Map<String, dynamic> report) =>
+      report['reason'] == 'Mineur présumé' ||
+      report['reason'] == 'Exploitation sexuelle d’un enfant' ||
+      report['reason'] == 'Suspected minor' ||
+      report['reason'] == 'Child sexual exploitation';
+
+  bool _canClose(Map<String, dynamic> report) =>
+      !_isChildSafetyReport(report) || report['child_safety_action'] != null;
+
+  Future<void> _recordChildSafetyAction(Map<String, dynamic> report) async {
+    final action = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(context.tr('Child safety decision')),
+        content: Text(
+          context.tr(
+            'Record a human decision. This form does not send a report to an authority.',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () =>
+                Navigator.pop(dialogContext, 'no_referral_required'),
+            child: Text(context.tr('No external report required')),
+          ),
+          FilledButton(
+            onPressed: () =>
+                Navigator.pop(dialogContext, 'reported_to_authority'),
+            child: Text(context.tr('External report already sent')),
+          ),
+        ],
+      ),
+    );
+    if (action == null || !mounted) return;
+    final authority = TextEditingController();
+    final reference = TextEditingController();
+    final rationale = TextEditingController();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(
+          context.tr(
+            action == 'reported_to_authority'
+                ? 'Record external report'
+                : 'Record review decision',
+          ),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: action == 'reported_to_authority'
+              ? [
+                  TextField(
+                    controller: authority,
+                    decoration: InputDecoration(
+                      labelText: context.tr('Authority or organization'),
+                    ),
+                  ),
+                  TextField(
+                    controller: reference,
+                    decoration: InputDecoration(
+                      labelText: context.tr('Receipt or case reference'),
+                    ),
+                  ),
+                ]
+              : [
+                  TextField(
+                    controller: rationale,
+                    maxLines: 3,
+                    decoration: InputDecoration(
+                      labelText: context.tr(
+                        'Reason no external report is required',
+                      ),
+                    ),
+                  ),
+                ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: Text(context.tr('Cancel')),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: Text(context.tr('Save decision')),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) {
+      try {
+        await MapLovRepository.instance.recordChildSafetyAction(
+          reportId: report['id'] as String,
+          action: action,
+          authority: authority.text.trim(),
+          reference: reference.text.trim(),
+          rationale: rationale.text.trim(),
+        );
+        _refresh();
+      } catch (error) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('${context.tr('Decision not saved')}: $error'),
+            ),
+          );
+        }
+      }
+    }
+    authority.dispose();
+    reference.dispose();
+    rationale.dispose();
+  }
+
   Future<void> _moderate(String id, String status, {String? notes}) async {
     await MapLovRepository.instance.moderateReport(id, status, notes: notes);
     _refresh();
@@ -156,11 +269,7 @@ class _ModerationReportsScreenState extends State<ModerationReportsScreen> {
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Unable to load report evidence: ' + error.toString(),
-            ),
-          ),
+          SnackBar(content: Text('Unable to load report evidence: $error')),
         );
       }
       return;
@@ -228,14 +337,12 @@ class _ModerationReportsScreenState extends State<ModerationReportsScreen> {
                           ? message['body'].toString()
                           : message['deleted_at'] != null
                           ? 'Message content was already erased before evidence retention.'
-                          : '[' + message['kind'].toString() + ']',
+                          : '[${message['kind']}]',
                     ),
                     subtitle: Text(
-                      '${context.tr('Author')} : ${authorLabel(message)} • ' +
-                          _adminDateTime(message['created_at']) +
-                          (message['reply_to_id'] == null
-                              ? ''
-                              : ' • ${context.tr('Reply to a message')}'),
+                      '${context.tr('Author')} : ${authorLabel(message)} • '
+                      '${_adminDateTime(message['created_at'])}'
+                      '${message['reply_to_id'] == null ? '' : ' • ${context.tr('Reply to a message')}'}',
                     ),
                   ),
                   for (final attachment in attachments.where(
@@ -281,7 +388,7 @@ class _ModerationReportsScreenState extends State<ModerationReportsScreen> {
     );
     await _moderate(
       report['id'] as String,
-      'resolved',
+      _canClose(report) ? 'resolved' : 'under_review',
       notes: notes.isEmpty ? 'Account banned after report review.' : notes,
     );
   }
@@ -511,7 +618,7 @@ class _ModerationReportsScreenState extends State<ModerationReportsScreen> {
                               const SizedBox(width: 8),
                               Expanded(
                                 child: Text(
-                                  report['reason'] as String,
+                                  context.tr(report['reason'] as String),
                                   style: const TextStyle(
                                     fontWeight: FontWeight.w800,
                                   ),
@@ -528,10 +635,50 @@ class _ModerationReportsScreenState extends State<ModerationReportsScreen> {
                               ),
                             ],
                           ),
+                          if (_isChildSafetyReport(report)) ...[
+                            Text(
+                              context.tr('Priority child safety report'),
+                              style: const TextStyle(
+                                color: AppColors.error,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            Text(
+                              report['child_safety_action'] == null
+                                  ? context.tr(
+                                      'Human review decision required before closure.',
+                                    )
+                                  : context.tr(
+                                      'Child safety decision recorded.',
+                                    ),
+                            ),
+                            if (report['child_safety_action'] is Map)
+                              Text(
+                                (report['child_safety_action']
+                                            as Map)['action'] ==
+                                        'reported_to_authority'
+                                    ? '${context.tr('External report already sent')}: '
+                                          '${(report['child_safety_action'] as Map)['authority']} · '
+                                          '${(report['child_safety_action'] as Map)['authority_reference']}'
+                                    : '${context.tr('No external report required')}: '
+                                          '${(report['child_safety_action'] as Map)['rationale']}',
+                              ),
+                            TextButton.icon(
+                              onPressed: () => _recordChildSafetyAction(report),
+                              icon: const Icon(
+                                Icons.assignment_turned_in_outlined,
+                              ),
+                              label: Text(
+                                context.tr('Record child safety decision'),
+                              ),
+                            ),
+                          ],
                           SizedBox(
                             width: double.infinity,
                             child: TextButton.icon(
-                              onPressed: () => _resolve(report['id'] as String),
+                              onPressed: _canClose(report)
+                                  ? () => _resolve(report['id'] as String)
+                                  : null,
                               icon: const Icon(Icons.task_alt),
                               label: const Text('Resolve with notes'),
                             ),
@@ -549,7 +696,9 @@ class _ModerationReportsScreenState extends State<ModerationReportsScreen> {
                                       );
                                   await _moderate(
                                     report['id'] as String,
-                                    'resolved',
+                                    _canClose(report)
+                                        ? 'resolved'
+                                        : 'under_review',
                                     notes: 'Reported content removed.',
                                   );
                                 },
@@ -574,7 +723,9 @@ class _ModerationReportsScreenState extends State<ModerationReportsScreen> {
                                       );
                                   await _moderate(
                                     report['id'] as String,
-                                    'resolved',
+                                    _canClose(report)
+                                        ? 'resolved'
+                                        : 'under_review',
                                     notes:
                                         'Account suspended pending safety review.',
                                   );
@@ -622,10 +773,12 @@ class _ModerationReportsScreenState extends State<ModerationReportsScreen> {
                             children: [
                               Expanded(
                                 child: OutlinedButton(
-                                  onPressed: () => _moderate(
-                                    report['id'] as String,
-                                    'dismissed',
-                                  ),
+                                  onPressed: _canClose(report)
+                                      ? () => _moderate(
+                                          report['id'] as String,
+                                          'dismissed',
+                                        )
+                                      : null,
                                   child: const Text('Dismiss'),
                                 ),
                               ),

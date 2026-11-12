@@ -44,7 +44,8 @@ class _RegistrationSmsFallbackScreenState
     final phone = _phone;
     if (email == null || phone == null) {
       setState(() {
-        _message = 'Your registration phone number is unavailable. Return to email verification.';
+        _message =
+            'Your registration phone number is unavailable. Return to email verification.';
         _messageIsError = true;
       });
       return;

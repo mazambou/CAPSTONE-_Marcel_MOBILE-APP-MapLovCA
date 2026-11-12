@@ -4,7 +4,6 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:maplove/app.dart';
-import 'package:maplove/app.dart' as app show Text;
 import 'package:maplove/config/supabase_config.dart';
 import 'package:maplove/routes/app_routes.dart';
 import 'package:maplove/services/auth_service.dart';

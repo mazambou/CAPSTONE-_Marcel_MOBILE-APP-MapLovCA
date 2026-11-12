@@ -11,6 +11,21 @@ const json = (status: number, body: Record<string, unknown>) =>
     headers: { 'content-type': 'application/json', ...corsHeaders },
   });
 
+const submissionError = (message: string) => {
+  if (message.includes('Daily report limit reached')) return 'report_rate_limited';
+  if (message.includes('Reported conversation is unavailable') ||
+    message.includes('Reported user is not in this conversation')) {
+    return 'conversation_unavailable';
+  }
+  if (message.includes('Reported user is unavailable') ||
+    message.includes('Reported content is unavailable') ||
+    message.includes('Reported profile not found')) {
+    return 'target_unavailable';
+  }
+  if (message.includes('already under review')) return 'report_already_open';
+  return 'report_unavailable';
+};
+
 Deno.serve(async (request) => {
   if (request.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers: corsHeaders });
@@ -63,7 +78,15 @@ Deno.serve(async (request) => {
       }
     );
     if (createError || typeof createdId !== 'string') {
-      return json(409, { error: 'report_unavailable' });
+      if (createError) {
+        console.error('submit_conversation_report failed', {
+          code: createError.code,
+          message: createError.message,
+        });
+      }
+      return json(409, {
+        error: submissionError(createError?.message ?? ''),
+      });
     }
     reportId = createdId;
   }

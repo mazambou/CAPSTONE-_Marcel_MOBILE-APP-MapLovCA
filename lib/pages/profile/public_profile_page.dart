@@ -284,8 +284,9 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
               ),
               label: Text('${selectedProfile.compatibilityScore}%'),
               onPressed: () async {
-                if (!await _allowProfileAction('other') || !context.mounted)
+                if (!await _allowProfileAction('other') || !context.mounted) {
                   return;
+                }
                 Navigator.push(
                   context,
                   MaterialPageRoute(
@@ -374,8 +375,9 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
                 imagePath: selectedProfile.imagePath,
                 icon: Icons.photo_library_outlined,
                 onTap: () async {
-                  if (!await _allowProfileAction('other') || !context.mounted)
+                  if (!await _allowProfileAction('other') || !context.mounted) {
                     return;
+                  }
                   if (!await _requireProfilePhotos(context, minimum: 1) ||
                       !context.mounted) {
                     return;
@@ -401,8 +403,9 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
                 icon: Icons.lock_outline,
                 locked: true,
                 onTap: () async {
-                  if (!await _allowProfileAction('other') || !context.mounted)
+                  if (!await _allowProfileAction('other') || !context.mounted) {
                     return;
+                  }
                   Navigator.push(
                     context,
                     MaterialPageRoute(
@@ -439,8 +442,10 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
             Expanded(
               child: FilledButton.icon(
                 onPressed: () async {
-                  if (!await _allowProfileAction('message') || !context.mounted)
+                  if (!await _allowProfileAction('message') ||
+                      !context.mounted) {
                     return;
+                  }
                   final id = await MapLovRepository.instance.startConversation(
                     selectedProfile.id,
                   );

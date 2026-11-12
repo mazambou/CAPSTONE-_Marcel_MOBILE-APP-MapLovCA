@@ -50,6 +50,8 @@
 - [x] Prepare public privacy-policy, account-deletion and child-safety pages
 - [ ] Deploy and verify the latest public legal pages on `maplov.ca`
 - [ ] Verify support and child-safety email addresses
+- [ ] Name a backup child-safety contact and run the fictitious case exercise in `docs/child_safety_response.md`
+- [ ] Verify the child-safety case log and external-referral process before checking the Play Console compliance declaration
 - [ ] Complete Data Safety, Child Safety, content rating and app access forms
 - [ ] Configure Google Play subscription products and purchase verification
 - [ ] Configure SMS and Google OAuth

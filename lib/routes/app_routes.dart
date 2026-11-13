@@ -36,6 +36,7 @@ class AppRoutes {
   static const photoViewer = '/photo-viewer';
   static const friendRequests = '/friend-requests';
   static const friends = '/friends';
+  static const addFriends = '/friends/add';
   static const posts = '/posts';
   static const createPost = '/posts/create';
   static const postDetails = '/posts/details';

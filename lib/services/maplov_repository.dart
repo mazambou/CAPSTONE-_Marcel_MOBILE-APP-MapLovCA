@@ -476,6 +476,44 @@ class FriendshipItem {
   final bool sentByMe;
 }
 
+class FriendSuggestion {
+  const FriendSuggestion({
+    required this.profile,
+    required this.compatibilityScore,
+    required this.visitedProfile,
+    required this.likedContent,
+    required this.commentedContent,
+    required this.sentMessage,
+    this.visitorOnlyLocked = false,
+    this.friendshipId,
+    this.friendshipStatus,
+    this.requestSentByMe = false,
+  });
+
+  final UserProfile? profile;
+  final int compatibilityScore;
+  final bool visitedProfile;
+  final bool likedContent;
+  final bool commentedContent;
+  final bool sentMessage;
+  final bool visitorOnlyLocked;
+  final String? friendshipId;
+  final String? friendshipStatus;
+  final bool requestSentByMe;
+}
+
+class FriendSuggestionsPage {
+  const FriendSuggestionsPage({
+    required this.items,
+    required this.nextOffset,
+    required this.hasMore,
+  });
+
+  final List<FriendSuggestion> items;
+  final int nextOffset;
+  final bool hasMore;
+}
+
 class ConversationItem {
   const ConversationItem({
     required this.id,
@@ -2066,6 +2104,93 @@ class MapLovRepository {
       );
     });
     return items.whereType<FriendshipItem>().toList();
+  }
+
+  Future<FriendSuggestionsPage> friendSuggestions({int offset = 0}) async {
+    const pageSize = 30;
+    if (!isLive) {
+      if (_client != null) {
+        return const FriendSuggestionsPage(
+          items: [],
+          nextOffset: 0,
+          hasMore: false,
+        );
+      }
+      final suggestions = mockProfiles
+          .where(
+            (profile) =>
+                !_demoBlockedIds.contains(profile.id) &&
+                !_demoFriendIds.contains(profile.id) &&
+                profile.distanceKm <= 100 &&
+                profile.compatibilityScore >= 60,
+          )
+          .toList(growable: false);
+      final page = suggestions.skip(offset).take(pageSize).toList();
+      return FriendSuggestionsPage(
+        items: page
+            .map(
+              (profile) => FriendSuggestion(
+                profile: profile,
+                compatibilityScore: profile.compatibilityScore,
+                visitedProfile: false,
+                likedContent: false,
+                commentedContent: false,
+                sentMessage: false,
+                friendshipStatus:
+                    _demoOutgoingFriendRequestIds.contains(profile.id)
+                    ? 'pending'
+                    : null,
+                requestSentByMe: true,
+              ),
+            )
+            .toList(growable: false),
+        nextOffset: offset + page.length,
+        hasMore: offset + page.length < suggestions.length,
+      );
+    }
+
+    final raw =
+        await _client!.rpc(
+              'add_friend_suggestions',
+              params: {'limit_value': pageSize + 1, 'offset_value': offset},
+            )
+            as List<dynamic>;
+    final rows = raw
+        .take(pageSize)
+        .map((value) => Map<String, dynamic>.from(value as Map))
+        .toList(growable: false);
+    final hydrated = await _mapInBatches(rows, (row) async {
+      if (row['visitor_only_locked'] == true) {
+        return const FriendSuggestion(
+          profile: null,
+          compatibilityScore: 0,
+          visitedProfile: false,
+          likedContent: false,
+          commentedContent: false,
+          sentMessage: false,
+          visitorOnlyLocked: true,
+        );
+      }
+      final profile = await getProfile(row['candidate_id'] as String);
+      if (profile == null) return null;
+      final score = (row['compatibility_score'] as num?)?.toInt() ?? 0;
+      return FriendSuggestion(
+        profile: _copyProfile(profile, compatibilityScore: score),
+        compatibilityScore: score,
+        visitedProfile: row['visited_profile'] == true,
+        likedContent: row['liked_content'] == true,
+        commentedContent: row['commented_content'] == true,
+        sentMessage: row['sent_message'] == true,
+        friendshipId: row['friendship_id'] as String?,
+        friendshipStatus: row['friendship_status'] as String?,
+        requestSentByMe: row['request_sent_by_me'] == true,
+      );
+    });
+    return FriendSuggestionsPage(
+      items: hydrated.whereType<FriendSuggestion>().toList(growable: false),
+      nextOffset: offset + rows.length,
+      hasMore: raw.length > pageSize,
+    );
   }
 
   Future<void> sendFriendRequest(String userId) async {

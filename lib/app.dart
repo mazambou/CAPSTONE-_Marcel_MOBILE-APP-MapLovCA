@@ -62,6 +62,7 @@ part 'pages/auth/widgets/auth_widgets.dart';
 part 'pages/community/posts_page.dart';
 part 'pages/community/create_post_page.dart';
 part 'pages/community/friends_list_page.dart';
+part 'pages/community/add_friends_page.dart';
 part 'pages/community/post_details_page.dart';
 part 'pages/discovery/discover_page.dart';
 part 'pages/discovery/filter_page.dart';

@@ -3197,6 +3197,7 @@ void main() {
     ),
     'friend requests': const FriendRequestsScreen(),
     'friends list': const FriendsListScreen(),
+    'add friends': const AddFriendsScreen(),
     'posts': const PostsScreen(),
     'create post': const CreatePostScreen(),
     'post details': const PostDetailsScreen(),

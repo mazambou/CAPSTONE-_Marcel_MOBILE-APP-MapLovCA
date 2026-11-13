@@ -161,6 +161,7 @@ class MapLovLocalizations {
     'Send warning': 'Envoyer l’avertissement',
     'Warning sent to the member.': 'Avertissement envoyé au membre.',
     'Warning was not sent': 'Avertissement non envoyé',
+    'Action failed': 'Action non effectuée',
     'Message from MapLov moderation': 'Message de la modération MapLov',
     'Could not load your account notice.':
         'Impossible de charger le message concernant votre compte.',
@@ -1669,6 +1670,30 @@ class MapLovLocalizations {
         'L’autorisation de localisation est bloquée dans les paramètres de l’appareil.',
     'Now': 'Maintenant',
     'Add friend': 'Ajouter comme ami',
+    'Add Friends': 'Ajouter des amis',
+    'Add': 'Ajouter',
+    'Sent': 'Envoyée',
+    'Respond': 'Répondre',
+    'Show more': 'Voir plus',
+    'Visited your profile': 'A consulté votre profil',
+    'Liked your content': 'A aimé votre contenu',
+    'Commented on your content': 'A commenté votre contenu',
+    'Sent you a message': 'Vous a envoyé un message',
+    'compatibility': 'de compatibilité',
+    'Members who interacted with you or match at least 60%, within your saved search distance.':
+        'Membres ayant interagi avec vous ou compatibles à au moins 60 %, dans votre rayon de recherche enregistré.',
+    'No eligible members within your search distance. Check your location and dating preferences.':
+        'Aucun membre admissible dans votre rayon de recherche. Vérifiez votre position et vos préférences de rencontre.',
+    'Unable to load friend suggestions.':
+        'Impossible de charger les suggestions d’amis.',
+    'Unable to send friend request.':
+        'Impossible d’envoyer la demande d’amitié.',
+    'Friend request sent.': 'Demande d’amitié envoyée.',
+    'Profile visitor': 'Visiteur du profil',
+    'Premium Plus to reveal': 'Premium Plus pour découvrir ce profil',
+    'Subscribe to Premium Plus to see this profile visitor and send a friend request.':
+        'Abonnez-vous à Premium Plus pour voir ce visiteur et lui envoyer une demande d’amitié.',
+    'See Premium Plus': 'Voir Premium Plus',
     'Allow international discovery': 'Autoriser la découverte internationale',
     'When disabled, your profile is hidden from searches that use the International option.':
         'Lorsque cette option est désactivée, votre profil est masqué des recherches utilisant l’option International.',

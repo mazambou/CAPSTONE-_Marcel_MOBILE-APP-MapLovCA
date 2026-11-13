@@ -448,6 +448,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
         Icons.person_add_alt,
         AppRoutes.friendRequests,
       ),
+      const SizedBox(height: 10),
+      const _QuickCard(
+        'Add Friends',
+        Icons.group_add_outlined,
+        AppRoutes.addFriends,
+      ),
       if (!AuthService.instance.isConfigured) ...[
         const KeyedSubtree(
           key: Key('personal_recent_activity'),

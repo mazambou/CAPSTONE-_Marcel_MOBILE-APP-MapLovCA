@@ -14,6 +14,7 @@ class _ModerationReportsScreenState extends State<ModerationReportsScreen> {
   late Future<List<Map<String, dynamic>>> reports;
   late Future<List<Map<String, dynamic>>> moderatedProfiles;
   late Future<List<Map<String, dynamic>>> moderatedPhotos;
+  final Set<String> _busyReports = {};
   @override
   void initState() {
     super.initState();
@@ -32,6 +33,47 @@ class _ModerationReportsScreenState extends State<ModerationReportsScreen> {
     if (!mounted) return;
     setState(() => _reload());
   }
+
+  Future<void> _runReportAction(
+    String reportId,
+    Future<void> Function() action,
+  ) async {
+    if (_busyReports.contains(reportId)) return;
+    setState(() => _busyReports.add(reportId));
+    try {
+      await action();
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${context.tr('Action failed')}: $error')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _busyReports.remove(reportId));
+    }
+  }
+
+  Widget _reportTextAction({
+    required IconData icon,
+    required String label,
+    required VoidCallback? onPressed,
+  }) => SizedBox(
+    width: double.infinity,
+    child: TextButton(
+      onPressed: onPressed,
+      style: TextButton.styleFrom(
+        alignment: Alignment.centerLeft,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      ),
+      child: Row(
+        children: [
+          Icon(icon),
+          const SizedBox(width: 12),
+          Expanded(child: Text(label)),
+        ],
+      ),
+    ),
+  );
 
   bool _isChildSafetyReport(Map<String, dynamic> report) =>
       report['reason'] == 'Mineur présumé' ||
@@ -72,53 +114,69 @@ class _ModerationReportsScreenState extends State<ModerationReportsScreen> {
     final rationale = TextEditingController();
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text(
-          context.tr(
-            action == 'reported_to_authority'
-                ? 'Record external report'
-                : 'Record review decision',
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => AlertDialog(
+          title: Text(
+            context.tr(
+              action == 'reported_to_authority'
+                  ? 'Record external report'
+                  : 'Record review decision',
+            ),
           ),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: action == 'reported_to_authority'
-              ? [
-                  TextField(
-                    controller: authority,
-                    decoration: InputDecoration(
-                      labelText: context.tr('Authority or organization'),
-                    ),
-                  ),
-                  TextField(
-                    controller: reference,
-                    decoration: InputDecoration(
-                      labelText: context.tr('Receipt or case reference'),
-                    ),
-                  ),
-                ]
-              : [
-                  TextField(
-                    controller: rationale,
-                    maxLines: 3,
-                    decoration: InputDecoration(
-                      labelText: context.tr(
-                        'Reason no external report is required',
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: action == 'reported_to_authority'
+                  ? [
+                      TextField(
+                        controller: authority,
+                        maxLength: 120,
+                        onChanged: (_) => setDialogState(() {}),
+                        decoration: InputDecoration(
+                          labelText: context.tr('Authority or organization'),
+                        ),
                       ),
-                    ),
-                  ),
-                ],
+                      TextField(
+                        controller: reference,
+                        maxLength: 200,
+                        onChanged: (_) => setDialogState(() {}),
+                        decoration: InputDecoration(
+                          labelText: context.tr('Receipt or case reference'),
+                        ),
+                      ),
+                    ]
+                  : [
+                      TextField(
+                        controller: rationale,
+                        maxLines: 3,
+                        maxLength: 1000,
+                        onChanged: (_) => setDialogState(() {}),
+                        decoration: InputDecoration(
+                          labelText: context.tr(
+                            'Reason no external report is required',
+                          ),
+                        ),
+                      ),
+                    ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: Text(context.tr('Cancel')),
+            ),
+            FilledButton(
+              onPressed:
+                  (action == 'reported_to_authority'
+                      ? authority.text.trim().isNotEmpty &&
+                            reference.text.trim().isNotEmpty
+                      : rationale.text.trim().isNotEmpty)
+                  ? () => Navigator.pop(dialogContext, true)
+                  : null,
+              child: Text(context.tr('Save decision')),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: Text(context.tr('Cancel')),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(dialogContext, true),
-            child: Text(context.tr('Save decision')),
-          ),
-        ],
       ),
     );
     if (confirmed == true) {
@@ -710,48 +768,53 @@ class _ModerationReportsScreenState extends State<ModerationReportsScreen> {
                                     : '${context.tr('No external report required')}: '
                                           '${(report['child_safety_action'] as Map)['rationale']}',
                               ),
-                            TextButton.icon(
-                              onPressed: () => _recordChildSafetyAction(report),
-                              icon: const Icon(
-                                Icons.assignment_turned_in_outlined,
-                              ),
-                              label: Text(
-                                context.tr('Record child safety decision'),
-                              ),
+                            _reportTextAction(
+                              icon: Icons.assignment_turned_in_outlined,
+                              label: 'Record child safety decision',
+                              onPressed: _busyReports.contains(report['id'])
+                                  ? null
+                                  : () => _runReportAction(
+                                      report['id'] as String,
+                                      () => _recordChildSafetyAction(report),
+                                    ),
                             ),
                           ],
-                          SizedBox(
-                            width: double.infinity,
-                            child: TextButton.icon(
-                              onPressed: _canClose(report)
-                                  ? () => _resolve(report['id'] as String)
-                                  : null,
-                              icon: const Icon(Icons.task_alt),
-                              label: const Text('Resolve with notes'),
-                            ),
+                          _reportTextAction(
+                            icon: Icons.task_alt,
+                            label: 'Resolve with notes',
+                            onPressed:
+                                _canClose(report) &&
+                                    !_busyReports.contains(report['id'])
+                                ? () => _runReportAction(
+                                    report['id'] as String,
+                                    () => _resolve(report['id'] as String),
+                                  )
+                                : null,
                           ),
                           if (report['target_type'] != 'user' &&
                               report['target_type'] != 'photo')
-                            SizedBox(
-                              width: double.infinity,
-                              child: TextButton.icon(
-                                onPressed: () async {
-                                  await MapLovRepository.instance
-                                      .adminRemoveContent(
-                                        report['target_type'] as String,
-                                        report['target_id'] as String,
-                                      );
-                                  await _moderate(
-                                    report['id'] as String,
-                                    _canClose(report)
-                                        ? 'resolved'
-                                        : 'under_review',
-                                    notes: 'Reported content removed.',
-                                  );
-                                },
-                                icon: const Icon(Icons.delete_outline),
-                                label: const Text('Remove reported content'),
-                              ),
+                            _reportTextAction(
+                              icon: Icons.delete_outline,
+                              label: 'Remove reported content',
+                              onPressed: _busyReports.contains(report['id'])
+                                  ? null
+                                  : () => _runReportAction(
+                                      report['id'] as String,
+                                      () async {
+                                        await MapLovRepository.instance
+                                            .adminRemoveContent(
+                                              report['target_type'] as String,
+                                              report['target_id'] as String,
+                                            );
+                                        await _moderate(
+                                          report['id'] as String,
+                                          _canClose(report)
+                                              ? 'resolved'
+                                              : 'under_review',
+                                          notes: 'Reported content removed.',
+                                        );
+                                      },
+                                    ),
                             ),
                           if (report['target_type'] == 'photo')
                             const Text(
@@ -759,46 +822,53 @@ class _ModerationReportsScreenState extends State<ModerationReportsScreen> {
                               style: TextStyle(color: AppColors.grayText),
                             ),
                           if (report['target_type'] == 'user')
-                            SizedBox(
-                              width: double.infinity,
-                              child: TextButton.icon(
-                                onPressed: () async {
-                                  await MapLovRepository.instance
-                                      .setAccountStatus(
-                                        report['target_id'] as String,
-                                        'suspended',
-                                      );
-                                  await _moderate(
-                                    report['id'] as String,
-                                    _canClose(report)
-                                        ? 'resolved'
-                                        : 'under_review',
-                                    notes:
-                                        'Account suspended pending safety review.',
-                                  );
-                                },
-                                icon: const Icon(Icons.person_off_outlined),
-                                label: const Text('Suspend reported account'),
-                              ),
+                            _reportTextAction(
+                              icon: Icons.person_off_outlined,
+                              label: 'Suspend reported account',
+                              onPressed: _busyReports.contains(report['id'])
+                                  ? null
+                                  : () => _runReportAction(
+                                      report['id'] as String,
+                                      () async {
+                                        await MapLovRepository.instance
+                                            .setAccountStatus(
+                                              report['target_id'] as String,
+                                              'suspended',
+                                            );
+                                        await _moderate(
+                                          report['id'] as String,
+                                          _canClose(report)
+                                              ? 'resolved'
+                                              : 'under_review',
+                                          notes:
+                                              'Account suspended pending safety review.',
+                                        );
+                                      },
+                                    ),
                             ),
                           if (report['target_type'] == 'user')
-                            Wrap(
-                              spacing: 12,
-                              children: [
-                                TextButton.icon(
-                                  onPressed: () =>
-                                      _warnReportedUser(report['id'] as String),
-                                  icon: const Icon(
-                                    Icons.warning_amber_outlined,
-                                  ),
-                                  label: const Text('Warn reported account'),
-                                ),
-                                TextButton.icon(
-                                  onPressed: () => _banReportedUser(report),
-                                  icon: const Icon(Icons.block_outlined),
-                                  label: const Text('Ban reported account'),
-                                ),
-                              ],
+                            _reportTextAction(
+                              icon: Icons.warning_amber_outlined,
+                              label: 'Warn reported account',
+                              onPressed: _busyReports.contains(report['id'])
+                                  ? null
+                                  : () => _runReportAction(
+                                      report['id'] as String,
+                                      () => _warnReportedUser(
+                                        report['id'] as String,
+                                      ),
+                                    ),
+                            ),
+                          if (report['target_type'] == 'user')
+                            _reportTextAction(
+                              icon: Icons.block_outlined,
+                              label: 'Ban reported account',
+                              onPressed: _busyReports.contains(report['id'])
+                                  ? null
+                                  : () => _runReportAction(
+                                      report['id'] as String,
+                                      () => _banReportedUser(report),
+                                    ),
                             ),
                           Text(
                             report['target_type'] == 'user'
@@ -816,27 +886,35 @@ class _ModerationReportsScreenState extends State<ModerationReportsScreen> {
                           if (report['comment'] != null)
                             Text(report['comment'] as String),
                           const SizedBox(height: 10),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: OutlinedButton(
-                                  onPressed: _canClose(report)
-                                      ? () => _moderate(
-                                          report['id'] as String,
-                                          'dismissed',
-                                        )
-                                      : null,
-                                  child: const Text('Dismiss'),
-                                ),
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: FilledButton(
-                                  onPressed: () => _reviewReport(report),
-                                  child: const Text('Review'),
-                                ),
-                              ),
-                            ],
+                          SizedBox(
+                            width: double.infinity,
+                            child: OutlinedButton(
+                              onPressed:
+                                  _canClose(report) &&
+                                      !_busyReports.contains(report['id'])
+                                  ? () => _runReportAction(
+                                      report['id'] as String,
+                                      () => _moderate(
+                                        report['id'] as String,
+                                        'dismissed',
+                                      ),
+                                    )
+                                  : null,
+                              child: const Text('Dismiss'),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          SizedBox(
+                            width: double.infinity,
+                            child: FilledButton(
+                              onPressed: _busyReports.contains(report['id'])
+                                  ? null
+                                  : () => _runReportAction(
+                                      report['id'] as String,
+                                      () => _reviewReport(report),
+                                    ),
+                              child: const Text('Review'),
+                            ),
                           ),
                         ],
                       ),

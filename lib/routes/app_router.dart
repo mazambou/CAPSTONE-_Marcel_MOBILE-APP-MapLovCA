@@ -60,6 +60,7 @@ class AppRouter {
     AppRoutes.photoViewer: (_) => _protected(const ProfileScreen()),
     AppRoutes.friendRequests: (_) => _protected(const FriendRequestsScreen()),
     AppRoutes.friends: (_) => _protected(const FriendsListScreen()),
+    AppRoutes.addFriends: (_) => _protected(const AddFriendsScreen()),
     AppRoutes.posts: (_) => _protected(const PostsScreen()),
     AppRoutes.createPost: (_) => _protected(const CreatePostScreen()),
     AppRoutes.postDetails: (_) => _protected(const PostsScreen()),

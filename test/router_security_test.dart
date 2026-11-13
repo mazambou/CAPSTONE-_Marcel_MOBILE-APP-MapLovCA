@@ -43,6 +43,7 @@ void main() {
       AppRoutes.photoViewer,
       AppRoutes.friendRequests,
       AppRoutes.friends,
+      AppRoutes.addFriends,
       AppRoutes.posts,
       AppRoutes.createPost,
       AppRoutes.postDetails,

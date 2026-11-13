@@ -373,10 +373,57 @@ class _ModerationReportsScreenState extends State<ModerationReportsScreen> {
   }
 
   Future<void> _warnReportedUser(String reportId) async {
-    final notes = await _decisionNotes('Warn this member?');
-    if (notes == null) return;
-    await MapLovRepository.instance.warnReportedUser(reportId, notes);
-    _refresh();
+    final controller = TextEditingController();
+    final message = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => AlertDialog(
+          title: Text(context.tr('Warn this member?')),
+          content: TextField(
+            controller: controller,
+            maxLines: 5,
+            maxLength: 2000,
+            onChanged: (_) => setDialogState(() {}),
+            decoration: InputDecoration(
+              labelText: context.tr('Message to the member'),
+              helperText: context.tr(
+                'The member must read and confirm this message at their next sign-in.',
+              ),
+              helperMaxLines: 3,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: Text(context.tr('Cancel')),
+            ),
+            FilledButton(
+              onPressed: controller.text.trim().isEmpty
+                  ? null
+                  : () => Navigator.pop(dialogContext, controller.text.trim()),
+              child: Text(context.tr('Send warning')),
+            ),
+          ],
+        ),
+      ),
+    );
+    controller.dispose();
+    if (message == null || !mounted) return;
+    try {
+      await MapLovRepository.instance.warnReportedUser(reportId, message);
+      if (!mounted) return;
+      _refresh();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(context.tr('Warning sent to the member.'))),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('${context.tr('Warning was not sent')}: $error'),
+        ),
+      );
+    }
   }
 
   Future<void> _banReportedUser(Map<String, dynamic> report) async {

@@ -3759,6 +3759,26 @@ class MapLovRepository {
     );
   }
 
+  Future<Map<String, dynamic>?> pendingAdminNotice() async {
+    if (!isLive) return null;
+    final rows = await _client!
+        .from('admin_user_notices')
+        .select('id, body, created_at')
+        .isFilter('acknowledged_at', null)
+        .order('created_at')
+        .limit(1);
+    if (rows.isEmpty) return null;
+    return Map<String, dynamic>.from(rows.first);
+  }
+
+  Future<void> acknowledgeAdminNotice(String noticeId) async {
+    if (!isLive) return;
+    await _client!.rpc(
+      'acknowledge_admin_user_notice',
+      params: {'notice_id_value': noticeId},
+    );
+  }
+
   Future<List<Map<String, dynamic>>> adminUsers() async {
     if (!isLive) return [];
     return List<Map<String, dynamic>>.from(

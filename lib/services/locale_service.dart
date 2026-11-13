@@ -154,6 +154,18 @@ class MapLovLocalizations {
     'Resolved': 'Résolu',
     'Dismissed': 'Classé',
     'Warn reported account': 'Avertir le compte signalé',
+    'Warn this member?': 'Avertir ce membre ?',
+    'Message to the member': 'Message destiné au membre',
+    'The member must read and confirm this message at their next sign-in.':
+        'Le membre devra lire et confirmer ce message à sa prochaine connexion.',
+    'Send warning': 'Envoyer l’avertissement',
+    'Warning sent to the member.': 'Avertissement envoyé au membre.',
+    'Warning was not sent': 'Avertissement non envoyé',
+    'Message from MapLov moderation': 'Message de la modération MapLov',
+    'Could not load your account notice.':
+        'Impossible de charger le message concernant votre compte.',
+    'Could not confirm this warning. Try again.':
+        'Impossible de confirmer cet avertissement. Réessayez.',
     'Ban reported account': 'Exclure le compte signalé',
     'Child safety decision': 'Décision de sécurité des mineurs',
     'Record a human decision. This form does not send a report to an authority.':

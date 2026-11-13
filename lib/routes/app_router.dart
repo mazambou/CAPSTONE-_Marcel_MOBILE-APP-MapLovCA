@@ -137,10 +137,17 @@ class _AuthenticatedRouteGuard extends StatefulWidget {
 
 class _AuthenticatedRouteGuardState extends State<_AuthenticatedRouteGuard> {
   Future<bool>? _phoneRequirement;
+  Future<Map<String, dynamic>?>? _pendingNotice;
+  bool _acknowledgingNotice = false;
+  String? _noticeError;
 
   @override
   void initState() {
     super.initState();
+    if (AuthService.instance.hasActiveSession &&
+        AuthService.instance.isConfigured) {
+      _pendingNotice = MapLovRepository.instance.pendingAdminNotice();
+    }
     if (!widget.allowPendingPhoneVerification &&
         AuthService.instance.hasActiveSession) {
       _phoneRequirement = AuthService.instance
@@ -148,36 +155,135 @@ class _AuthenticatedRouteGuardState extends State<_AuthenticatedRouteGuard> {
     }
   }
 
+  Future<void> _acknowledgeNotice(String noticeId) async {
+    if (_acknowledgingNotice) return;
+    setState(() {
+      _acknowledgingNotice = true;
+      _noticeError = null;
+    });
+    try {
+      await MapLovRepository.instance.acknowledgeAdminNotice(noticeId);
+      if (!mounted) return;
+      setState(() {
+        _pendingNotice = MapLovRepository.instance.pendingAdminNotice();
+        _acknowledgingNotice = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _acknowledgingNotice = false;
+        _noticeError = context.tr('Could not confirm this warning. Try again.');
+      });
+    }
+  }
+
+  Widget _noticeLoading() =>
+      const Scaffold(body: Center(child: CircularProgressIndicator()));
+
+  Widget _noticeFailure() => Scaffold(
+    body: Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(context.tr('Could not load your account notice.')),
+            const SizedBox(height: 16),
+            FilledButton(
+              onPressed: () => setState(() {
+                _pendingNotice = MapLovRepository.instance.pendingAdminNotice();
+              }),
+              child: Text(context.tr('Try again')),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+
+  Widget _noticeDialog(Map<String, dynamic> notice) => PopScope(
+    canPop: false,
+    child: Scaffold(
+      body: Stack(
+        children: [
+          const ModalBarrier(color: Colors.black54, dismissible: false),
+          Center(
+            child: AlertDialog(
+              title: Text(context.tr('Message from MapLov moderation')),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(notice['body'] as String? ?? ''),
+                    if (_noticeError != null) ...[
+                      const SizedBox(height: 12),
+                      Text(
+                        _noticeError!,
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.error,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              actions: [
+                FilledButton(
+                  onPressed: _acknowledgingNotice
+                      ? null
+                      : () => _acknowledgeNotice(notice['id'] as String),
+                  child: Text(context.tr('OK')),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+
+  Widget _authenticatedContent() {
+    if (widget.allowPendingPhoneVerification ||
+        !AuthService.instance.isConfigured) {
+      return widget.child;
+    }
+    return FutureBuilder<bool>(
+      future: _phoneRequirement,
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) return _noticeLoading();
+        if (snapshot.data == true) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!context.mounted) return;
+            Navigator.pushNamedAndRemoveUntil(
+              context,
+              AppRoutes.verifyPhone,
+              (_) => false,
+            );
+          });
+          return _noticeLoading();
+        }
+        return widget.child;
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (AuthService.instance.hasActiveSession ||
         (!AuthService.instance.isConfigured && AppConfig.allowDemoData)) {
-      if (widget.allowPendingPhoneVerification ||
-          !AuthService.instance.isConfigured) {
-        return widget.child;
-      }
-      return FutureBuilder<bool>(
-        future: _phoneRequirement,
+      if (!AuthService.instance.isConfigured) return widget.child;
+      _pendingNotice ??= MapLovRepository.instance.pendingAdminNotice();
+      return FutureBuilder<Map<String, dynamic>?>(
+        future: _pendingNotice,
         builder: (context, snapshot) {
-          if (!snapshot.hasData) {
-            return const Scaffold(
-              body: Center(child: CircularProgressIndicator()),
-            );
+          if (snapshot.connectionState != ConnectionState.done) {
+            return _noticeLoading();
           }
-          if (snapshot.data == true) {
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (!context.mounted) return;
-              Navigator.pushNamedAndRemoveUntil(
-                context,
-                AppRoutes.verifyPhone,
-                (_) => false,
-              );
-            });
-            return const Scaffold(
-              body: Center(child: CircularProgressIndicator()),
-            );
-          }
-          return widget.child;
+          if (snapshot.hasError) return _noticeFailure();
+          final notice = snapshot.data;
+          if (notice != null) return _noticeDialog(notice);
+          return _authenticatedContent();
         },
       );
     }
